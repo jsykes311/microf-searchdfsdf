@@ -9,8 +9,6 @@
 !requirements.txt
 !static/
 !static/**
-!azure/
-!azure/**
 
 # ── Never allow secrets or caches, even inside static/ ──────────────────────
 .env
