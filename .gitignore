@@ -1,0 +1,16 @@
+# ── Ignore everything by default ────────────────────────────────────────────
+*
+
+# ── Then explicitly allow the app files ─────────────────────────────────────
+!.gitignore
+!main.py
+!requirements.txt
+!static/
+!static/**
+
+# ── Never allow secrets or caches, even inside static/ ──────────────────────
+.env
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store

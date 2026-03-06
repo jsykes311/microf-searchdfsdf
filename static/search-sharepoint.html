@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moogle Search</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:   #1e44b8;
+      --blue2:  #0f2878;
+      --text:   #1a1a2e;
+      --muted:  #666;
+      --border: #e0e4ef;
+      --card:   #ffffff;
+      --bg:     #f5f7fc;
+      --tag-bg: #eef1fb;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Hero / centered stage ─────────────────────────────────────── */
+    #stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 16px;
+      transition: padding 0.35s ease, margin 0.35s ease;
+    }
+
+    body.idle #stage {
+      justify-content: center;
+      flex: 1;
+      padding-top: 0;
+      margin-top: -60px;
+    }
+
+    body.active #stage {
+      padding-top: 28px;
+      padding-bottom: 20px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    }
+
+    /* ── Logo ──────────────────────────────────────────────────────── */
+    .logo {
+      font-size: 2.6rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 28px;
+      user-select: none;
+      transition: font-size 0.35s ease, margin-bottom 0.35s ease;
+    }
+
+    body.active .logo {
+      font-size: 1.6rem;
+      margin-bottom: 14px;
+    }
+
+    .logo-dark  { color: var(--text); }
+    .logo-blue  { color: var(--blue); }
+
+    /* ── Search bar ────────────────────────────────────────────────── */
+    .search-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 620px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.15rem;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    #q {
+      width: 100%;
+      padding: 16px 48px 16px 50px;
+      font-size: 1.05rem;
+      border: 2px solid var(--border);
+      border-radius: 50px;
+      outline: none;
+      background: white;
+      color: var(--text);
+      box-shadow: 0 2px 10px rgba(0,0,0,.07);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    #q:focus {
+      border-color: var(--blue);
+      box-shadow: 0 2px 16px rgba(30,68,184,.15);
+    }
+
+    body.active #q {
+      padding: 12px 44px 12px 46px;
+      font-size: 0.97rem;
+    }
+
+    .clear-btn {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.1rem;
+      color: var(--muted);
+      display: none;
+      line-height: 1;
+      padding: 4px;
+      border-radius: 50%;
+    }
+    .clear-btn:hover { color: var(--text); background: var(--tag-bg); }
+    .clear-btn.visible { display: block; }
+
+    /* ── Results area ──────────────────────────────────────────────── */
+    #results {
+      width: 100%;
+      max-width: 720px;
+      margin: 28px auto 60px;
+      padding: 0 16px;
+      display: none;
+    }
+    body.active #results { display: block; }
+
+    /* ── Status / spinner ──────────────────────────────────────────── */
+    #status {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 32px 0;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 22px; height: 22px;
+      border: 3px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Section headings ──────────────────────────────────────────── */
+    .section-heading {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 24px 0 10px;
+    }
+    .section-heading:first-child { margin-top: 0; }
+
+    /* ── Result cards ──────────────────────────────────────────────── */
+    .result-card {
+      display: flex;
+      align-items: center;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 8px;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.15s, border-color 0.15s, transform 0.15s;
+      cursor: pointer;
+    }
+
+    .result-card:hover {
+      box-shadow: 0 4px 18px rgba(30,68,184,.12);
+      border-color: var(--blue);
+      transform: translateY(-1px);
+    }
+
+    .card-icon {
+      font-size: 1.3rem;
+      margin-right: 14px;
+      flex-shrink: 0;
+    }
+
+    .card-body { flex: 1; min-width: 0; }
+
+    .card-name {
+      font-weight: 600;
+      font-size: 0.97rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-tag {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      background: var(--tag-bg);
+      color: var(--blue);
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-left: 8px;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
+    .card-arrow {
+      font-size: 1rem;
+      color: var(--muted);
+      margin-left: 12px;
+      flex-shrink: 0;
+      transition: color 0.15s;
+    }
+    .result-card:hover .card-arrow { color: var(--blue); }
+
+    /* ── No results ────────────────────────────────────────────────── */
+    .no-results {
+      text-align: center;
+      padding: 40px 16px;
+      color: var(--muted);
+    }
+    .no-results .nr-icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .no-results .nr-msg  { font-size: 1rem; }
+  </style>
+</head>
+<body class="idle">
+
+  <div id="stage">
+    <div class="logo">
+      <span class="logo-dark">Moogle</span><span class="logo-blue">Search</span>
+    </div>
+
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input id="q" type="text" placeholder="Search accounts, contacts, dealer IDs…"
+             autocomplete="off" spellcheck="false" />
+      <button class="clear-btn" id="clearBtn" title="Clear">✕</button>
+    </div>
+  </div>
+
+  <div id="results">
+    <div id="status"></div>
+    <div id="cards"></div>
+  </div>
+
+  <script>
+    // ─────────────────────────────────────────────────────────────────
+    // CONFIGURATION — fill this in after deploying to Render
+    // Example: 'https://moogle-search.onrender.com'
+    // No trailing slash.
+    // ─────────────────────────────────────────────────────────────────
+    const API_BASE = 'https://microf-search.onrender.com';
+
+    const input    = document.getElementById('q');
+    const clearBtn = document.getElementById('clearBtn');
+    const status   = document.getElementById('status');
+    const cards    = document.getElementById('cards');
+    let debounce;
+
+    // ── Input handling ──────────────────────────────────────────────
+    input.addEventListener('input', () => {
+      clearBtn.classList.toggle('visible', input.value.length > 0);
+      clearTimeout(debounce);
+      if (!input.value.trim()) { reset(); return; }
+      debounce = setTimeout(doSearch, 320);
+    });
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { clearTimeout(debounce); doSearch(); }
+      if (e.key === 'Escape') { clearAll(); }
+    });
+
+    clearBtn.addEventListener('click', clearAll);
+
+    function clearAll() {
+      input.value = '';
+      clearBtn.classList.remove('visible');
+      reset();
+      input.focus();
+    }
+
+    function reset() {
+      document.body.className = 'idle';
+      cards.innerHTML = '';
+      status.innerHTML = '';
+    }
+
+    // ── Search ──────────────────────────────────────────────────────
+    async function doSearch() {
+      const q = input.value.trim();
+      if (!q) { reset(); return; }
+
+      document.body.className = 'active';
+      cards.innerHTML = '';
+      status.innerHTML = '<span class="spinner"></span> Searching…';
+
+      try {
+        const res  = await fetch(`${API_BASE}/api/global-search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        renderResults(data);
+      } catch (err) {
+        status.innerHTML = '⚠️ Could not reach the search server. Make sure Render is running.';
+      }
+    }
+
+    // ── Render results ───────────────────────────────────────────────
+    function renderResults(data) {
+      const accounts = data.accounts || [];
+      const contacts = data.contacts || [];
+      const slps     = data.slps     || [];
+      const total    = data.total    || 0;
+
+      status.innerHTML = '';
+      cards.innerHTML  = '';
+
+      if (total === 0) {
+        cards.innerHTML = `
+          <div class="no-results">
+            <div class="nr-icon">🔍</div>
+            <div class="nr-msg">No results for <strong>${esc(data.query)}</strong></div>
+          </div>`;
+        return;
+      }
+
+      // ── Accounts ──
+      if (accounts.length) {
+        cards.insertAdjacentHTML('beforeend', '<div class="section-heading">Accounts</div>');
+        accounts.forEach(a => {
+          const name = (a.name || '').trim() || '(unnamed)';
+          const sub  = a.dealer_id ? `Dealer ID ${a.dealer_id}` : '';
+          const tag  = a.matched_on === 'dealer id' ? 'dealer id' :
+                       a.matched_on === 'contact'   ? 'via contact' : '';
+          const url  = a.account_url || '#';
+          cards.insertAdjacentHTML('beforeend', card('🏢', name, sub, tag, url));
+        });
+      }
+
+      // ── Contacts ──
+      if (contacts.length) {
+        cards.insertAdjacentHTML('beforeend', '<div class="section-heading">Contacts</div>');
+        contacts.forEach(c => {
+          const name = c.name || '(no name)';
+          const sub  = c.email || '';
+          const url  = c.contact_url || '#';
+          cards.insertAdjacentHTML('beforeend', card('👤', name, sub, '', url));
+        });
+      }
+
+      // ── SLPs — link to associated account ──
+      if (slps.length) {
+        cards.insertAdjacentHTML('beforeend', '<div class="section-heading">SLP Records</div>');
+        slps.forEach(s => {
+          const name = s.dealer_id ? `Dealer ID ${s.dealer_id}` : s.record_id;
+          const sub  = s.platform  ? `Platform: ${s.platform}`  : '';
+          const url  = s.account_url || '#';
+          cards.insertAdjacentHTML('beforeend', card('📋', name, sub, 'slp', url));
+        });
+      }
+    }
+
+    function card(icon, name, sub, tag, url) {
+      return `
+        <a class="result-card" href="${esc(url)}" target="_blank" rel="noopener">
+          <span class="card-icon">${icon}</span>
+          <div class="card-body">
+            <div class="card-name">${esc(name)}${tag ? `<span class="card-tag">${esc(tag)}</span>` : ''}</div>
+            ${sub ? `<div class="card-sub">${esc(sub)}</div>` : ''}
+          </div>
+          <span class="card-arrow">↗</span>
+        </a>`;
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+  </script>
+</body>
+</html>

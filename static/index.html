@@ -1,0 +1,2339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AC Reporter</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  height: 100vh;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+/* ── App Shell ── */
+.app-shell { display: flex; height: 100vh; overflow: hidden; }
+
+.app-nav {
+  width: 200px; min-width: 200px;
+  background: linear-gradient(180deg, #1e44b8 0%, #0f2878 100%);
+  display: flex; flex-direction: column;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.18);
+  z-index: 10;
+}
+.nav-logo {
+  padding: 18px 16px 14px;
+  font-size: 1.05rem; font-weight: 700; color: white; letter-spacing: -0.3px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.nav-logo span { opacity: 0.6; font-weight: 400; }
+
+.app-nav nav { flex: 1; display: flex; flex-direction: column; padding: 8px 0; }
+.app-nav nav button {
+  background: none; border: none; color: rgba(255,255,255,0.7);
+  text-align: left; padding: 10px 16px; cursor: pointer;
+  font-size: 0.84rem; font-weight: 500; transition: all 0.15s;
+  border-left: 3px solid transparent; display: flex; align-items: center; gap: 8px;
+}
+.app-nav nav button:hover  { color: white; background: rgba(255,255,255,0.1); }
+.app-nav nav button.active { color: white; background: rgba(255,255,255,0.15); border-left-color: white; }
+
+.nav-search-btn {
+  margin: 10px 12px 14px;
+  background: rgba(255,255,255,0.12); border: none; color: rgba(255,255,255,0.8);
+  padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  font-size: 0.82rem; text-align: left; display: flex; align-items: center; gap: 8px;
+  transition: background 0.15s;
+}
+.nav-search-btn:hover { background: rgba(255,255,255,0.22); color: white; }
+
+/* ── App Main ── */
+.app-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+#tab-accounts       { display: none; flex: 1; min-height: 0; }
+#tab-accounts.active { display: flex; }
+
+#tools-container       { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
+#tools-container.active { display: flex; }
+
+/* ── Layout ── */
+.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Cards ── */
+.card {
+  background: white; border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 22px; margin-bottom: 18px;
+}
+.card-title {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: #6b7280; margin-bottom: 14px;
+}
+
+/* ── Grid ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+@media (max-width: 900px) { .two-col, .three-col { grid-template-columns: 1fr; } }
+
+/* ── Object Picker ── */
+.object-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.obj-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-radius: 8px; border: 2px solid #e5e7eb;
+  background: white; cursor: pointer; font-size: 0.85rem; font-weight: 500;
+  color: #374151; transition: all 0.15s;
+}
+.obj-btn:hover   { border-color: #356ae6; color: #356ae6; background: #eff5ff; }
+.obj-btn.active  { border-color: #356ae6; color: #356ae6; background: #eff5ff; }
+.obj-btn .icon   { font-size: 1.1rem; }
+
+/* ── Field Picker ── */
+.field-search {
+  width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px;
+  font-size: 0.85rem; margin-bottom: 10px; outline: none;
+}
+.field-search:focus { border-color: #356ae6; }
+
+.field-list {
+  max-height: 260px; overflow-y: auto; border: 1px solid #e5e7eb;
+  border-radius: 8px; padding: 4px;
+}
+.field-group-label {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+  color: #9ca3af; padding: 8px 8px 4px; margin-top: 4px;
+}
+.field-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  border-radius: 5px; cursor: pointer; transition: background 0.1s;
+}
+.field-item:hover { background: #f3f4f6; }
+.field-item input  { cursor: pointer; accent-color: #356ae6; }
+.field-item label  { cursor: pointer; font-size: 0.83rem; color: #374151; flex: 1; }
+.field-item .badge {
+  font-size: 0.6rem; padding: 2px 5px; border-radius: 3px;
+  background: #e0e7ff; color: #3730a3; font-weight: 600;
+}
+.field-item .badge.related { background: #ecfdf5; color: #065f46; }
+
+.selected-tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 32px; }
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #eff5ff; border: 1px solid #bfdbfe; color: #1d4ed8;
+  padding: 3px 8px; border-radius: 12px; font-size: 0.78rem; font-weight: 500;
+}
+.tag button { background: none; border: none; cursor: pointer; color: #93c5fd; font-size: 0.9rem; padding: 0 1px; line-height: 1; }
+.tag button:hover { color: #1d4ed8; }
+
+/* ── Filters ── */
+.filter-row {
+  display: flex; gap: 8px; align-items: center; padding: 8px;
+  border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; background: #fafafa;
+}
+.filter-row select, .filter-row input {
+  flex: 1; padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 5px;
+  font-size: 0.82rem; background: white; outline: none; min-width: 0;
+}
+.filter-row select:focus, .filter-row input:focus { border-color: #356ae6; }
+.filter-row .rm-btn {
+  background: none; border: none; cursor: pointer; color: #ef4444;
+  font-size: 1.1rem; padding: 0 4px; flex-shrink: 0;
+}
+
+/* ── Buttons ── */
+.btn {
+  padding: 9px 18px; border-radius: 7px; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; border: none; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary   { background: #356ae6; color: white; }
+.btn-primary:hover  { background: #2557d3; }
+.btn-secondary { background: #e5e7eb; color: #374151; }
+.btn-secondary:hover { background: #d1d5db; }
+.btn-success   { background: #059669; color: white; }
+.btn-success:hover   { background: #047857; }
+.btn-sm { padding: 6px 12px; font-size: 0.78rem; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Results Table ── */
+.results-bar {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+}
+.results-count { font-size: 0.85rem; color: #6b7280; }
+.results-count strong { color: #111827; }
+
+.table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid #e5e7eb; }
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+th {
+  background: #f8fafc; padding: 9px 12px; text-align: left; font-weight: 600;
+  color: #374151; border-bottom: 1px solid #e5e7eb; white-space: nowrap;
+  cursor: pointer; user-select: none;
+}
+th:hover { background: #f1f5f9; }
+th .sort-icon { opacity: 0.4; margin-left: 4px; }
+th.sorted .sort-icon { opacity: 1; }
+td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; color: #374151; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafafa; }
+
+/* ── Pre-built Reports ── */
+.prebuilt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; }
+.report-card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 22px; }
+.report-card h3 { font-size: 1rem; font-weight: 600; color: #111827; margin-bottom: 4px; }
+.report-card p  { font-size: 0.82rem; color: #6b7280; margin-bottom: 16px; line-height: 1.5; }
+.report-card .badge-icon { font-size: 1.8rem; margin-bottom: 10px; display: block; }
+
+.form-row { margin-bottom: 12px; }
+.form-row label { display: block; font-size: 0.78rem; font-weight: 600; color: #374151; margin-bottom: 4px; }
+.form-row input, .form-row select {
+  width: 100%; padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 6px;
+  font-size: 0.83rem; outline: none;
+}
+.form-row input:focus, .form-row select:focus { border-color: #356ae6; }
+
+.btn-row { display: flex; gap: 8px; }
+
+/* ── Dealer Profile ── */
+.profile-search { display: flex; gap: 10px; margin-bottom: 20px; }
+.profile-search input { flex: 1; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; outline: none; }
+.profile-search input:focus { border-color: #356ae6; }
+
+.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.profile-section h4 { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #6b7280; margin-bottom: 10px; }
+.kv-list { list-style: none; }
+.kv-list li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f3f4f6; font-size: 0.82rem; }
+.kv-list li:last-child { border-bottom: none; }
+.kv-list .k { color: #6b7280; }
+.kv-list .v { color: #111827; font-weight: 500; text-align: right; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.summary-pills { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.pill { background: #eff5ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 6px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; }
+
+/* ── Analytics ── */
+.bar-chart { margin-top: 16px; }
+.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 0.82rem; }
+.bar-label { width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #374151; flex-shrink: 0; text-align: right; }
+.bar-track { flex: 1; background: #f3f4f6; border-radius: 4px; height: 20px; overflow: hidden; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #356ae6, #6366f1); border-radius: 4px; min-width: 2px; transition: width 0.4s ease; }
+.bar-count { width: 50px; text-align: right; font-weight: 600; color: #374151; flex-shrink: 0; }
+
+/* ── Misc ── */
+.spinner {
+  display: inline-block; width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty { text-align: center; padding: 40px 20px; color: #9ca3af; font-size: 0.9rem; }
+.empty .big { font-size: 2.5rem; margin-bottom: 8px; }
+
+.alert { padding: 10px 14px; border-radius: 7px; font-size: 0.83rem; margin-bottom: 12px; }
+.alert-info  { background: #eff5ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.alert-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+
+select, input { font-family: inherit; }
+
+.dedup-row { display: flex; align-items: center; gap: 10px; }
+.dedup-row label { font-size: 0.83rem; color: #374151; }
+.dedup-row select { padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 5px; font-size: 0.82rem; }
+
+/* ── Period Quick-Select Pills ── */
+.period-row {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;
+  padding-bottom: 10px; border-bottom: 1px solid #f3f4f6;
+}
+.period-label {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  color: #9ca3af; align-self: center; margin-right: 2px; flex-shrink: 0;
+}
+.period-btn {
+  padding: 3px 9px; border-radius: 20px; border: 1px solid #e5e7eb;
+  font-size: 0.72rem; font-weight: 500; cursor: pointer; background: white;
+  color: #6b7280; transition: all 0.12s; white-space: nowrap; line-height: 1.6;
+}
+.period-btn:hover  { border-color: #356ae6; color: #356ae6; background: #eff5ff; }
+.period-btn.active { background: #356ae6; color: white; border-color: #356ae6; }
+
+/* ── Smart Query ── */
+.sq-box {
+  display: flex; gap: 10px; margin-bottom: 16px;
+}
+.sq-input {
+  flex: 1; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px;
+  font-size: 1rem; outline: none; transition: border-color 0.15s;
+}
+.sq-input:focus { border-color: #356ae6; }
+.sq-examples {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;
+}
+.sq-chip {
+  padding: 4px 12px; border-radius: 20px; border: 1px solid #d1d5db;
+  font-size: 0.78rem; cursor: pointer; background: white; color: #6b7280;
+  transition: all 0.12s;
+}
+.sq-chip:hover { border-color: #356ae6; color: #356ae6; background: #eff5ff; }
+.sq-intent { margin-bottom: 12px; }
+.sq-understood {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+}
+.sq-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #f0fdf4; border: 1px solid #86efac; color: #166534;
+  padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;
+}
+.sq-tag.warn {
+  background: #fefce8; border-color: #fde047; color: #854d0e;
+}
+
+/* ── Global Search ── */
+.gs-box {
+  display: flex; gap: 10px; margin-bottom: 20px;
+}
+.gs-input {
+  flex: 1; padding: 14px 18px; border: 2px solid #e5e7eb; border-radius: 10px;
+  font-size: 1.05rem; outline: none; transition: border-color 0.15s;
+}
+.gs-input:focus { border-color: #356ae6; }
+.gs-section { margin-bottom: 24px; }
+.gs-section-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: #6b7280; margin-bottom: 10px;
+}
+.gs-badge {
+  background: #356ae6; color: white; font-size: 0.65rem;
+  padding: 2px 7px; border-radius: 10px; font-weight: 700;
+}
+.gs-empty { color: #9ca3af; font-size: 0.83rem; font-style: italic; }
+
+/* ── Account Browser ── */
+.ab-layout {
+  display: grid; grid-template-columns: 280px 1fr;
+  flex: 1; min-height: 0; overflow: hidden;
+}
+.ab-sidebar {
+  background: white; border-right: 1px solid #e2e8f0;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.ab-search-wrap { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+.ab-search {
+  width: 100%; padding: 8px 10px 8px 32px;
+  border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.84rem; outline: none;
+  background: #f8fafc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center;
+}
+.ab-search:focus { border-color: #356ae6; outline: none; background-color: white; }
+.ab-count { font-size: 0.68rem; color: #94a3b8; padding: 6px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.ab-list { flex: 1; overflow-y: auto; }
+.ab-item { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.1s; }
+.ab-item:hover  { background: #f8fafc; }
+.ab-item.active { background: #eff6ff; border-left: 3px solid #2563eb; }
+.ab-item-name { font-size: 0.82rem; font-weight: 600; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ab-item-sub  { font-size: 0.7rem; color: #94a3b8; margin-top: 1px; }
+
+/* Detail pane */
+.ab-detail { overflow-y: auto; background: #f1f5f9; }
+.ab-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #94a3b8; gap: 10px; font-size: 0.9rem; }
+.ab-empty-state .big { font-size: 3rem; }
+
+/* AC-style header */
+.acui-header {
+  background: white; border-bottom: 1px solid #e2e8f0;
+  padding: 14px 24px;
+}
+.acui-breadcrumb { font-size: 0.75rem; color: #64748b; margin-bottom: 10px; }
+.acui-breadcrumb a { color: #2563eb; text-decoration: none; }
+.acui-breadcrumb a:hover { text-decoration: underline; }
+.acui-name-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.acui-name { font-size: 1.15rem; font-weight: 700; color: #0f172a; }
+.acui-url { font-size: 0.78rem; color: #2563eb; text-decoration: none; display: block; margin-top: 2px; }
+.acui-url:hover { text-decoration: underline; }
+.acui-header-right { display: flex; align-items: center; gap: 24px; flex-shrink: 0; }
+.acui-owner { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #475569; }
+.acui-owner-avatar { width: 28px; height: 28px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: #64748b; flex-shrink: 0; }
+.acui-timestamps { font-size: 0.73rem; color: #94a3b8; line-height: 1.6; }
+.acui-timestamps strong { color: #475569; }
+
+/* Body layout */
+.acui-body { display: grid; grid-template-columns: 1fr 320px; gap: 0; align-items: start; }
+
+/* About card */
+.acui-about {
+  margin: 16px 0 0 16px;
+  background: white; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;
+}
+.acui-about-header {
+  padding: 14px 18px; font-size: 0.88rem; font-weight: 600; color: #1e293b;
+  border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;
+}
+.acui-section-row {
+  border-bottom: 1px solid #f1f5f9;
+}
+.acui-section-toggle {
+  width: 100%; padding: 10px 18px; text-align: left; background: none; border: none;
+  cursor: pointer; display: flex; align-items: center; gap: 8px;
+  font-size: 0.82rem; font-weight: 500; color: #374151; transition: background 0.1s;
+}
+.acui-section-toggle:hover { background: #f8fafc; }
+.acui-section-toggle .chevron { font-size: 0.65rem; color: #94a3b8; transition: transform 0.15s; }
+.acui-section-toggle.open .chevron { transform: rotate(90deg); }
+.acui-section-body { display: none; padding: 0 18px 12px; }
+.acui-section-body.open { display: block; }
+.acui-field-row { display: flex; padding: 6px 0; border-bottom: 1px solid #f8fafc; gap: 12px; }
+.acui-field-row:last-child { border-bottom: none; }
+.acui-field-label { font-size: 0.78rem; color: #64748b; width: 200px; flex-shrink: 0; font-weight: 500; }
+.acui-field-value { font-size: 0.78rem; color: #0f172a; flex: 1; }
+
+/* Custom object tabs */
+.acui-co-tabs {
+  display: flex; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc; overflow-x: auto;
+}
+.acui-co-tab {
+  padding: 10px 16px; font-size: 0.78rem; font-weight: 500; color: #64748b;
+  border: none; background: none; cursor: pointer; white-space: nowrap;
+  border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 5px;
+  transition: all 0.12s;
+}
+.acui-co-tab:hover  { color: #1e293b; background: #f1f5f9; }
+.acui-co-tab.active { color: #2563eb; border-bottom-color: #2563eb; background: white; }
+.acui-co-tab .tab-badge { background: #e2e8f0; color: #475569; font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; font-weight: 700; }
+.acui-co-tab.active .tab-badge { background: #dbeafe; color: #1d4ed8; }
+.acui-co-content { padding: 0; }
+.acui-co-panel { display: none; }
+.acui-co-panel.active { display: block; }
+.acui-co-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.acui-co-table th { background: #f8fafc; padding: 8px 14px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+.acui-co-table td { padding: 8px 14px; border-bottom: 1px solid #f1f5f9; color: #374151; }
+.acui-co-table tr:last-child td { border-bottom: none; }
+.acui-co-table tr:hover td { background: #f8fafc; }
+.acui-co-empty { padding: 20px 18px; color: #94a3b8; font-size: 0.82rem; font-style: italic; }
+
+/* Right sidebar */
+.acui-sidebar { margin: 16px 16px 16px 0; display: flex; flex-direction: column; gap: 12px; }
+.acui-panel {
+  background: white; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;
+}
+.acui-panel-header {
+  padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid #f1f5f9; cursor: pointer;
+}
+.acui-panel-header h4 { font-size: 0.82rem; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 6px; }
+.acui-panel-header h4 .cnt { font-size: 0.7rem; color: #94a3b8; font-weight: 400; }
+.acui-panel-actions { display: flex; gap: 10px; }
+.acui-panel-actions a { font-size: 0.72rem; color: #2563eb; text-decoration: none; }
+.acui-panel-actions a:hover { text-decoration: underline; }
+.acui-panel-body { padding: 10px 16px; }
+
+.acui-contact-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+.acui-contact-row:last-child { border-bottom: none; }
+.acui-avatar { width: 30px; height: 30px; border-radius: 50%; background: #dbeafe; color: #1d4ed8; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+.acui-contact-name { font-size: 0.82rem; font-weight: 600; color: #2563eb; }
+.acui-contact-title { font-size: 0.72rem; color: #64748b; margin-top: 1px; }
+.acui-contact-info { font-size: 0.72rem; color: #64748b; margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+.acui-deal-row { padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+.acui-deal-row:last-child { border-bottom: none; }
+.acui-deal-status { font-size: 0.68rem; color: #16a34a; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+.acui-deal-title { font-size: 0.82rem; font-weight: 600; color: #2563eb; }
+.acui-deal-meta { font-size: 0.72rem; color: #64748b; margin-top: 3px; }
+
+.acui-note-row { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.78rem; }
+.acui-note-row:last-child { border-bottom: none; }
+.acui-note-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; flex-shrink: 0; margin-top: 4px; }
+.acui-note-text { color: #374151; line-height: 1.5; flex: 1; }
+.acui-note-date { font-size: 0.68rem; color: #94a3b8; margin-top: 2px; }
+
+/* ── Global Search Overlay ── */
+.gs-overlay {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(15,23,42,0.5); backdrop-filter: blur(2px);
+  align-items: flex-start; justify-content: center; padding-top: 80px;
+}
+.gs-overlay.open { display: flex; }
+.gs-modal {
+  background: white; border-radius: 12px; width: 640px; max-width: 95vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25); overflow: hidden;
+}
+.gs-modal-input-wrap {
+  display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.gs-modal-icon { color: #94a3b8; font-size: 1rem; flex-shrink: 0; }
+.gs-modal-input {
+  flex: 1; border: none; outline: none; font-size: 1rem; color: #0f172a;
+}
+.gs-modal-input::placeholder { color: #94a3b8; }
+.gs-modal-close {
+  background: none; border: none; cursor: pointer; color: #94a3b8;
+  font-size: 0.75rem; padding: 3px 7px; border: 1px solid #e2e8f0; border-radius: 4px;
+}
+.gs-modal-results { max-height: 420px; overflow-y: auto; }
+.gs-modal-section-label {
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+  color: #94a3b8; padding: 10px 18px 4px;
+}
+.gs-modal-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 18px; cursor: pointer; transition: background 0.1s;
+  border-bottom: 1px solid #f8fafc;
+}
+.gs-modal-item:hover { background: #f1f5f9; }
+.gs-modal-item:last-child { border-bottom: none; }
+.gs-modal-badge {
+  font-size: 0.62rem; font-weight: 700; padding: 2px 7px; border-radius: 10px;
+  text-transform: uppercase; flex-shrink: 0;
+}
+.gs-modal-badge.account { background: #dbeafe; color: #1d4ed8; }
+.gs-modal-badge.slp     { background: #d1fae5; color: #065f46; }
+.gs-modal-badge.contact { background: #fef3c7; color: #92400e; }
+.gs-modal-item-name { font-size: 0.85rem; font-weight: 600; color: #1e293b; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-modal-item-sub  { font-size: 0.72rem; color: #94a3b8; }
+.gs-modal-empty { padding: 24px 18px; text-align: center; color: #94a3b8; font-size: 0.85rem; }
+
+/* header search btn */
+.header-search-btn {
+  background: rgba(255,255,255,0.15); border: none; color: white;
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+  font-size: 1rem; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s; margin-left: 8px;
+}
+.header-search-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* AB sidebar result types */
+.ab-result-badge {
+  font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: 8px;
+  text-transform: uppercase; flex-shrink: 0;
+}
+.ab-result-badge.account { background: #dbeafe; color: #1d4ed8; }
+.ab-result-badge.slp     { background: #d1fae5; color: #065f46; }
+.ab-result-badge.contact { background: #fef3c7; color: #92400e; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+<!-- Left sidebar nav -->
+<div class="app-nav">
+  <div class="nav-logo">AC <span>Reporter</span></div>
+  <nav>
+    <button class="active" onclick="showTab('accounts', this)">🏢 Accounts</button>
+    <button onclick="showTab('builder', this)">📊 Report Builder</button>
+    <button onclick="showTab('prebuilt', this)">⚡ Pre-Built Reports</button>
+    <button onclick="showTab('profile', this)">🏢 Dealer Profile</button>
+    <button onclick="showTab('analytics', this)">📈 Analytics</button>
+    <button onclick="showTab('smartquery', this)">🔍 Smart Search</button>
+  </nav>
+  <button class="nav-search-btn" onclick="openGlobalSearch()">🔍 Global Search</button>
+</div>
+
+<!-- Main content area -->
+<div class="app-main">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- ACCOUNTS BROWSER TAB  (default, full-height)              -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="tab-accounts" class="tab-panel active">
+  <div class="ab-layout">
+
+    <!-- Left: list -->
+    <div class="ab-sidebar">
+      <div class="ab-search-wrap">
+        <input id="ab-search" class="ab-search" placeholder="Search accounts…"
+               oninput="abSearch(this.value)" autocomplete="off"/>
+      </div>
+      <div class="ab-count" id="ab-count">Loading…</div>
+      <div class="ab-list" id="ab-list"></div>
+    </div>
+
+    <!-- Right: detail -->
+    <div class="ab-detail" id="ab-detail">
+      <div class="ab-empty-state">
+        <div class="big">🏢</div>
+        <div>Select an account to view details</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- TOOLS TABS (Report Builder, Pre-Built, etc.)              -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="tools-container" class="container">
+<div id="tab-builder" class="tab-panel">
+  <div class="two-col" style="align-items: start;">
+
+    <!-- Left: Config -->
+    <div>
+      <!-- Object Picker -->
+      <div class="card">
+        <div class="card-title">1 · Select Object</div>
+        <div class="object-grid" id="object-grid"></div>
+      </div>
+
+      <!-- Field Picker -->
+      <div class="card" id="field-card" style="display:none;">
+        <div class="card-title">2 · Choose Fields</div>
+        <input class="field-search" id="field-search" placeholder="Search fields…" oninput="filterFields()"/>
+        <div class="field-list" id="field-list"></div>
+        <div style="margin-top: 12px;">
+          <div class="card-title" style="margin-bottom: 8px;">Selected Fields</div>
+          <div class="selected-tags" id="selected-tags">
+            <span style="color:#9ca3af; font-size:0.8rem;">No fields selected yet</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="card" id="filter-card" style="display:none;">
+        <div class="card-title">3 · Add Filters <span style="font-weight:400; text-transform:none; letter-spacing:0">(optional)</span></div>
+        <div id="filter-rows"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:4px;" onclick="addFilter()">+ Add Filter</button>
+      </div>
+
+      <!-- Options -->
+      <div class="card" id="options-card" style="display:none;">
+        <div class="card-title">4 · Options</div>
+        <div class="dedup-row">
+          <label>Deduplicate by:</label>
+          <select id="dedup-select"><option value="">— none —</option></select>
+        </div>
+      </div>
+
+      <!-- Run -->
+      <div id="run-card" style="display:none; display:flex; gap:10px;">
+        <button class="btn btn-primary" id="run-btn" onclick="runReport()" style="display:none;">▶ Run Report</button>
+        <button class="btn btn-success" id="csv-btn" onclick="downloadCSV()" style="display:none;">⬇ Download CSV</button>
+      </div>
+    </div>
+
+    <!-- Right: Results -->
+    <div>
+      <div class="card" id="results-card" style="display:none; min-width:0;">
+        <div class="results-bar">
+          <span class="results-count">Found <strong id="result-count">0</strong> records</span>
+          <button class="btn btn-success btn-sm" onclick="downloadCSV()">⬇ CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table id="results-table">
+            <thead id="results-head"></thead>
+            <tbody id="results-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="empty" id="results-empty" style="display:none;">
+        <div class="big">📭</div>
+        No records matched your filters.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- PRE-BUILT REPORTS TAB                                      -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="tab-prebuilt" class="tab-panel">
+  <div class="prebuilt-grid">
+
+    <!-- Activations -->
+    <div class="report-card">
+      <span class="badge-icon">🚀</span>
+      <h3>Partner Activations</h3>
+      <p>SLP records with "Contractor Activated" status, joined to account data. Filter by date range, platform, or BDR.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_month','act-from','act-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','act-from','act-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','act-from','act-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('this_quarter','act-from','act-to',this)">This Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','act-from','act-to',this)">YTD</button>
+        <button class="period-btn" onclick="applyPeriod('this_year','act-from','act-to',this)">This Year</button>
+        <button class="period-btn" onclick="applyPeriod('last_year','act-from','act-to',this)">Last Year</button>
+        <button class="period-btn" onclick="applyPeriod('all','act-from','act-to',this)">All Time</button>
+      </div>
+      <div class="form-row">
+        <label>From Date</label>
+        <input type="date" id="act-from"/>
+      </div>
+      <div class="form-row">
+        <label>To Date</label>
+        <input type="date" id="act-to"/>
+      </div>
+      <div class="form-row">
+        <label>Platform (optional)</label>
+        <input type="text" id="act-platform" placeholder="e.g. OPTIMUS"/>
+      </div>
+      <div class="form-row">
+        <label>Assigned BDR (optional)</label>
+        <input type="text" id="act-bdr" placeholder="e.g. Chip Harden"/>
+      </div>
+      <div class="form-row">
+        <label>Exclude Platforms (comma-separated)</label>
+        <input type="text" id="act-exclude" placeholder="e.g. LTO, Microf"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runPrebuilt('activations')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('activations')">⬇ CSV</button>
+      </div>
+      <div id="act-result" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- License Expiration -->
+    <div class="report-card">
+      <span class="badge-icon">📜</span>
+      <h3>License Expiration</h3>
+      <p>Contractor license records expiring within N days. Optionally include already-expired licenses.</p>
+      <div class="form-row">
+        <label>Expiring within (days)</label>
+        <input type="number" id="lic-days" value="90" min="1"/>
+      </div>
+      <div class="form-row">
+        <label>Include Already Expired</label>
+        <select id="lic-expired">
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runPrebuilt('license')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('license')">⬇ CSV</button>
+      </div>
+      <div id="lic-result" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- BDR Summary -->
+    <div class="report-card">
+      <span class="badge-icon">👥</span>
+      <h3>BDR Performance Summary</h3>
+      <p>Activation counts, account counts, and platform breakdowns per Business Development Rep.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_month','bdr-from','bdr-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','bdr-from','bdr-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','bdr-from','bdr-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('this_quarter','bdr-from','bdr-to',this)">This Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','bdr-from','bdr-to',this)">YTD</button>
+        <button class="period-btn" onclick="applyPeriod('this_year','bdr-from','bdr-to',this)">This Year</button>
+        <button class="period-btn" onclick="applyPeriod('last_year','bdr-from','bdr-to',this)">Last Year</button>
+        <button class="period-btn" onclick="applyPeriod('all','bdr-from','bdr-to',this)">All Time</button>
+      </div>
+      <div class="form-row">
+        <label>Activation From Date (optional)</label>
+        <input type="date" id="bdr-from"/>
+      </div>
+      <div class="form-row">
+        <label>Activation To Date (optional)</label>
+        <input type="date" id="bdr-to"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runPrebuilt('bdr')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('bdr')">⬇ CSV</button>
+      </div>
+      <div id="bdr-result" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Training Summary -->
+    <div class="report-card">
+      <span class="badge-icon">🎓</span>
+      <h3>Training Summary</h3>
+      <p>Training records joined with account data. Filter by date, trainer, or training type.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_month','trn-from','trn-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','trn-from','trn-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','trn-from','trn-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('this_quarter','trn-from','trn-to',this)">This Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','trn-from','trn-to',this)">YTD</button>
+        <button class="period-btn" onclick="applyPeriod('this_year','trn-from','trn-to',this)">This Year</button>
+        <button class="period-btn" onclick="applyPeriod('last_year','trn-from','trn-to',this)">Last Year</button>
+        <button class="period-btn" onclick="applyPeriod('all','trn-from','trn-to',this)">All Time</button>
+      </div>
+      <div class="form-row">
+        <label>From Date</label>
+        <input type="date" id="trn-from"/>
+      </div>
+      <div class="form-row">
+        <label>To Date</label>
+        <input type="date" id="trn-to"/>
+      </div>
+      <div class="form-row">
+        <label>Trainer (optional)</label>
+        <input type="text" id="trn-trainer" placeholder="e.g. Blake Sanders"/>
+      </div>
+      <div class="form-row">
+        <label>Training Type (optional)</label>
+        <select id="trn-type">
+          <option value="">— all —</option>
+          <option>Webinar</option>
+          <option>Video Link</option>
+          <option>In Person</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runPrebuilt('training')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('training')">⬇ CSV</button>
+      </div>
+      <div id="trn-result" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Account Activity -->
+    <div class="report-card">
+      <span class="badge-icon">📋</span>
+      <h3>Account Activity</h3>
+      <p>Per-account summary of notes activity, deals, and contact count. Great for identifying cold or active accounts.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_month','acta-from','acta-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','acta-from','acta-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','acta-from','acta-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('this_quarter','acta-from','acta-to',this)">This Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','acta-from','acta-to',this)">YTD</button>
+        <button class="period-btn" onclick="applyPeriod('this_year','acta-from','acta-to',this)">This Year</button>
+        <button class="period-btn" onclick="applyPeriod('last_year','acta-from','acta-to',this)">Last Year</button>
+        <button class="period-btn" onclick="applyPeriod('all','acta-from','acta-to',this)">All Time</button>
+      </div>
+      <div class="form-row">
+        <label>Notes From Date</label>
+        <input type="date" id="acta-from"/>
+      </div>
+      <div class="form-row">
+        <label>Notes To Date</label>
+        <input type="date" id="acta-to"/>
+      </div>
+      <div class="form-row">
+        <label>Min Note Count</label>
+        <input type="number" id="acta-min" placeholder="0" min="0" style="width:80px;"/>
+      </div>
+      <div class="form-row" style="align-items:center; gap:8px;">
+        <label style="margin:0;">Active Accounts Only</label>
+        <input type="checkbox" id="acta-active"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runPrebuilt('acta')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('acta')">⬇ CSV</button>
+      </div>
+      <div id="acta-result" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Team Performance -->
+    <div class="report-card">
+      <span class="badge-icon">🏆</span>
+      <h3>Team Performance</h3>
+      <p>Notes activity broken down by team member — who's engaging accounts, how many accounts they're touching, and when they were last active.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_month','team-from','team-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','team-from','team-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','team-from','team-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('this_quarter','team-from','team-to',this)">This Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','team-from','team-to',this)">YTD</button>
+        <button class="period-btn" onclick="applyPeriod('this_year','team-from','team-to',this)">This Year</button>
+        <button class="period-btn" onclick="applyPeriod('last_year','team-from','team-to',this)">Last Year</button>
+        <button class="period-btn" onclick="applyPeriod('all','team-from','team-to',this)">All Time</button>
+      </div>
+      <div class="form-row">
+        <label>From Date</label>
+        <input type="date" id="team-from"/>
+      </div>
+      <div class="form-row">
+        <label>To Date</label>
+        <input type="date" id="team-to"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runPrebuilt('team')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('team')">⬇ CSV</button>
+      </div>
+      <div id="team-result" style="margin-top:12px;"></div>
+    </div>
+
+  </div>
+
+  <!-- Prebuilt Results Table -->
+  <div class="card" id="prebuilt-results-card" style="display:none; margin-top:20px;">
+    <div class="results-bar">
+      <span class="results-count">Found <strong id="prebuilt-count">0</strong> records</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead id="prebuilt-head"></thead>
+        <tbody id="prebuilt-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- DEALER PROFILE TAB                                         -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="tab-profile" class="tab-panel">
+  <div class="card">
+    <div class="card-title">Search Dealer</div>
+    <div class="profile-search">
+      <input type="text" id="profile-input" placeholder="Dealer ID or Account ID…" onkeydown="if(event.key==='Enter') lookupProfile()"/>
+      <select id="profile-search-type">
+        <option value="dealer_id">Dealer ID</option>
+        <option value="account_id">Account ID</option>
+      </select>
+      <button class="btn btn-primary" onclick="lookupProfile()">🔍 Look Up</button>
+    </div>
+  </div>
+
+  <div id="profile-result" style="display:none;">
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+        <div style="font-size:2rem;">🏢</div>
+        <div>
+          <div style="font-size:1.2rem; font-weight:700; color:#111827;" id="profile-name"></div>
+          <div style="font-size:0.82rem; color:#6b7280;" id="profile-id-display"></div>
+        </div>
+      </div>
+      <div class="summary-pills" id="profile-pills"></div>
+      <div class="profile-grid">
+        <div class="profile-section">
+          <h4>Account Fields</h4>
+          <ul class="kv-list" id="profile-account-fields"></ul>
+        </div>
+        <div>
+          <div class="profile-section" style="margin-bottom:18px;">
+            <h4>Contacts (<span id="profile-contact-count">0</span>)</h4>
+            <ul class="kv-list" id="profile-contacts"></ul>
+          </div>
+          <div class="profile-section">
+            <h4>Deals (<span id="profile-deal-count">0</span>)</h4>
+            <ul class="kv-list" id="profile-deals"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">SLP Records (<span id="profile-slp-count">0</span>)</div>
+        <div class="table-wrap">
+          <table>
+            <thead id="profile-slp-head"></thead>
+            <tbody id="profile-slp-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Training Records (<span id="profile-trn-count">0</span>)</div>
+        <div class="table-wrap">
+          <table>
+            <thead id="profile-trn-head"></thead>
+            <tbody id="profile-trn-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- ANALYTICS TAB                                              -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="tab-analytics" class="tab-panel">
+  <div class="card" style="max-width:700px;">
+    <div class="card-title">Group-By Analytics</div>
+    <div class="two-col">
+      <div class="form-row">
+        <label>Object</label>
+        <select id="an-object" onchange="loadAnalyticsFields()">
+          <option value="slp">Strategic Lending Partners</option>
+          <option value="accounts">Accounts</option>
+          <option value="contacts">Contacts</option>
+          <option value="deals">Deals</option>
+          <option value="trainings">Trainings</option>
+          <option value="license_details">License Details</option>
+          <option value="notes">Notes</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Group By Field</label>
+        <select id="an-groupby"><option>— select object first —</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Count Distinct Values of (optional)</label>
+      <select id="an-countfield"><option value="">— none —</option></select>
+    </div>
+
+    <!-- Date Filter -->
+    <div style="border-top:1px solid #f3f4f6; padding-top:12px; margin-top:4px;">
+      <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#9ca3af; margin-bottom:8px;">Date Filter (optional)</div>
+      <div class="period-row" id="an-period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_month','an-from','an-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','an-from','an-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','an-from','an-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('this_quarter','an-from','an-to',this)">This Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','an-from','an-to',this)">YTD</button>
+        <button class="period-btn" onclick="applyPeriod('this_year','an-from','an-to',this)">This Year</button>
+        <button class="period-btn" onclick="applyPeriod('last_year','an-from','an-to',this)">Last Year</button>
+        <button class="period-btn" onclick="applyPeriod('all','an-from','an-to',this)">All Time</button>
+      </div>
+      <div class="two-col" style="gap:8px;">
+        <div class="form-row" style="margin-bottom:0;">
+          <label>Date Field to Filter</label>
+          <select id="an-date-field">
+            <option value="">— no date filter —</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <div class="form-row" style="margin-bottom:0; flex:1;">
+            <label>From</label>
+            <input type="date" id="an-from"/>
+          </div>
+          <div class="form-row" style="margin-bottom:0; flex:1;">
+            <label>To</label>
+            <input type="date" id="an-to"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="runAnalytics()">▶ Run</button>
+    </div>
+  </div>
+
+  <div class="two-col" id="analytics-result" style="display:none; margin-top:18px;">
+    <div class="card">
+      <div class="card-title" id="an-chart-title">Chart</div>
+      <div class="bar-chart" id="an-chart"></div>
+    </div>
+    <div class="card">
+      <div class="results-bar">
+        <span class="results-count"><strong id="an-count">0</strong> groups · <strong id="an-total">0</strong> records</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead id="an-table-head"></thead>
+          <tbody id="an-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SMART QUERY TAB                                            -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="tab-smartquery" class="tab-panel">
+  <div class="card" style="max-width:800px;">
+    <div class="card-title">🔍 Smart Search — Type What You Want</div>
+    <p style="font-size:0.85rem; color:#6b7280; margin-bottom:14px; line-height:1.6;">
+      Describe the report you need in plain English. Try phrases like <em>"show me activations for Optimus last month"</em> or <em>"team performance this quarter"</em>.
+    </p>
+
+    <!-- Search box -->
+    <div class="sq-box">
+      <input class="sq-input" id="sq-input" type="text"
+        placeholder='e.g. "show me the latest activations for Optimus"'
+        onkeydown="if(event.key==='Enter') runSmartQuery()"/>
+      <button class="btn btn-primary" style="white-space:nowrap;" onclick="runSmartQuery()">🔍 Search</button>
+    </div>
+
+    <!-- Example chips -->
+    <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#9ca3af; margin-bottom:8px;">Try an example</div>
+    <div class="sq-examples">
+      <button class="sq-chip" onclick="setSQQuery(this.textContent)">Activations for Optimus last month</button>
+      <button class="sq-chip" onclick="setSQQuery(this.textContent)">Latest activations this quarter</button>
+      <button class="sq-chip" onclick="setSQQuery(this.textContent)">Training summary last year</button>
+      <button class="sq-chip" onclick="setSQQuery(this.textContent)">License expiring soon</button>
+      <button class="sq-chip" onclick="setSQQuery(this.textContent)">BDR performance YTD</button>
+      <button class="sq-chip" onclick="setSQQuery(this.textContent)">Team performance this month</button>
+      <button class="sq-chip" onclick="setSQQuery(this.textContent)">Account activity last quarter</button>
+      <button class="sq-chip" onclick="setSQQuery(this.textContent)">Cold accounts with no notes this year</button>
+      <button class="sq-chip" onclick="setSQQuery(this.textContent)">Activations for LTO this year</button>
+      <button class="sq-chip" onclick="setSQQuery(this.textContent)">Who wrote the most notes last month</button>
+    </div>
+  </div>
+
+  <!-- Interpreted intent tags -->
+  <div id="sq-intent" style="max-width:800px;"></div>
+
+  <!-- Results -->
+  <div id="sq-result"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- GLOBAL SEARCH TAB                                          -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="tab-globalsearch" class="tab-panel">
+  <div class="card" style="max-width:860px;">
+    <div class="card-title">🌐 Global Search — Find Any Value Across AC</div>
+    <p style="font-size:0.83rem; color:#6b7280; margin-bottom:16px; line-height:1.5;">
+      Search across SLP records, accounts, and contacts. Works with dealer IDs, names, emails, platform values, oracle IDs, and more.
+    </p>
+    <div class="gs-box">
+      <input id="gs-input" class="gs-input" placeholder="e.g. 12345  or  john@example.com  or  OPTIMUS"
+             onkeydown="if(event.key==='Enter') runGlobalSearch()"/>
+      <button class="btn btn-primary" onclick="runGlobalSearch()">Search</button>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px;">
+      <span style="font-size:0.72rem;color:#9ca3af;align-self:center;">Try:</span>
+      <button class="sq-chip" onclick="gsSetQ(this.textContent)">dealer ID</button>
+      <button class="sq-chip" onclick="gsSetQ(this.textContent)">oracle ID</button>
+      <button class="sq-chip" onclick="gsSetQ(this.textContent)">email</button>
+      <button class="sq-chip" onclick="gsSetQ(this.textContent)">company name</button>
+      <button class="sq-chip" onclick="gsSetQ(this.textContent)">OPTIMUS</button>
+    </div>
+  </div>
+  <div id="gs-result" style="max-width:860px;"></div>
+</div>
+
+</div><!-- /tools-container -->
+
+</div><!-- /app-main -->
+</div><!-- /app-shell -->
+
+<!-- Global Search Overlay (fixed, outside shell) -->
+<div id="gs-overlay" class="gs-overlay" onclick="gsOverlayBgClick(event)">
+  <div class="gs-modal">
+    <div class="gs-modal-input-wrap">
+      <span class="gs-modal-icon">🔍</span>
+      <input id="gs-overlay-input" class="gs-modal-input"
+             placeholder="Search accounts, dealer IDs, emails, SLPs…"
+             oninput="gsOverlaySearch(this.value)"
+             onkeydown="if(event.key==='Escape') closeGlobalSearch()"/>
+      <button class="gs-modal-close" onclick="closeGlobalSearch()">ESC</button>
+    </div>
+    <div id="gs-overlay-results" class="gs-modal-results">
+      <div class="gs-modal-empty">Start typing to search across all of AC</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────
+const state = {
+  object: null,
+  fields: [],        // all fields from API
+  selected: [],      // selected field IDs
+  filters: [],
+  results: [],
+  lastParams: null,
+  sortCol: null,
+  sortAsc: true,
+};
+
+// ── Tab Nav ────────────────────────────────────────────────────
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.app-nav nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+  // Accounts fills app-main; tools use scrollable container
+  const tools = document.getElementById('tools-container');
+  if (id === 'accounts') {
+    tools.classList.remove('active');
+    abInit();
+  } else {
+    tools.classList.add('active');
+  }
+}
+
+// ── Boot ───────────────────────────────────────────────────────
+async function init() {
+  // Accounts is default tab — load it immediately
+  abInit();
+
+  // Lazy-load tool data in background
+  fetch('/api/objects').then(r => r.json()).then(data => {
+    const grid = document.getElementById('object-grid');
+    data.objects.forEach(obj => {
+      const btn = document.createElement('button');
+      btn.className = 'obj-btn';
+      btn.innerHTML = `<span class="icon">${obj.icon}</span>${obj.name}`;
+      btn.onclick = () => selectObject(obj.id, obj.name, btn);
+      grid.appendChild(btn);
+    });
+  });
+  loadAnalyticsFields();
+}
+
+// ── Object Selection ───────────────────────────────────────────
+async function selectObject(id, name, btn) {
+  state.object   = id;
+  state.selected = [];
+  state.filters  = [];
+
+  document.querySelectorAll('.obj-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  document.getElementById('run-btn').style.display = 'none';
+  document.getElementById('csv-btn').style.display  = 'none';
+  document.getElementById('results-card').style.display  = 'none';
+  document.getElementById('results-empty').style.display = 'none';
+
+  // Load fields
+  document.getElementById('field-card').style.display   = 'block';
+  document.getElementById('filter-card').style.display  = 'block';
+  document.getElementById('options-card').style.display = 'block';
+  document.getElementById('run-btn').style.display      = 'inline-flex';
+
+  const fieldList = document.getElementById('field-list');
+  fieldList.innerHTML = '<div style="padding:12px; color:#6b7280; font-size:0.83rem;">Loading fields…</div>';
+
+  const res  = await fetch(`/api/fields/${id}`);
+  const data = await res.json();
+  state.fields = data.fields || [];
+
+  renderFieldList();
+  renderFilterRows();
+  updateDedup();
+}
+
+// ── Field List Rendering ───────────────────────────────────────
+function renderFieldList(query = '') {
+  const list = document.getElementById('field-list');
+  list.innerHTML = '';
+  const q = query.toLowerCase();
+
+  const primary  = state.fields.filter(f => f.type === 'primary'  && (!q || f.label.toLowerCase().includes(q)));
+  const related  = state.fields.filter(f => f.type === 'related'  && (!q || f.label.toLowerCase().includes(q)));
+
+  function renderGroup(fields, label, badgeClass) {
+    if (!fields.length) return;
+    const lbl = document.createElement('div');
+    lbl.className = 'field-group-label';
+    lbl.textContent = label;
+    list.appendChild(lbl);
+    fields.forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'field-item';
+      const checked = state.selected.includes(f.id) ? 'checked' : '';
+      item.innerHTML = `
+        <input type="checkbox" id="f_${CSS.escape(f.id)}" ${checked}/>
+        <label for="f_${CSS.escape(f.id)}">${f.label}</label>
+        <span class="badge ${badgeClass}">${f.dataType || 'text'}</span>`;
+      item.querySelector('input').onchange = e => toggleField(f.id, e.target.checked);
+      list.appendChild(item);
+    });
+  }
+
+  renderGroup(primary, 'Primary Fields', '');
+  renderGroup(related, 'Cross-Object Fields', 'related');
+
+  if (!primary.length && !related.length) {
+    list.innerHTML = '<div style="padding:12px; color:#9ca3af; font-size:0.83rem;">No fields match.</div>';
+  }
+}
+
+function filterFields() {
+  renderFieldList(document.getElementById('field-search').value);
+}
+
+function toggleField(id, checked) {
+  if (checked && !state.selected.includes(id)) state.selected.push(id);
+  if (!checked) state.selected = state.selected.filter(s => s !== id);
+  renderSelectedTags();
+  updateDedup();
+}
+
+function renderSelectedTags() {
+  const wrap = document.getElementById('selected-tags');
+  if (!state.selected.length) {
+    wrap.innerHTML = '<span style="color:#9ca3af; font-size:0.8rem;">No fields selected yet</span>';
+    return;
+  }
+  wrap.innerHTML = state.selected.map(id => {
+    const f = state.fields.find(x => x.id === id);
+    const label = f ? f.label : id;
+    return `<span class="tag">${label}<button onclick="removeField('${id.replace(/'/g,"\\'")}')">×</button></span>`;
+  }).join('');
+}
+
+function removeField(id) {
+  state.selected = state.selected.filter(s => s !== id);
+  renderSelectedTags();
+  updateDedup();
+  // Uncheck in list
+  const el = document.getElementById('f_' + CSS.escape(id));
+  if (el) el.checked = false;
+}
+
+function updateDedup() {
+  const sel = document.getElementById('dedup-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— none —</option>';
+  state.selected.forEach(id => {
+    const f = state.fields.find(x => x.id === id);
+    if (!f) return;
+    const opt = document.createElement('option');
+    opt.value = id; opt.textContent = f.label;
+    if (id === cur) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Filters ────────────────────────────────────────────────────
+function addFilter() {
+  state.filters.push({ field: '', type: 'text', operator: 'contains', value: '', dateRange: '' });
+  renderFilterRows();
+}
+
+function removeFilter(i) {
+  state.filters.splice(i, 1);
+  renderFilterRows();
+}
+
+function renderFilterRows() {
+  const wrap = document.getElementById('filter-rows');
+  wrap.innerHTML = '';
+  state.filters.forEach((f, i) => {
+    const row = document.createElement('div');
+    row.className = 'filter-row';
+
+    // Field selector
+    const fieldSel = document.createElement('select');
+    fieldSel.style.flex = '2';
+    fieldSel.innerHTML = '<option value="">— choose field —</option>' +
+      state.fields.map(fld => `<option value="${fld.id}" ${fld.id === f.field ? 'selected' : ''}>${fld.label}</option>`).join('');
+    fieldSel.onchange = e => {
+      const fld = state.fields.find(x => x.id === e.target.value);
+      state.filters[i].field = e.target.value;
+      state.filters[i].type  = fld?.dataType || 'text';
+      renderFilterRows();
+    };
+
+    // Operator / date range
+    let controlHtml = '';
+    if (f.type === 'date') {
+      controlHtml = `
+        <select onchange="state.filters[${i}].dateRange=this.value; renderFilterRows();">
+          ${[
+            ['today','Today'],['yesterday','Yesterday'],['this_week','This Week'],
+            ['last_7_days','Last 7 Days'],['last_30_days','Last 30 Days'],['last_90_days','Last 90 Days'],
+            ['this_month','This Month'],['last_month','Last Month'],
+            ['this_quarter','This Quarter'],['last_quarter','Last Quarter'],
+            ['ytd','Year to Date'],['this_year','This Year'],['last_year','Last Year'],
+            ['next_30_days','Next 30 Days'],['next_90_days','Next 90 Days'],
+            ['custom','Custom Range…']
+          ].map(([v,l]) => `<option value="${v}" ${f.dateRange===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+        ${f.dateRange === 'custom' ? `
+          <input type="date" value="${f.fromDate||''}" onchange="state.filters[${i}].fromDate=this.value" placeholder="From"/>
+          <input type="date" value="${f.toDate||''}"   onchange="state.filters[${i}].toDate=this.value"   placeholder="To"/>
+        ` : ''}`;
+    } else {
+      controlHtml = `
+        <select onchange="state.filters[${i}].operator=this.value">
+          ${['contains','equals','starts_with','not_equals']
+            .map(v => `<option value="${v}" ${f.operator===v?'selected':''}>${v}</option>`).join('')}
+        </select>
+        <input type="text" value="${f.value}" placeholder="Value…"
+          onchange="state.filters[${i}].value=this.value" oninput="state.filters[${i}].value=this.value"/>`;
+    }
+
+    row.appendChild(fieldSel);
+    const controls = document.createElement('div');
+    controls.style.cssText = 'display:flex; gap:6px; flex:3; align-items:center;';
+    controls.innerHTML = controlHtml;
+    row.appendChild(controls);
+
+    const rm = document.createElement('button');
+    rm.className = 'rm-btn'; rm.innerHTML = '✕';
+    rm.onclick = () => removeFilter(i);
+    row.appendChild(rm);
+
+    wrap.appendChild(row);
+  });
+}
+
+// ── Run Report ─────────────────────────────────────────────────
+async function runReport() {
+  if (!state.object || !state.selected.length) {
+    alert('Select an object and at least one field.');
+    return;
+  }
+
+  const btn = document.getElementById('run-btn');
+  btn.innerHTML = '<span class="spinner"></span> Loading…';
+  btn.disabled = true;
+
+  const params = buildParams();
+  state.lastParams = params;
+
+  try {
+    const url = `/api/report?${params}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    state.results   = data.records || [];
+    state.sortCol   = null;
+
+    document.getElementById('result-count').textContent = data.count || 0;
+    renderResultsTable(state.results);
+
+    document.getElementById('results-card').style.display  = state.results.length ? 'block' : 'none';
+    document.getElementById('results-empty').style.display = state.results.length ? 'none'  : 'block';
+    document.getElementById('csv-btn').style.display       = state.results.length ? 'inline-flex' : 'none';
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+
+  btn.innerHTML = '▶ Run Report';
+  btn.disabled  = false;
+}
+
+function buildParams() {
+  const params = new URLSearchParams();
+  params.set('object_type', state.object);
+  params.set('fields', state.selected.join(','));
+
+  const validFilters = state.filters.filter(f => f.field && (f.value || f.dateRange));
+  if (validFilters.length) {
+    params.set('filters', JSON.stringify(validFilters));
+  }
+
+  const dedup = document.getElementById('dedup-select').value;
+  if (dedup) params.set('dedup_field', dedup);
+
+  return params.toString();
+}
+
+function renderResultsTable(records, sortCol = null, sortAsc = true) {
+  if (!records.length) return;
+  const keys = Object.keys(records[0]);
+
+  const head = document.getElementById('results-head');
+  head.innerHTML = '<tr>' + keys.map(k => {
+    const f     = state.fields.find(x => x.id === k);
+    const label = f ? f.label : k;
+    const isSorted = k === sortCol;
+    return `<th class="${isSorted?'sorted':''}" onclick="sortResults('${k}')">
+      ${label} <span class="sort-icon">${isSorted ? (sortAsc ? '↑':'↓') : '↕'}</span>
+    </th>`;
+  }).join('') + '</tr>';
+
+  const body = document.getElementById('results-body');
+  body.innerHTML = records.slice(0, 500).map(r =>
+    '<tr>' + keys.map(k => `<td title="${esc(String(r[k]||''))}">${esc(String(r[k]||''))}</td>`).join('') + '</tr>'
+  ).join('');
+
+  if (records.length > 500) {
+    const tr = body.insertRow();
+    tr.innerHTML = `<td colspan="${keys.length}" style="text-align:center; color:#6b7280; font-style:italic; padding:10px;">
+      Showing 500 of ${records.length} — download CSV for all rows</td>`;
+  }
+}
+
+function sortResults(col) {
+  if (state.sortCol === col) {
+    state.sortAsc = !state.sortAsc;
+  } else {
+    state.sortCol = col;
+    state.sortAsc = true;
+  }
+  const asc = state.sortAsc;
+  const sorted = [...state.results].sort((a, b) => {
+    const av = String(a[col] || ''), bv = String(b[col] || '');
+    return asc ? av.localeCompare(bv, undefined, {numeric: true}) : bv.localeCompare(av, undefined, {numeric: true});
+  });
+  renderResultsTable(sorted, state.sortCol, state.sortAsc);
+}
+
+async function downloadCSV() {
+  if (!state.lastParams) return;
+  window.location.href = `/api/report/csv?${state.lastParams}`;
+}
+
+// ── Period Utilities ───────────────────────────────────────────
+function computeDateRange(period) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const today = fmt(now);
+  switch (period) {
+    case 'today':        return { from: today, to: today };
+    case 'yesterday': {  const d = new Date(now); d.setDate(d.getDate()-1); const s=fmt(d); return { from:s, to:s }; }
+    case 'this_week': {  const d = new Date(now); d.setDate(d.getDate() - (d.getDay()===0?6:d.getDay()-1)); return { from:fmt(d), to:today }; }
+    case 'last_7_days':  { const d=new Date(now); d.setDate(d.getDate()-7);  return { from:fmt(d), to:today }; }
+    case 'last_30_days': { const d=new Date(now); d.setDate(d.getDate()-30); return { from:fmt(d), to:today }; }
+    case 'last_90_days': { const d=new Date(now); d.setDate(d.getDate()-90); return { from:fmt(d), to:today }; }
+    case 'this_month':   return { from:`${now.getFullYear()}-${pad(now.getMonth()+1)}-01`, to:today };
+    case 'last_month': {
+      const f=new Date(now.getFullYear(),now.getMonth()-1,1), l=new Date(now.getFullYear(),now.getMonth(),0);
+      return { from:fmt(f), to:fmt(l) };
+    }
+    case 'this_quarter': {
+      const q=Math.floor(now.getMonth()/3);
+      return { from:fmt(new Date(now.getFullYear(),q*3,1)), to:today };
+    }
+    case 'last_quarter': {
+      const q=Math.floor(now.getMonth()/3);
+      const [sy,sm] = q===0 ? [now.getFullYear()-1,9] : [now.getFullYear(),(q-1)*3];
+      return { from:fmt(new Date(sy,sm,1)), to:fmt(new Date(sy,sm+3,0)) };
+    }
+    case 'ytd':       return { from:`${now.getFullYear()}-01-01`, to:today };
+    case 'this_year': return { from:`${now.getFullYear()}-01-01`, to:`${now.getFullYear()}-12-31` };
+    case 'last_year': { const y=now.getFullYear()-1; return { from:`${y}-01-01`, to:`${y}-12-31` }; }
+    default:          return { from:'', to:'' };
+  }
+}
+
+function applyPeriod(period, fromId, toId, btn) {
+  if (btn) {
+    btn.closest('.period-row').querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  const { from, to } = computeDateRange(period);
+  const fe = document.getElementById(fromId), te = document.getElementById(toId);
+  if (fe) fe.value = from;
+  if (te) te.value = to;
+}
+
+// ── Pre-built Reports ──────────────────────────────────────────
+function prebuiltParams(type) {
+  const p = new URLSearchParams();
+  if (type === 'activations') {
+    const from = document.getElementById('act-from').value;
+    const to   = document.getElementById('act-to').value;
+    const plat = document.getElementById('act-platform').value.trim();
+    const bdr  = document.getElementById('act-bdr').value.trim();
+    const excl = document.getElementById('act-exclude').value.trim();
+    if (from) p.set('from_date', from);
+    if (to)   p.set('to_date', to);
+    if (plat) p.set('platform', plat);
+    if (bdr)  p.set('bdr', bdr);
+    if (excl) p.set('exclude_platforms', excl);
+    return { endpoint: 'activations', params: p };
+  }
+  if (type === 'license') {
+    p.set('days_ahead', document.getElementById('lic-days').value || '90');
+    p.set('include_expired', document.getElementById('lic-expired').value);
+    return { endpoint: 'license-expiration', params: p };
+  }
+  if (type === 'bdr') {
+    const from = document.getElementById('bdr-from').value;
+    const to   = document.getElementById('bdr-to').value;
+    if (from) p.set('from_date', from);
+    if (to)   p.set('to_date', to);
+    return { endpoint: 'bdr-summary', params: p };
+  }
+  if (type === 'training') {
+    const from    = document.getElementById('trn-from').value;
+    const to      = document.getElementById('trn-to').value;
+    const trainer = document.getElementById('trn-trainer').value.trim();
+    const ttype   = document.getElementById('trn-type').value;
+    if (from)    p.set('from_date', from);
+    if (to)      p.set('to_date', to);
+    if (trainer) p.set('trainer', trainer);
+    if (ttype)   p.set('training_type', ttype);
+    return { endpoint: 'training-summary', params: p };
+  }
+  if (type === 'acta') {
+    const from   = document.getElementById('acta-from').value;
+    const to     = document.getElementById('acta-to').value;
+    const min    = document.getElementById('acta-min').value;
+    const active = document.getElementById('acta-active').checked;
+    if (from)   p.set('from_date', from);
+    if (to)     p.set('to_date', to);
+    if (min)    p.set('min_notes', min);
+    if (active) p.set('has_activity', 'true');
+    return { endpoint: 'account-activity', params: p };
+  }
+  if (type === 'team') {
+    const from = document.getElementById('team-from').value;
+    const to   = document.getElementById('team-to').value;
+    if (from) p.set('from_date', from);
+    if (to)   p.set('to_date', to);
+    return { endpoint: 'team-activity', params: p };
+  }
+}
+
+async function runPrebuilt(type) {
+  const { endpoint, params } = prebuiltParams(type);
+  const resultId = { activations: 'act-result', license: 'lic-result', bdr: 'bdr-result', training: 'trn-result', acta: 'acta-result', team: 'team-result' }[type];
+  document.getElementById(resultId).innerHTML = '<span style="color:#6b7280; font-size:0.82rem;">Loading…</span>';
+
+  try {
+    const res  = await fetch(`/api/report/${endpoint}?${params}`);
+    const data = await res.json();
+    const records = data.records || [];
+    document.getElementById(resultId).innerHTML = `<span style="color:#059669; font-size:0.82rem;">✓ ${records.length} records</span>`;
+    renderPrebuiltTable(records);
+  } catch(e) {
+    document.getElementById(resultId).innerHTML = `<span style="color:#dc2626; font-size:0.82rem;">✕ ${e.message}</span>`;
+  }
+}
+
+function downloadPrebuilt(type) {
+  const { endpoint, params } = prebuiltParams(type);
+  params.set('format', 'csv');
+  window.location.href = `/api/report/${endpoint}?${params}`;
+}
+
+function renderPrebuiltTable(records) {
+  if (!records.length) {
+    document.getElementById('prebuilt-results-card').style.display = 'none';
+    return;
+  }
+  const keys = Object.keys(records[0]);
+  document.getElementById('prebuilt-count').textContent = records.length;
+  document.getElementById('prebuilt-head').innerHTML = '<tr>' + keys.map(k => `<th>${k}</th>`).join('') + '</tr>';
+  document.getElementById('prebuilt-body').innerHTML = records.slice(0, 300).map(r =>
+    '<tr>' + keys.map(k => `<td title="${esc(String(r[k]||''))}">${esc(String(r[k]||''))}</td>`).join('') + '</tr>'
+  ).join('');
+  document.getElementById('prebuilt-results-card').style.display = 'block';
+  document.getElementById('prebuilt-results-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── Dealer Profile ─────────────────────────────────────────────
+async function lookupProfile() {
+  const val  = document.getElementById('profile-input').value.trim();
+  const type = document.getElementById('profile-search-type').value;
+  if (!val) return;
+
+  const params = new URLSearchParams();
+  params.set(type, val);
+
+  try {
+    const res  = await fetch(`/api/report/dealer-profile?${params}`);
+    if (!res.ok) { alert('Not found'); return; }
+    const data = await res.json();
+    renderProfile(data);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function renderProfile(data) {
+  const { account, slps, contacts, deals, trainings, summary } = data;
+  const FIELD_LABELS = {
+    '15': 'DBA Name', '18': 'Dealer ID', '19': 'Account Status', '22': 'Doing Business In',
+    '23': 'Sales Region', '26': 'Partner Activation Date', '29': 'Dealer Program',
+    '34': 'Platforms', '35': 'Original Owner', '119': 'Assigned BDR', '118': 'Oracle Producer ID',
+  };
+
+  document.getElementById('profile-name').textContent    = account.name || '(no name)';
+  document.getElementById('profile-id-display').textContent = `Account ID: ${account.id}`;
+
+  document.getElementById('profile-pills').innerHTML = `
+    <span class="pill">📊 ${summary.slp_count} SLPs</span>
+    <span class="pill">👤 ${summary.contact_count} Contacts</span>
+    <span class="pill">💰 ${summary.deal_count} Deals</span>
+    <span class="pill">🎓 ${summary.training_count} Trainings</span>`;
+
+  // Account fields
+  const cfs = account.custom_fields || {};
+  document.getElementById('profile-account-fields').innerHTML =
+    Object.entries(cfs).filter(([,v]) => v).map(([k,v]) =>
+      `<li><span class="k">${FIELD_LABELS[k] || 'Field '+k}</span><span class="v" title="${esc(v)}">${esc(v)}</span></li>`
+    ).join('') || '<li style="color:#9ca3af; font-size:0.8rem;">No custom field data</li>';
+
+  // Contacts
+  document.getElementById('profile-contact-count').textContent = contacts.length;
+  document.getElementById('profile-contacts').innerHTML = contacts.slice(0,5).map(c =>
+    `<li><span class="k">${esc(c.firstName||'')} ${esc(c.lastName||'')}</span><span class="v">${esc(c.email||'')}</span></li>`
+  ).join('') || '<li style="color:#9ca3af;">None</li>';
+
+  // Deals
+  document.getElementById('profile-deal-count').textContent = deals.length;
+  document.getElementById('profile-deals').innerHTML = deals.slice(0,5).map(d =>
+    `<li><span class="k">${esc(d.title||'Deal '+d.id)}</span><span class="v">${esc(d.status||'')}</span></li>`
+  ).join('') || '<li style="color:#9ca3af;">None</li>';
+
+  // SLPs table
+  document.getElementById('profile-slp-count').textContent = slps.length;
+  if (slps.length) {
+    const keys = ['platform', 'slp-status-detail', 'dealer-id', 'contractor-activated-date', 'assigned-bdr'];
+    document.getElementById('profile-slp-head').innerHTML = '<tr>' + keys.map(k => `<th>${k}</th>`).join('') + '</tr>';
+    document.getElementById('profile-slp-body').innerHTML = slps.map(s =>
+      '<tr>' + keys.map(k => `<td>${esc(String(s[k]||''))}</td>`).join('') + '</tr>'
+    ).join('');
+  } else {
+    document.getElementById('profile-slp-body').innerHTML = '<tr><td style="color:#9ca3af;">No SLP records</td></tr>';
+  }
+
+  // Trainings table
+  document.getElementById('profile-trn-count').textContent = trainings.length;
+  if (trainings.length) {
+    const keys = ['training-type', 'training-agenda', 'date-of-training', 'trained-by'];
+    document.getElementById('profile-trn-head').innerHTML = '<tr>' + keys.map(k => `<th>${k}</th>`).join('') + '</tr>';
+    document.getElementById('profile-trn-body').innerHTML = trainings.map(t =>
+      '<tr>' + keys.map(k => `<td>${esc(String(t[k]||''))}</td>`).join('') + '</tr>'
+    ).join('');
+  } else {
+    document.getElementById('profile-trn-body').innerHTML = '<tr><td style="color:#9ca3af;">No training records</td></tr>';
+  }
+
+  document.getElementById('profile-result').style.display = 'block';
+  document.getElementById('profile-result').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── Analytics ──────────────────────────────────────────────────
+async function loadAnalyticsFields() {
+  const obj = document.getElementById('an-object').value;
+  const [gbSel, cfSel, dfSel] = [
+    document.getElementById('an-groupby'),
+    document.getElementById('an-countfield'),
+    document.getElementById('an-date-field'),
+  ];
+  gbSel.innerHTML = '<option>Loading…</option>';
+  cfSel.innerHTML = '<option value="">— none —</option>';
+  dfSel.innerHTML = '<option value="">— no date filter —</option>';
+
+  try {
+    const res  = await fetch(`/api/fields/${obj}`);
+    const data = await res.json();
+    const opts      = data.fields.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
+    const dateOpts  = data.fields.filter(f => f.dataType === 'date')
+                          .map(f => `<option value="${f.id}">${f.label}</option>`).join('');
+    gbSel.innerHTML = opts;
+    cfSel.innerHTML = '<option value="">— none —</option>' + opts;
+    dfSel.innerHTML = '<option value="">— no date filter —</option>' + dateOpts;
+  } catch(e) {
+    gbSel.innerHTML = '<option>Error loading fields</option>';
+  }
+}
+
+async function runAnalytics() {
+  const obj        = document.getElementById('an-object').value;
+  const grpBy      = document.getElementById('an-groupby').value;
+  const cf         = document.getElementById('an-countfield').value;
+  const dateField  = document.getElementById('an-date-field').value;
+  const dateFrom   = document.getElementById('an-from').value;
+  const dateTo     = document.getElementById('an-to').value;
+  if (!grpBy) return;
+
+  const params = new URLSearchParams({ object_type: obj, group_by: grpBy });
+  if (cf) params.set('count_field', cf);
+
+  // Build a date filter and pass as JSON in `filters`
+  if (dateField && (dateFrom || dateTo)) {
+    const filter = { field: dateField, type: 'date', dateRange: 'custom',
+                     fromDate: dateFrom, toDate: dateTo };
+    params.set('filters', JSON.stringify([filter]));
+  }
+
+  try {
+    const res  = await fetch(`/api/summary?${params}`);
+    const data = await res.json();
+    renderAnalytics(data, grpBy, cf);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function renderAnalytics(data, grpBy, cf) {
+  const records = data.records || [];
+  if (!records.length) return;
+
+  document.getElementById('an-count').textContent = data.total_groups;
+  document.getElementById('an-total').textContent = data.total_records;
+
+  const max = Math.max(...records.map(r => r.count));
+  const chart = document.getElementById('an-chart');
+  const title = document.getElementById('an-chart-title');
+
+  // Find label for group_by field
+  title.textContent = `${grpBy} distribution`;
+
+  chart.innerHTML = records.slice(0, 25).map(r => `
+    <div class="bar-row">
+      <div class="bar-label" title="${esc(r.group)}">${esc(r.group)}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${Math.max(4, (r.count/max)*100)}%"></div>
+      </div>
+      <div class="bar-count">${r.count}</div>
+    </div>`).join('');
+
+  // Table
+  const hasDist = records[0].distinct_count !== undefined;
+  document.getElementById('an-table-head').innerHTML = '<tr><th>Group</th><th>Count</th>' + (hasDist ? `<th>Distinct ${cf}</th>` : '') + '</tr>';
+  document.getElementById('an-table-body').innerHTML = records.map(r =>
+    `<tr><td>${esc(r.group)}</td><td><strong>${r.count}</strong></td>${hasDist ? `<td>${r.distinct_count}</td>` : ''}</tr>`
+  ).join('');
+
+  document.getElementById('analytics-result').style.display = 'grid';
+}
+
+// ── Utils ──────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Smart Query (NL Search) ─────────────────────────────────────
+function setSQQuery(text) {
+  document.getElementById('sq-input').value = text;
+  runSmartQuery();
+}
+
+function parseQuery(query) {
+  const q = query.toLowerCase();
+
+  // ── Date / Period ──────────────────────────────────────────
+  let period = null;
+  if (/\byear.to.date\b|\bytd\b/i.test(q))            period = 'ytd';
+  else if (/\blast\s+year\b/i.test(q))                 period = 'last_year';
+  else if (/\bthis\s+year\b/i.test(q))                 period = 'this_year';
+  else if (/\blast\s+(quarter|qtr)\b/i.test(q))        period = 'last_quarter';
+  else if (/\bthis\s+(quarter|qtr)\b|\bq[1-4]\b/i.test(q)) period = 'this_quarter';
+  else if (/\blast\s+month\b/i.test(q))                period = 'last_month';
+  else if (/\bthis\s+month\b/i.test(q))                period = 'this_month';
+  else if (/\blast\s+90\s+days\b/i.test(q))            period = 'last_90_days';
+  else if (/\blast\s+30\s+days\b/i.test(q))            period = 'last_30_days';
+  else if (/\blast\s+week\b|\blast\s+7\s+days\b/i.test(q)) period = 'last_7_days';
+  else if (/\bthis\s+week\b/i.test(q))                 period = 'this_week';
+  else if (/\byesterday\b/i.test(q))                   period = 'yesterday';
+  else if (/\btoday\b/i.test(q))                       period = 'today';
+  else if (/\brecent|latest|newest\b/i.test(q))        period = 'last_30_days';
+  else if (/\bsoon\b|\bexpir/i.test(q))                period = null; // license handles its own
+
+  // ── Intent ────────────────────────────────────────────────
+  let intent = null;
+  // Team / user / who-wrote
+  if (/\bwho\s+(wrote|created|added)\b|\bnotes?\s+by\s+(user|team|rep)\b|\bteam\s+(perf|activ|prod|stat)\b|\buser\s+activ\b/i.test(q))
+    intent = 'team';
+  // Activations
+  else if (/\bactivat(ion|ed|e)\b|\bcontractor\s+activ\b|\bpartner\s+activ\b/i.test(q))
+    intent = 'activations';
+  // Training
+  else if (/\btrain(ing|ed|s)?\b|\bwebinar\b|\bcoach\b/i.test(q))
+    intent = 'training';
+  // License
+  else if (/\blicense\b|\bexpir\b|\brenew\b/i.test(q))
+    intent = 'license';
+  // BDR performance
+  else if (/\bbdr\b|\bbusiness\s+dev\b|\brep\s+perf\b|\bperf(ormance)?\s+summ\b/i.test(q))
+    intent = 'bdr';
+  // Team performance (broader)
+  else if (/\bteam\b|\bstaff\b|\bemployee\b|\binternal\b/i.test(q))
+    intent = 'team';
+  // Account activity / cold accounts
+  else if (/\baccount\s+(activ|notes|engag|touch)\b|\bcold\s+account\b|\bno\s+notes\b/i.test(q))
+    intent = 'account_activity';
+  // Notes analytics
+  else if (/\bnotes?\b/i.test(q))
+    intent = 'notes_analytics';
+  // Dealer / account profile lookup
+  else if (/\bdealer\s+(profile|info|detail|lookup)\b|\blook\s+up\b|\bshow\s+dealer\b/i.test(q))
+    intent = 'dealer_profile';
+
+  // ── Platform extraction ────────────────────────────────────
+  // Match known platforms or "for [Word]" pattern
+  const KNOWN_PLATFORMS = ['OPTIMUS','LTO','MICROF','ACIMA','FLEXSHOPPER','SNAP','KORNERSTONE','GREENSKY','UOWN','WELLS'];
+  let platform = null;
+  for (const p of KNOWN_PLATFORMS) {
+    if (new RegExp('\\b' + p + '\\b', 'i').test(query)) { platform = p; break; }
+  }
+  if (!platform) {
+    const m = query.match(/\bfor\s+([A-Z][A-Za-z]{2,})\b/);
+    if (m && !['LAST','THIS','NEXT','THE','ALL','YTD','OUR'].includes(m[1].toUpperCase())) {
+      platform = m[1].toUpperCase();
+    }
+  }
+
+  // ── BDR name extraction ────────────────────────────────────
+  let bdr = null;
+  const bdrM = query.match(/(?:(?:assigned to|for bdr|by bdr|bdr)\s+)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+  if (bdrM) bdr = bdrM[1].trim();
+
+  // ── "cold" modifier for account activity ─────────────────
+  const coldAccounts = /\bcold\b|\bno\s+notes\b|\binactive\b/i.test(q);
+
+  return { intent, period, platform, bdr, coldAccounts };
+}
+
+async function runSmartQuery() {
+  const query = document.getElementById('sq-input').value.trim();
+  if (!query) return;
+
+  const { intent, period, platform, bdr, coldAccounts } = parseQuery(query);
+  const dates = period ? computeDateRange(period) : { from: '', to: '' };
+
+  const intentDiv  = document.getElementById('sq-intent');
+  const resultDiv  = document.getElementById('sq-result');
+
+  // Show interpretation chips
+  const chips = [];
+  if (intent) chips.push({ label: '📊 ' + intent.replace(/_/g,' '), ok: true });
+  else        chips.push({ label: '⚠ Unknown report type', ok: false });
+  if (period)   chips.push({ label: '📅 ' + period.replace(/_/g,' '), ok: true });
+  if (platform) chips.push({ label: '🏷 Platform: ' + platform, ok: true });
+  if (bdr)      chips.push({ label: '👤 BDR: ' + bdr, ok: true });
+  if (coldAccounts && intent === 'account_activity') chips.push({ label: '❄ Active accounts only excluded', ok: true });
+
+  intentDiv.innerHTML = chips.length
+    ? `<div class="sq-understood">${chips.map(c => `<span class="sq-tag ${c.ok?'':'warn'}">${esc(c.label)}</span>`).join('')}</div>`
+    : '';
+
+  if (!intent) {
+    resultDiv.innerHTML = `<div class="card" style="max-width:800px;"><div class="alert alert-error">
+      ⚠ Couldn't identify a report type. Try phrases like:<br>
+      <em>"activations for Optimus last month"</em>, <em>"training this quarter"</em>, <em>"team performance YTD"</em>, <em>"license expiring soon"</em>
+    </div></div>`;
+    return;
+  }
+
+  resultDiv.innerHTML = `<div class="card" style="max-width:800px; color:#6b7280; padding:24px; text-align:center;">
+    <span class="spinner" style="border-color:rgba(53,106,230,0.3); border-top-color:#356ae6; width:24px; height:24px;"></span>
+    <div style="margin-top:10px; font-size:0.85rem;">Loading…</div>
+  </div>`;
+
+  try {
+    const p = new URLSearchParams();
+    if (dates.from) p.set('from_date', dates.from);
+    if (dates.to)   p.set('to_date',   dates.to);
+
+    let url = '';
+    let displayTitle = '';
+
+    switch (intent) {
+      case 'activations':
+        if (platform) p.set('platform', platform);
+        if (bdr)      p.set('bdr', bdr);
+        url = `/api/report/activations?${p}`;
+        displayTitle = `Partner Activations${platform ? ' — ' + platform : ''}${period ? ' (' + period.replace(/_/g,' ') + ')' : ''}`;
+        break;
+      case 'training':
+        url = `/api/report/training-summary?${p}`;
+        displayTitle = `Training Summary${period ? ' (' + period.replace(/_/g,' ') + ')' : ''}`;
+        break;
+      case 'license':
+        p.set('days_ahead', '90');
+        p.set('include_expired', 'true');
+        url = `/api/report/license-expiration?${p}`;
+        displayTitle = 'License Expiration (next 90 days + expired)';
+        break;
+      case 'bdr':
+        url = `/api/report/bdr-summary?${p}`;
+        displayTitle = `BDR Performance Summary${period ? ' (' + period.replace(/_/g,' ') + ')' : ''}`;
+        break;
+      case 'team':
+        url = `/api/report/team-activity?${p}`;
+        displayTitle = `Team Activity${period ? ' (' + period.replace(/_/g,' ') + ')' : ''}`;
+        break;
+      case 'account_activity':
+        if (coldAccounts) p.set('has_activity', 'false');
+        url = `/api/report/account-activity?${p}`;
+        displayTitle = `Account Activity${period ? ' (' + period.replace(/_/g,' ') + ')' : ''}`;
+        break;
+      case 'notes_analytics':
+        // Route to analytics for notes grouped by date
+        url = `/api/summary?object_type=notes&group_by=cdate`;
+        displayTitle = `Notes Overview`;
+        break;
+      default:
+        resultDiv.innerHTML = `<div class="card" style="max-width:800px;"><div class="alert alert-error">Could not map to a report endpoint.</div></div>`;
+        return;
+    }
+
+    const res  = await fetch(url);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+
+    // Normalize records
+    let records = data.records || data.by_user || [];
+
+    if (!records.length) {
+      resultDiv.innerHTML = `<div class="card" style="max-width:800px;"><div class="empty"><div class="big">📭</div>No records found for that query.</div></div>`;
+      return;
+    }
+
+    // Render results table
+    const keys = Object.keys(records[0]);
+    const tableHtml = `
+      <div class="card" style="margin-top:12px;">
+        <div class="results-bar">
+          <span class="results-count"><strong>${records.length}</strong> records · <em style="color:#374151; font-weight:600;">${esc(displayTitle)}</em></span>
+          <button class="btn btn-success btn-sm" onclick="sqDownloadCSV('${url}')">⬇ CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>${keys.map(k => `<th>${esc(k)}</th>`).join('')}</tr></thead>
+            <tbody>${records.slice(0,300).map(r =>
+              '<tr>' + keys.map(k => `<td title="${esc(String(r[k]||''))}">${esc(String(r[k]||''))}</td>`).join('') + '</tr>'
+            ).join('')}
+            ${records.length > 300 ? `<tr><td colspan="${keys.length}" style="text-align:center;color:#6b7280;font-style:italic;padding:10px;">Showing 300 of ${records.length} — download CSV for all rows</td></tr>` : ''}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    resultDiv.innerHTML = tableHtml;
+
+  } catch(e) {
+    resultDiv.innerHTML = `<div class="card" style="max-width:800px;"><div class="alert alert-error">✕ ${esc(e.message)}</div></div>`;
+  }
+}
+
+function sqDownloadCSV(baseUrl) {
+  // Append format=csv to the URL
+  const sep = baseUrl.includes('?') ? '&' : '?';
+  window.location.href = baseUrl + sep + 'format=csv';
+}
+
+// ── Global Search ───────────────────────────────────────────────
+function gsSetQ(val) {
+  document.getElementById('gs-input').value = val;
+  runGlobalSearch();
+}
+
+async function runGlobalSearch() {
+  const q = document.getElementById('gs-input').value.trim();
+  if (!q) return;
+  const out = document.getElementById('gs-result');
+  out.innerHTML = `<div class="card" style="text-align:center; color:#6b7280; padding:24px;">
+    <span class="spinner" style="border-color:rgba(53,106,230,0.3);border-top-color:#356ae6;width:24px;height:24px;"></span>
+    <div style="margin-top:10px;font-size:0.85rem;">Searching AC…</div>
+  </div>`;
+
+  try {
+    const res  = await fetch(`/api/global-search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    const data = await res.json();
+
+    if (data.total === 0) {
+      out.innerHTML = `<div class="card"><div class="empty"><div class="big">🔍</div>No matches found for <strong>${esc(q)}</strong></div></div>`;
+      return;
+    }
+
+    const sections = [
+      { key: 'slps',     icon: '📋', label: 'SLP Records',
+        cols: ['record_id','dealer_id','platform','account_id','status','matched_on'] },
+      { key: 'accounts', icon: '🏢', label: 'Accounts',
+        cols: ['id','name','matched_on'] },
+      { key: 'contacts', icon: '👤', label: 'Contacts',
+        cols: ['id','name','email','account_id','matched_on'] },
+    ];
+
+    let html = `<div class="card" style="margin-bottom:12px;">
+      <span style="font-size:0.85rem;color:#374151;"><strong>${data.total}</strong> result${data.total!==1?'s':''} for <strong>${esc(q)}</strong></span>
+    </div>`;
+
+    for (const s of sections) {
+      const rows = data[s.key] || [];
+      // Collect unique account URLs for the section title bar
+      const acctLinks = [...new Map(rows.filter(r=>r.account_url).map(r=>[r.account_url, r])).values()];
+      const linkBtns  = acctLinks.slice(0,5).map(r =>
+        `<a href="${esc(r.account_url)}" target="_blank"
+            style="margin-left:10px; padding:3px 10px; border-radius:6px; border:1px solid #d1d5db;
+                   background:white; color:#374151; font-size:0.75rem; font-weight:600;
+                   text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center; gap:4px;">
+          Go to Account ↗
+        </a>`
+      ).join('');
+      html += `<div class="card gs-section">
+        <div class="gs-section-title" style="justify-content:space-between; flex-wrap:wrap; gap:6px;">
+          <span style="display:flex;align-items:center;gap:8px;">${s.icon} ${s.label} <span class="gs-badge">${rows.length}</span></span>
+          <span>${linkBtns}</span>
+        </div>`;
+      if (!rows.length) {
+        html += `<div class="gs-empty">No matches</div>`;
+      } else {
+        html += `<div class="table-wrap"><table>
+          <thead><tr>${s.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>
+          <tbody>${rows.slice(0,100).map(r =>
+            '<tr>' + s.cols.map(c => `<td title="${esc(String(r[c]||''))}">${esc(String(r[c]||''))}</td>`).join('') + '</tr>'
+          ).join('')}</tbody>
+        </table></div>`;
+        if (rows.length > 100) html += `<div style="font-size:0.78rem;color:#9ca3af;margin-top:6px;">Showing 100 of ${rows.length}</div>`;
+      }
+      html += `</div>`;
+    }
+
+    out.innerHTML = html;
+  } catch(e) {
+    out.innerHTML = `<div class="card"><div class="alert alert-error">✕ ${esc(e.message)}</div></div>`;
+  }
+}
+
+// ── Global Search Overlay ────────────────────────────────────────
+let gsOverlayTimer = null;
+
+function openGlobalSearch() {
+  document.getElementById('gs-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('gs-overlay-input').focus(), 50);
+}
+
+function closeGlobalSearch() {
+  document.getElementById('gs-overlay').classList.remove('open');
+  document.getElementById('gs-overlay-input').value = '';
+  document.getElementById('gs-overlay-results').innerHTML =
+    '<div class="gs-modal-empty">Start typing to search across all of AC</div>';
+}
+
+function gsOverlayBgClick(e) {
+  if (e.target === document.getElementById('gs-overlay')) closeGlobalSearch();
+}
+
+async function gsOverlaySearch(q) {
+  clearTimeout(gsOverlayTimer);
+  const results = document.getElementById('gs-overlay-results');
+  if (!q.trim()) {
+    results.innerHTML = '<div class="gs-modal-empty">Start typing to search across all of AC</div>';
+    return;
+  }
+  gsOverlayTimer = setTimeout(async () => {
+    results.innerHTML = '<div class="gs-modal-empty">Searching…</div>';
+    try {
+      const res  = await fetch(`/api/global-search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (data.total === 0) {
+        results.innerHTML = `<div class="gs-modal-empty">No results for "${esc(q)}"</div>`;
+        return;
+      }
+      let html = '';
+      if (data.accounts && data.accounts.length) {
+        html += `<div class="gs-modal-section-label">Accounts</div>`;
+        html += data.accounts.slice(0,8).map(a =>
+          `<div class="gs-modal-item" onclick="gsOverlaySelect('${a.id}')">
+            <span class="gs-modal-badge account">Account</span>
+            <span class="gs-modal-item-name">${esc(a.name)}</span>
+            <span class="gs-modal-item-sub">${a.dealer_id ? `dealer id ${esc(a.dealer_id)}` : ''}</span>
+          </div>`).join('');
+      }
+      if (data.slps && data.slps.length) {
+        html += `<div class="gs-modal-section-label">SLP Records</div>`;
+        html += data.slps.slice(0,5).map(s =>
+          `<div class="gs-modal-item" onclick="gsOverlaySelect('${s.account_id}')">
+            <span class="gs-modal-badge slp">SLP</span>
+            <span class="gs-modal-item-name">${esc(s.dealer_id ? `dealer id ${s.dealer_id}` : s.account_id)}</span>
+            <span class="gs-modal-item-sub">platform: ${esc(s.platform||'—')}</span>
+          </div>`).join('');
+      }
+      if (data.contacts && data.contacts.length) {
+        html += `<div class="gs-modal-section-label">Contacts</div>`;
+        html += data.contacts.slice(0,5).map(c =>
+          `<div class="gs-modal-item" onclick="gsOverlaySelect('${c.account_id}')">
+            <span class="gs-modal-badge contact">Contact</span>
+            <span class="gs-modal-item-name">${esc(c.name||c.email)}</span>
+            <span class="gs-modal-item-sub">${esc(c.email||'')}</span>
+          </div>`).join('');
+      }
+      results.innerHTML = html;
+    } catch(e) {
+      results.innerHTML = `<div class="gs-modal-empty">Error: ${esc(e.message)}</div>`;
+    }
+  }, 300);
+}
+
+function gsOverlaySelect(accountId) {
+  closeGlobalSearch();
+  // Switch to accounts tab via showTab
+  const btn = document.querySelector('.app-nav nav button:first-child');
+  showTab('accounts', btn);
+  if (ab.initialized) {
+    abSelect(accountId);
+  } else {
+    abInit().then(() => abSelect(accountId));
+  }
+}
+
+// ── Account Browser ─────────────────────────────────────────────
+const ab = { results: [], activeId: null, searchTimer: null, initialized: false };
+
+async function abInit() {
+  if (ab.initialized) return;
+  ab.initialized = true;
+  await abLoad('');
+}
+
+async function abLoad(q) {
+  const list  = document.getElementById('ab-list');
+  const count = document.getElementById('ab-count');
+  list.innerHTML = `<div style="padding:20px;text-align:center;color:#9ca3af;font-size:0.82rem;">Loading…</div>`;
+
+  if (!q.trim()) {
+    // No query — show 20 recent accounts
+    try {
+      const res  = await fetch(`/api/accounts/search?q=&limit=20`);
+      const data = await res.json();
+      ab.results = (data.accounts || []).map(a => ({ type:'account', id:a.id, accountId:a.id, name:a.name, sub:a.dealer_id ? `dealer id ${a.dealer_id}` : '' }));
+      count.textContent = `${ab.results.length} accounts`;
+      abRenderList();
+    } catch(e) {
+      list.innerHTML = `<div style="padding:16px;color:#ef4444;font-size:0.82rem;">Error</div>`;
+    }
+    return;
+  }
+
+  // Global search
+  try {
+    const res  = await fetch(`/api/global-search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    ab.results = [];
+    for (const a of (data.accounts||[])) {
+      const sub = a.dealer_id ? `dealer id ${a.dealer_id}` : '';
+      ab.results.push({ type:'account', id:a.id, accountId:a.id, name:a.name||'(unnamed)', sub });
+    }
+    for (const s of (data.slps||[])) {
+      ab.results.push({ type:'slp', id:s.record_id, accountId:s.account_id, name:s.dealer_id ? `dealer id ${s.dealer_id}` : s.account_id, sub:`SLP · dealer id ${s.dealer_id}` });
+    }
+    for (const c of (data.contacts||[])) {
+      ab.results.push({ type:'contact', id:c.id, accountId:c.account_id, name:`${c.name||c.email}`, sub:`Contact · ${c.email}` });
+    }
+    count.textContent = `${data.total} result${data.total!==1?'s':''} for "${q}"`;
+    abRenderList();
+  } catch(e) {
+    list.innerHTML = `<div style="padding:16px;color:#ef4444;font-size:0.82rem;">Search error</div>`;
+  }
+}
+
+function abRenderList() {
+  const list = document.getElementById('ab-list');
+  if (!ab.results.length) {
+    list.innerHTML = `<div style="padding:20px;text-align:center;color:#9ca3af;font-size:0.82rem;">No results</div>`;
+    return;
+  }
+  list.innerHTML = ab.results.map(r => `
+    <div class="ab-item ${r.accountId === ab.activeId ? 'active' : ''}" onclick="abSelect('${r.accountId}')">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+        <span class="ab-result-badge ${r.type}">${r.type}</span>
+        <span class="ab-item-name" style="margin:0;">${esc(r.name||'(unnamed)')}</span>
+      </div>
+      <div class="ab-item-sub">${esc(r.sub)}</div>
+    </div>`).join('');
+}
+
+function abSearch(q) {
+  clearTimeout(ab.searchTimer);
+  ab.searchTimer = setTimeout(() => abLoad(q), 300);
+}
+
+async function abSelect(accountId) {
+  ab.activeId = accountId;
+  abRenderList();
+  const detail = document.getElementById('ab-detail');
+  detail.innerHTML = `<div class="ab-empty-state"><span class="spinner" style="border-color:rgba(53,106,230,0.3);border-top-color:#356ae6;width:28px;height:28px;"></span><div>Loading…</div></div>`;
+  try {
+    const res  = await fetch(`/api/accounts/${accountId}/detail`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json();
+    abRenderDetail(d);
+  } catch(e) {
+    detail.innerHTML = `<div style="padding:24px;"><div class="alert alert-error">✕ ${esc(e.message)}</div></div>`;
+  }
+}
+
+function abRenderDetail(d) {
+  const a = d.account;
+  const s = d.summary;
+
+  // ── Header ────────────────────────────────────────────────────
+  const header = `
+    <div class="acui-header">
+      <div class="acui-breadcrumb"><a href="#">Accounts</a> / ${esc(a.name)}</div>
+      <div class="acui-name-row">
+        <div>
+          <div class="acui-name">${esc(a.name)}</div>
+          ${a.url ? `<a href="${esc(a.url)}" target="_blank" class="acui-url">${esc(a.url)}</a>` : ''}
+        </div>
+        <div class="acui-header-right">
+          <div class="acui-owner">
+            <div class="acui-owner-avatar">AJ</div>
+            <div><div style="font-size:0.68rem;color:#94a3b8;">Account Owner</div><div style="font-weight:500;">${esc(a.fields.assigned_bdr||'—')}</div></div>
+          </div>
+          <div class="acui-timestamps">
+            ${a.created ? `<div>Created <strong>${esc(a.created.slice(0,10))}</strong></div>` : ''}
+          </div>
+          <a href="${esc(a.ac_url)}" target="_blank" class="btn btn-primary btn-sm">Open in AC ↗</a>
+        </div>
+      </div>
+    </div>`;
+
+  // ── Field groups for "About" — AC labels, grouped by category ─
+  const FIELD_GROUPS = [
+    { label: 'General',    keys: ['Parent Dealer ID','Account Status','DBA Name','Dealer Status','Contractor Status','Sales Region','Doing Business in States','Dealer Program','Account Type','Account Segment'] },
+    { label: 'Enrollment', keys: ['Partner Activation Date','Reactivation Date','Dealer Activation Timestamp','Original Owner','Oracle Producer ID','Assigned BDR','Account Source','Account Source – Secondary'] },
+    { label: 'Contact',    keys: ['Phone Number','Primary Contact First Name','Primary Contact Last Name','Primary Contact Email','Primary Contract Phone','Primary Contact Phone'] },
+    { label: 'Business',   keys: ['Years In Business','Number of Employees','Annual Revenue','Industry/Vertical','Primary Brand','Primary Distributor','Vendor Tax–ID','Platforms','Strategic Partners','Financing Partners'] },
+  ];
+  const usedKeys = new Set(FIELD_GROUPS.flatMap(g => g.keys));
+  const otherEntries = Object.entries(a.fields).filter(([k,v]) => v && !usedKeys.has(k) && !k.startsWith('field_'));
+
+  function fieldRow(label, val) {
+    return `<div class="acui-field-row">
+      <span class="acui-field-label">${esc(label)}</span>
+      <span class="acui-field-value">${esc(String(val))}</span>
+    </div>`;
+  }
+
+  const sections = FIELD_GROUPS.map((g,i) => {
+    // Business absorbs any fields not covered by other groups
+    const extra = (g.label === 'Business') ? otherEntries.map(([k,v]) => fieldRow(k,v)).join('') : '';
+    const rows  = g.keys.filter(k => a.fields[k]).map(k => fieldRow(k, a.fields[k])).join('') + extra;
+    if (!rows) return '';
+    return `<div class="acui-section-row">
+      <button class="acui-section-toggle ${i===0?'open':''}" onclick="abToggleSection(this)">
+        <span class="chevron">▶</span> ${esc(g.label)}
+      </button>
+      <div class="acui-section-body ${i===0?'open':''}">${rows}</div>
+    </div>`;
+  }).join('');
+
+  // ── SLPs table ────────────────────────────────────────────────
+  const slpCols = ['dealer-id','name','platform','slp-status-detail','contractor-activated-date'];
+  function coTable(rows, cols) {
+    const useCols = cols.filter(c => rows.some(r => r[c]));
+    if (!rows.length) return `<div class="acui-co-empty">No SLP records</div>`;
+    return `<table class="acui-co-table">
+      <thead><tr>${useCols.map(c=>`<th>${esc(c.replace(/-/g,' '))}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r=>'<tr>'+useCols.map(c=>`<td>${esc(String(r[c]||''))}</td>`).join('')+'</tr>').join('')}</tbody>
+    </table>`;
+  }
+
+  const aboutCard = `
+    <div class="acui-about">
+      <div class="acui-about-header">About ${esc(a.name)}</div>
+      ${sections}
+      <div class="acui-about-header" style="border-top:1px solid #e2e8f0;">
+        SLP Records <span style="font-weight:400;color:#94a3b8;font-size:0.78rem;">(${s.slp_count})</span>
+      </div>
+      <div>${coTable(d.slps, slpCols)}</div>
+    </div>`;
+
+  // ── Right sidebar ─────────────────────────────────────────────
+  const contactsPanel = `
+    <div class="acui-panel">
+      <div class="acui-panel-header">
+        <h4>Contacts <span class="cnt">(${s.contact_count})</span></h4>
+      </div>
+      <div class="acui-panel-body">${d.contacts.length
+        ? d.contacts.map(c => `
+          <div class="acui-contact-row">
+            <div class="acui-avatar">${esc((c.firstName||'?')[0].toUpperCase())}</div>
+            <div>
+              <div class="acui-contact-name">${esc((c.firstName||'')+' '+(c.lastName||''))}</div>
+              <div class="acui-contact-info">
+                ${c.phone ? `<span>📞 ${esc(c.phone)}</span>` : ''}
+                ${c.email ? `<span>✉ ${esc(c.email)}</span>` : ''}
+              </div>
+            </div>
+          </div>`).join('')
+        : '<div style="color:#94a3b8;font-size:0.78rem;">No contacts</div>'
+      }</div>
+    </div>`;
+
+  const sidebar = `<div class="acui-sidebar">${contactsPanel}</div>`;
+  const body    = `<div class="acui-body">${aboutCard}${sidebar}</div>`;
+
+  document.getElementById('ab-detail').innerHTML = header + body;
+}
+
+function abToggleSection(btn) {
+  btn.classList.toggle('open');
+  btn.nextElementSibling.classList.toggle('open');
+}
+
+function abCoTab(key, btn) {
+  document.querySelectorAll('.acui-co-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.acui-co-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('acotab-' + key).classList.add('active');
+  btn.classList.add('active');
+}
+
+init();
+</script>
+</body>
+</html>

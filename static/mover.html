@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Data Mover · AC Reporter</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+header {
+  background: linear-gradient(135deg, #356ae6 0%, #1a3fa8 100%);
+  color: white;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 56px;
+  box-shadow: 0 2px 12px rgba(53,106,230,0.3);
+}
+.logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; }
+.logo span { opacity: 0.7; font-weight: 400; }
+header a {
+  color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.8rem;
+  padding: 6px 12px; border-radius: 6px; background: rgba(255,255,255,0.12);
+}
+header a:hover { background: rgba(255,255,255,0.22); color: white; }
+
+.container { max-width: 1000px; margin: 0 auto; padding: 28px 24px; }
+
+.card {
+  background: white; border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 24px; margin-bottom: 20px;
+}
+.card-title {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: #6b7280; margin-bottom: 16px;
+}
+
+/* ── Op Cards ── */
+.ops-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 28px; }
+
+.op-card {
+  background: white; border-radius: 12px; padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border: 2px solid transparent; cursor: pointer; transition: all 0.15s;
+}
+.op-card:hover   { border-color: #356ae6; box-shadow: 0 4px 16px rgba(53,106,230,0.12); }
+.op-card.active  { border-color: #356ae6; background: #eff5ff; }
+
+.op-card .icon   { font-size: 1.8rem; margin-bottom: 10px; }
+.op-card h3      { font-size: 0.95rem; font-weight: 700; color: #111827; margin-bottom: 6px; }
+.op-card p       { font-size: 0.8rem; color: #6b7280; line-height: 1.5; }
+
+.flow-arrow {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.82rem; color: #374151; margin-bottom: 12px; font-weight: 600;
+}
+.flow-arrow .from { background: #dbeafe; color: #1d4ed8; padding: 4px 10px; border-radius: 5px; }
+.flow-arrow .to   { background: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 5px; }
+.flow-arrow .arr  { color: #9ca3af; font-size: 1.1rem; }
+
+/* ── Config Panel ── */
+.config-panel { display: none; }
+.config-panel.visible { display: block; }
+
+.form-row { margin-bottom: 14px; }
+.form-row label { display: block; font-size: 0.78rem; font-weight: 600; color: #374151; margin-bottom: 5px; }
+.form-row input, .form-row select, .form-row textarea {
+  width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 7px;
+  font-size: 0.83rem; font-family: inherit; outline: none;
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: #356ae6; }
+.form-row .hint { font-size: 0.73rem; color: #9ca3af; margin-top: 4px; }
+
+.field-map-row {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 8px;
+}
+.field-map-row input { flex: 1; }
+.field-map-row select { flex: 1; }
+.field-map-row .rm-btn { background: none; border: none; cursor: pointer; color: #ef4444; font-size: 1.1rem; padding: 0 4px; }
+
+/* ── Buttons ── */
+.btn {
+  padding: 9px 20px; border-radius: 7px; font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; border: none; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary   { background: #356ae6; color: white; }
+.btn-primary:hover  { background: #2557d3; }
+.btn-secondary { background: #e5e7eb; color: #374151; }
+.btn-secondary:hover { background: #d1d5db; }
+.btn-sm { padding: 6px 12px; font-size: 0.78rem; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Log ── */
+.log-wrap {
+  background: #1e293b; border-radius: 10px; padding: 16px;
+  font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem;
+  max-height: 320px; overflow-y: auto; color: #94a3b8;
+}
+.log-line { margin-bottom: 3px; line-height: 1.5; }
+.log-line.ok      { color: #34d399; }
+.log-line.err     { color: #f87171; }
+.log-line.warn    { color: #fbbf24; }
+.log-line.info    { color: #60a5fa; }
+.log-line.muted   { color: #64748b; }
+
+/* ── Progress ── */
+.progress-wrap { margin: 12px 0; display: none; }
+.progress-bar  { height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #356ae6, #6366f1); border-radius: 3px; transition: width 0.3s; }
+.progress-label { font-size: 0.75rem; color: #6b7280; margin-top: 5px; }
+
+/* ── Known field mapping ── */
+.known-fields { display: flex; flex-wrap: wrap; gap: 6px; }
+.known-field-tag {
+  font-size: 0.72rem; padding: 3px 8px; border-radius: 4px;
+  background: #f3f4f6; border: 1px solid #e5e7eb; color: #374151; cursor: pointer;
+}
+.known-field-tag:hover { background: #eff5ff; border-color: #bfdbfe; color: #356ae6; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">AC <span>Reporter</span></div>
+  <a href="/">← Report Builder</a>
+</header>
+
+<div class="container">
+
+  <div class="card" style="margin-bottom: 28px;">
+    <div class="card-title">Data Mover — Field Sync Operations</div>
+    <p style="font-size:0.85rem; color:#6b7280; line-height:1.6;">
+      Select an operation below to push field values between AC objects. Each operation
+      reads from a source object and writes matching values to a target object.
+      All operations are logged in real-time below.
+    </p>
+  </div>
+
+  <!-- Operation Cards -->
+  <div class="ops-grid">
+
+    <div class="op-card" onclick="selectOp('dealer-id-to-contacts', this)">
+      <div class="icon">🔢</div>
+      <h3>Dealer ID → Contacts</h3>
+      <p>Push the Dealer ID from each account down to all linked contacts.</p>
+    </div>
+
+    <div class="op-card" onclick="selectOp('bdr-to-contacts', this)">
+      <div class="icon">👤</div>
+      <h3>Assigned BDR → Contacts</h3>
+      <p>Push the account's Assigned BDR field to all linked contacts.</p>
+    </div>
+
+    <div class="op-card" onclick="selectOp('legal-name-to-contacts', this)">
+      <div class="icon">🏷️</div>
+      <h3>Legal Name → Contacts</h3>
+      <p>Push account Legal Business Name to all linked contacts.</p>
+    </div>
+
+    <div class="op-card" onclick="selectOp('account-to-slp', this)">
+      <div class="icon">📊</div>
+      <h3>Account Fields → SLP</h3>
+      <p>Sync selected account custom fields into linked SLP records.</p>
+    </div>
+
+    <div class="op-card" onclick="selectOp('slp-to-contacts', this)">
+      <div class="icon">🔄</div>
+      <h3>SLP Fields → Contacts</h3>
+      <p>Push SLP record fields (platform, status, etc.) to linked contact fields.</p>
+    </div>
+
+    <div class="op-card" onclick="selectOp('custom', this)">
+      <div class="icon">⚙️</div>
+      <h3>Custom Field Mapping</h3>
+      <p>Map any source object fields to target object fields manually.</p>
+    </div>
+
+  </div>
+
+  <!-- Config Panel -->
+  <div class="config-panel card" id="config-panel">
+    <div id="config-inner"></div>
+    <div style="margin-top:16px; display:flex; gap:10px; align-items:center;">
+      <button class="btn btn-primary" id="run-btn" onclick="runOp()">▶ Run Operation</button>
+      <button class="btn btn-secondary" onclick="clearLog()">Clear Log</button>
+      <span id="run-status" style="font-size:0.82rem; color:#6b7280;"></span>
+    </div>
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="progress-label">0 / 0</div>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="card" id="log-card" style="display:none;">
+    <div class="card-title">Operation Log</div>
+    <div class="log-wrap" id="log"></div>
+  </div>
+
+</div>
+
+<script>
+// ── Known field IDs (from field_id_mapping.csv) ────────────────
+const ACCOUNT_FIELDS = {
+  '18': 'Dealer ID (Parent)',
+  '15': 'DBA Name',
+  '19': 'Account Status',
+  '22': 'Doing Business In States',
+  '23': 'Sales Region',
+  '26': 'Partner Activation Date',
+  '29': 'Dealer Program',
+  '34': 'Platforms',
+  '35': 'Original Owner',
+  '36': 'Legal Business Name',
+  '119': 'Assigned BDR',
+  '118': 'Oracle Producer ID',
+};
+
+const CONTACT_FIELDS = {
+  '13': 'Assigned BDR',
+  '14': 'Legal Business Name',
+  '15': 'Dealer ID',
+  '21': 'Account Owner',
+  '22': 'Account Owner Email',
+};
+
+const SLP_FIELDS = {
+  'dealer-id': 'Dealer ID',
+  'platform': 'Platform',
+  'slp-status-detail': 'SLP Status Detail',
+  'original-owner': 'Original Owner',
+  'assigned-bdr': 'Assigned BDR',
+  'contractor-activated-date': 'Contractor Activated Date',
+};
+
+// ── State ──────────────────────────────────────────────────────
+let currentOp   = null;
+let fieldMaps   = [];
+
+// ── Op Selection ───────────────────────────────────────────────
+function selectOp(op, el) {
+  currentOp = op;
+  fieldMaps = [];
+
+  document.querySelectorAll('.op-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+
+  const panel = document.getElementById('config-panel');
+  const inner = document.getElementById('config-inner');
+  panel.classList.add('visible');
+
+  const configs = {
+    'dealer-id-to-contacts': {
+      title: 'Push Dealer ID to Contacts',
+      from: 'Accounts (field: Dealer ID #18)',
+      to:   'Contacts (field: Dealer ID #15)',
+      html: `
+        <p style="font-size:0.83rem; color:#6b7280; margin-bottom:14px;">
+          Iterates all accounts, reads the Dealer ID custom field (account field #18),
+          and writes it to all linked contacts (contact field #15).
+          Accounts without a Dealer ID or without contacts are skipped.
+        </p>
+        <div class="form-row">
+          <label>Filter: Only accounts with Account Status</label>
+          <select id="cfg-status">
+            <option value="">— all statuses —</option>
+            <option>Active</option>
+            <option>Not Active</option>
+            <option>Pre-Activation</option>
+            <option>Deactivated for Cause</option>
+          </select>
+        </div>`
+    },
+    'bdr-to-contacts': {
+      title: 'Push Assigned BDR to Contacts',
+      from: 'Accounts (field: Assigned BDR #119)',
+      to:   'Contacts (field: Assigned BDR #13)',
+      html: `
+        <p style="font-size:0.83rem; color:#6b7280; margin-bottom:14px;">
+          Reads the Assigned BDR from each account and writes it to all linked contacts.
+        </p>`
+    },
+    'legal-name-to-contacts': {
+      title: 'Push Legal Business Name to Contacts',
+      from: 'Accounts (field: Legal Business Name #36)',
+      to:   'Contacts (field: Legal Business Name #14)',
+      html: `
+        <p style="font-size:0.83rem; color:#6b7280; margin-bottom:14px;">
+          Reads the account's Legal Business Name (or falls back to account name)
+          and writes it to all linked contacts.
+        </p>`
+    },
+    'account-to-slp': {
+      title: 'Push Account Fields → SLP Records',
+      from: 'Accounts',
+      to:   'SLP Custom Object',
+      html: `
+        <p style="font-size:0.83rem; color:#6b7280; margin-bottom:14px;">
+          Maps account custom fields to SLP record fields. Add one or more field mappings below.
+        </p>
+        <div class="form-row">
+          <label>Field Mappings</label>
+          <div class="known-fields" style="margin-bottom:8px;">
+            ${Object.entries(ACCOUNT_FIELDS).map(([id, lbl]) =>
+              `<span class="known-field-tag" onclick="addAccountMap('${id}', '${lbl}')">${lbl}</span>`
+            ).join('')}
+          </div>
+          <div id="field-map-rows"></div>
+          <button class="btn btn-secondary btn-sm" onclick="addMapRow()" style="margin-top:4px;">+ Add Row</button>
+        </div>`
+    },
+    'slp-to-contacts': {
+      title: 'Push SLP Fields → Contacts',
+      from: 'SLP Custom Object',
+      to:   'Contacts',
+      html: `
+        <p style="font-size:0.83rem; color:#6b7280; margin-bottom:14px;">
+          Reads SLP field values and writes them to linked contact fields (via the SLP's account).
+        </p>
+        <div class="form-row">
+          <label>SLP Field → Contact Field Mappings</label>
+          <div id="field-map-rows"></div>
+          <button class="btn btn-secondary btn-sm" onclick="addSlpMapRow()" style="margin-top:4px;">+ Add Row</button>
+        </div>`
+    },
+    'custom': {
+      title: 'Custom Field Mapping',
+      from: 'Source Object',
+      to:   'Target Object',
+      html: `
+        <div class="form-row">
+          <label>Source Object</label>
+          <select id="cfg-src">
+            <option value="accounts">Accounts</option>
+            <option value="slp">SLP</option>
+            <option value="contacts">Contacts</option>
+            <option value="deals">Deals</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Target Object</label>
+          <select id="cfg-tgt">
+            <option value="contacts">Contacts</option>
+            <option value="slp">SLP</option>
+            <option value="accounts">Accounts</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Field Mappings (source_field_id : target_field_id)</label>
+          <div id="field-map-rows"></div>
+          <button class="btn btn-secondary btn-sm" onclick="addCustomMapRow()" style="margin-top:4px;">+ Add Row</button>
+        </div>
+        <div class="form-row">
+          <label>Notes / Description</label>
+          <textarea id="cfg-notes" rows="2" placeholder="Describe what this sync does…"></textarea>
+        </div>`
+    }
+  };
+
+  const cfg = configs[op];
+  if (!cfg) return;
+
+  inner.innerHTML = `
+    <div class="flow-arrow" style="margin-bottom:16px;">
+      <span class="from">FROM: ${cfg.from}</span>
+      <span class="arr">→</span>
+      <span class="to">TO: ${cfg.to}</span>
+    </div>
+    <div style="font-size:1rem; font-weight:700; color:#111827; margin-bottom:14px;">${cfg.title}</div>
+    ${cfg.html}`;
+}
+
+// ── Field Map Rows ─────────────────────────────────────────────
+function addAccountMap(srcId, label) {
+  fieldMaps.push({ src: srcId, tgt: '' });
+  renderAccountMapRows();
+}
+
+function addMapRow() {
+  fieldMaps.push({ src: '', tgt: '' });
+  renderAccountMapRows();
+}
+
+function renderAccountMapRows() {
+  const wrap = document.getElementById('field-map-rows');
+  if (!wrap) return;
+  wrap.innerHTML = fieldMaps.map((m, i) => `
+    <div class="field-map-row">
+      <select onchange="fieldMaps[${i}].src=this.value">
+        <option value="">— account field —</option>
+        ${Object.entries(ACCOUNT_FIELDS).map(([id,lbl]) =>
+          `<option value="${id}" ${m.src===id?'selected':''}>${lbl} (${id})</option>`).join('')}
+      </select>
+      <span style="color:#9ca3af; font-size:1rem;">→</span>
+      <input type="text" placeholder="SLP field id (e.g. dealer-id)" value="${m.tgt}"
+        onchange="fieldMaps[${i}].tgt=this.value" oninput="fieldMaps[${i}].tgt=this.value"/>
+      <button class="rm-btn" onclick="fieldMaps.splice(${i},1); renderAccountMapRows()">✕</button>
+    </div>`).join('');
+}
+
+function addSlpMapRow() {
+  fieldMaps.push({ src: '', tgt: '' });
+  renderSlpMapRows();
+}
+
+function renderSlpMapRows() {
+  const wrap = document.getElementById('field-map-rows');
+  if (!wrap) return;
+  wrap.innerHTML = fieldMaps.map((m, i) => `
+    <div class="field-map-row">
+      <select onchange="fieldMaps[${i}].src=this.value">
+        <option value="">— SLP field —</option>
+        ${Object.entries(SLP_FIELDS).map(([id,lbl]) =>
+          `<option value="${id}" ${m.src===id?'selected':''}>${lbl}</option>`).join('')}
+      </select>
+      <span style="color:#9ca3af;">→</span>
+      <select onchange="fieldMaps[${i}].tgt=this.value">
+        <option value="">— contact field —</option>
+        ${Object.entries(CONTACT_FIELDS).map(([id,lbl]) =>
+          `<option value="${id}" ${m.tgt===id?'selected':''}>${lbl} (${id})</option>`).join('')}
+      </select>
+      <button class="rm-btn" onclick="fieldMaps.splice(${i},1); renderSlpMapRows()">✕</button>
+    </div>`).join('');
+}
+
+function addCustomMapRow() {
+  fieldMaps.push({ src: '', tgt: '' });
+  renderCustomMapRows();
+}
+
+function renderCustomMapRows() {
+  const wrap = document.getElementById('field-map-rows');
+  if (!wrap) return;
+  wrap.innerHTML = fieldMaps.map((m, i) => `
+    <div class="field-map-row">
+      <input type="text" placeholder="Source field ID" value="${m.src}"
+        onchange="fieldMaps[${i}].src=this.value" oninput="fieldMaps[${i}].src=this.value"/>
+      <span style="color:#9ca3af;">→</span>
+      <input type="text" placeholder="Target field ID" value="${m.tgt}"
+        onchange="fieldMaps[${i}].tgt=this.value" oninput="fieldMaps[${i}].tgt=this.value"/>
+      <button class="rm-btn" onclick="fieldMaps.splice(${i},1); renderCustomMapRows()">✕</button>
+    </div>`).join('');
+}
+
+// ── Run Operation ──────────────────────────────────────────────
+function runOp() {
+  if (!currentOp) return;
+
+  log('info', `Starting operation: ${currentOp}`);
+  log('warn', '⚠️  This UI currently previews the operation. To execute, run the corresponding Python script.');
+  log('muted', '─'.repeat(60));
+
+  switch(currentOp) {
+    case 'dealer-id-to-contacts':
+      log('info', 'Script: python push_dealer_id_to_contacts.py');
+      log('muted', 'Reads Account field #18 (Dealer ID) → writes to Contact field #15');
+      previewOp('push_dealer_id_to_contacts.py');
+      break;
+    case 'bdr-to-contacts':
+      log('info', 'Script: python push_account_fields_to_contacts.py');
+      log('muted', 'Reads Account field #119 (Assigned BDR) → writes to Contact field #13');
+      previewOp('push_account_fields_to_contacts.py');
+      break;
+    case 'legal-name-to-contacts':
+      log('info', 'Script: python push_account_fields_to_contacts.py');
+      log('muted', 'Reads Account field #36 (Legal Business Name) → writes to Contact field #14');
+      previewOp('push_account_fields_to_contacts.py');
+      break;
+    case 'account-to-slp':
+      const maps = fieldMaps.filter(m => m.src && m.tgt);
+      if (!maps.length) { log('err', 'Add at least one field mapping first.'); return; }
+      log('info', 'Script: python push_account_fields_to_slp.py');
+      maps.forEach(m => log('muted', `  ${ACCOUNT_FIELDS[m.src]||m.src} (acct #${m.src}) → SLP field "${m.tgt}"`));
+      previewOp('push_account_fields_to_slp.py');
+      break;
+    case 'slp-to-contacts':
+      const sMaps = fieldMaps.filter(m => m.src && m.tgt);
+      if (!sMaps.length) { log('err', 'Add at least one field mapping first.'); return; }
+      log('info', 'Script: python push_account_fields_to_contacts.py (SLP variant)');
+      sMaps.forEach(m => log('muted', `  SLP "${m.src}" → Contact field #${m.tgt} (${CONTACT_FIELDS[m.tgt]||m.tgt})`));
+      previewOp('push_account_fields_to_contacts.py');
+      break;
+    case 'custom':
+      const cMaps = fieldMaps.filter(m => m.src && m.tgt);
+      if (!cMaps.length) { log('err', 'Add at least one field mapping first.'); return; }
+      const src = document.getElementById('cfg-src')?.value;
+      const tgt = document.getElementById('cfg-tgt')?.value;
+      log('info', `Custom sync: ${src} → ${tgt}`);
+      cMaps.forEach(m => log('muted', `  Field "${m.src}" → "${m.tgt}"`));
+      log('ok', '✓ Field mapping captured. Use ac_data_sync.py or a custom script to execute.');
+      break;
+  }
+
+  log('muted', '─'.repeat(60));
+  log('ok', '✓ Preview complete. Run the appropriate script from Terminal to execute.');
+}
+
+function previewOp(scriptName) {
+  log('ok', `✓ Run from Claude folder:`);
+  log('muted', `    source .env && python ${scriptName}`);
+  log('muted', '  Results will be logged to a timestamped CSV file.');
+}
+
+// ── Log ────────────────────────────────────────────────────────
+function log(type, msg) {
+  const logEl = document.getElementById('log');
+  const card  = document.getElementById('log-card');
+  card.style.display = 'block';
+
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  const prefix = { ok: '✓', err: '✗', warn: '⚠', info: '›', muted: ' ' }[type] || '·';
+  line.textContent = `${new Date().toLocaleTimeString()} ${prefix}  ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('log').innerHTML = '';
+}
+</script>
+</body>
+</html>

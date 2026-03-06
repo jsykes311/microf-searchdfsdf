@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Contact Lookup · AC Reporter</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+header {
+  background: linear-gradient(135deg, #356ae6 0%, #1a3fa8 100%);
+  color: white;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 56px;
+  box-shadow: 0 2px 12px rgba(53,106,230,0.3);
+}
+.logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; }
+.logo span { opacity: 0.7; font-weight: 400; }
+header a {
+  color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.8rem;
+  padding: 6px 12px; border-radius: 6px; background: rgba(255,255,255,0.12);
+}
+header a:hover { background: rgba(255,255,255,0.22); color: white; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 0;
+  height: calc(100vh - 56px);
+}
+
+/* ── Left Panel ── */
+.left-panel {
+  background: white;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.search-wrap {
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0 12px;
+}
+.search-input-wrap input {
+  flex: 1; border: none; background: none; padding: 10px 0;
+  font-size: 0.88rem; outline: none; color: #111827;
+}
+.search-input-wrap .icon { color: #9ca3af; font-size: 1rem; }
+.search-input-wrap:focus-within { border-color: #356ae6; background: white; }
+
+.search-hint { font-size: 0.75rem; color: #9ca3af; margin-top: 6px; padding: 0 2px; }
+
+.contact-list { flex: 1; overflow-y: auto; }
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.1s;
+}
+.contact-item:hover   { background: #f8fafc; }
+.contact-item.active  { background: #eff5ff; border-right: 3px solid #356ae6; }
+
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.85rem; flex-shrink: 0;
+  color: white;
+}
+.contact-info .name  { font-weight: 600; font-size: 0.88rem; color: #111827; }
+.contact-info .email { font-size: 0.78rem; color: #6b7280; margin-top: 1px; }
+.contact-info .org   { font-size: 0.75rem; color: #9ca3af; margin-top: 1px; }
+
+.empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: #9ca3af;
+}
+.empty-state .big { font-size: 2.5rem; margin-bottom: 8px; }
+.empty-state p    { font-size: 0.85rem; }
+
+/* ── Right Panel ── */
+.right-panel {
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.no-selection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #9ca3af;
+  text-align: center;
+}
+.no-selection .big  { font-size: 3rem; margin-bottom: 12px; }
+.no-selection p     { font-size: 0.9rem; }
+
+/* ── Profile ── */
+.profile-header {
+  background: white;
+  border-radius: 12px;
+  padding: 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.profile-avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.3rem; color: white; flex-shrink: 0;
+}
+.profile-name { font-size: 1.3rem; font-weight: 700; color: #111827; }
+.profile-meta { font-size: 0.83rem; color: #6b7280; margin-top: 3px; }
+.profile-meta a { color: #356ae6; text-decoration: none; }
+
+.profile-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.field-chip {
+  background: white;
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.field-chip .label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #9ca3af; margin-bottom: 4px; }
+.field-chip .value { font-size: 0.88rem; font-weight: 600; color: #111827; word-break: break-word; }
+
+/* ── Activity Feed ── */
+.section-title {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: #6b7280; margin-bottom: 12px;
+}
+
+.activity-feed {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.activity-item {
+  display: flex;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f3f4f6;
+  align-items: flex-start;
+}
+.activity-item:last-child { border-bottom: none; }
+
+.activity-icon {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem; flex-shrink: 0;
+}
+.icon-send        { background: #dbeafe; }
+.icon-open        { background: #d1fae5; }
+.icon-click       { background: #ede9fe; }
+.icon-bounce      { background: #fee2e2; }
+.icon-unsubscribe { background: #ffedd5; }
+.icon-note        { background: #fef9c3; }
+.icon-task        { background: #f3f4f6; }
+
+.activity-content .act-label {
+  font-size: 0.75rem; font-weight: 600; color: #374151; margin-bottom: 2px;
+}
+.activity-content .act-desc {
+  font-size: 0.82rem; color: #6b7280; line-height: 1.4;
+  max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.activity-content .act-time {
+  font-size: 0.72rem; color: #9ca3af; margin-top: 3px;
+}
+
+.no-activity { padding: 30px; text-align: center; color: #9ca3af; font-size: 0.85rem; }
+
+/* Loading spinner */
+.loading {
+  display: flex; align-items: center; gap: 10px;
+  padding: 30px; color: #6b7280; font-size: 0.85rem;
+  justify-content: center;
+}
+.spin {
+  width: 20px; height: 20px;
+  border: 2px solid #e5e7eb; border-top-color: #356ae6;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.badge-pill {
+  display: inline-block;
+  padding: 3px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600;
+}
+.badge-blue   { background: #dbeafe; color: #1d4ed8; }
+.badge-green  { background: #d1fae5; color: #065f46; }
+.badge-gray   { background: #f3f4f6; color: #374151; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">AC <span>Reporter</span></div>
+  <a href="/">← Report Builder</a>
+</header>
+
+<div class="layout">
+  <!-- Left: Search + List -->
+  <div class="left-panel">
+    <div class="search-wrap">
+      <div class="search-input-wrap">
+        <span class="icon">🔍</span>
+        <input type="text" id="search-input" placeholder="Search by name or email…"
+               oninput="handleSearch(this.value)" autocomplete="off"/>
+      </div>
+      <div class="search-hint">Type at least 2 characters to search</div>
+    </div>
+    <div class="contact-list" id="contact-list">
+      <div class="empty-state">
+        <div class="big">👤</div>
+        <p>Search for a contact above</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Profile -->
+  <div class="right-panel" id="right-panel">
+    <div class="no-selection">
+      <div class="big">👈</div>
+      <p>Select a contact from the list</p>
+    </div>
+  </div>
+</div>
+
+<script>
+let searchTimeout = null;
+let activeId      = null;
+
+const COLORS = ['#356ae6','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#be185d'];
+
+function colorFor(name) {
+  let hash = 0;
+  for (const c of (name || 'X')) hash = c.charCodeAt(0) + ((hash << 5) - hash);
+  return COLORS[Math.abs(hash) % COLORS.length];
+}
+
+function initials(first, last) {
+  return ((first||'')[0]||'') + ((last||'')[0]||'').toUpperCase() || '?';
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function handleSearch(val) {
+  clearTimeout(searchTimeout);
+  if (val.length < 2) {
+    document.getElementById('contact-list').innerHTML =
+      '<div class="empty-state"><div class="big">👤</div><p>Type at least 2 characters</p></div>';
+    return;
+  }
+  searchTimeout = setTimeout(() => searchContacts(val), 300);
+}
+
+async function searchContacts(q) {
+  const list = document.getElementById('contact-list');
+  list.innerHTML = '<div class="loading"><div class="spin"></div> Searching…</div>';
+
+  try {
+    const res  = await fetch(`/api/contact-search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    const contacts = data.contacts || [];
+
+    if (!contacts.length) {
+      list.innerHTML = '<div class="empty-state"><div class="big">😶</div><p>No contacts found</p></div>';
+      return;
+    }
+
+    list.innerHTML = contacts.map(c => {
+      const name  = `${c.firstName||''} ${c.lastName||''}`.trim() || c.email;
+      const color = colorFor(name);
+      const ini   = initials(c.firstName, c.lastName);
+      return `
+        <div class="contact-item ${c.id === activeId ? 'active' : ''}" onclick="loadProfile('${c.id}', this)">
+          <div class="avatar" style="background:${color}">${esc(ini)}</div>
+          <div class="contact-info">
+            <div class="name">${esc(name)}</div>
+            <div class="email">${esc(c.email||'')}</div>
+            ${c.orgName ? `<div class="org">${esc(c.orgName)}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = `<div class="empty-state"><p style="color:#dc2626">Error: ${esc(e.message)}</p></div>`;
+  }
+}
+
+async function loadProfile(id, el) {
+  activeId = id;
+  document.querySelectorAll('.contact-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  const panel = document.getElementById('right-panel');
+  panel.innerHTML = '<div class="loading"><div class="spin"></div> Loading profile…</div>';
+
+  try {
+    const res  = await fetch(`/api/contact-profile/${id}`);
+    const data = await res.json();
+    renderProfile(data);
+  } catch(e) {
+    panel.innerHTML = `<div class="loading" style="color:#dc2626">✕ ${esc(e.message)}</div>`;
+  }
+}
+
+function renderProfile({ contact, activity }) {
+  const panel  = document.getElementById('right-panel');
+  const name   = `${contact.firstName||''} ${contact.lastName||''}`.trim() || contact.email || 'Unknown';
+  const color  = colorFor(name);
+  const ini    = initials(contact.firstName, contact.lastName);
+
+  const formatDate = iso => {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch { return iso; }
+  };
+
+  const ICON_CLASS = {
+    send: 'icon-send', open: 'icon-open', click: 'icon-click',
+    bounce: 'icon-bounce', unsubscribe: 'icon-unsubscribe', note: 'icon-note', task: 'icon-task'
+  };
+
+  const activityHtml = activity.length
+    ? activity.map(a => `
+        <div class="activity-item">
+          <div class="activity-icon ${ICON_CLASS[a.type]||'icon-task'}">${esc(a.icon||'•')}</div>
+          <div class="activity-content">
+            <div class="act-label">${esc(a.label)}</div>
+            ${a.description ? `<div class="act-desc" title="${esc(a.description)}">${esc(a.description)}</div>` : ''}
+            <div class="act-time">${formatDate(a.timestamp)}</div>
+          </div>
+        </div>`).join('')
+    : '<div class="no-activity">No recent activity found</div>';
+
+  panel.innerHTML = `
+    <div class="profile-header">
+      <div class="profile-avatar" style="background:${color}">${esc(ini)}</div>
+      <div>
+        <div class="profile-name">${esc(name)}</div>
+        <div class="profile-meta">
+          ${contact.email ? `<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : ''}
+          ${contact.phone ? ` · ${esc(contact.phone)}` : ''}
+          ${contact.orgName ? ` · ${esc(contact.orgName)}` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-fields">
+      <div class="field-chip">
+        <div class="label">Contact ID</div>
+        <div class="value">${esc(contact.id||'—')}</div>
+      </div>
+      <div class="field-chip">
+        <div class="label">Created</div>
+        <div class="value">${formatDate(contact.created)}</div>
+      </div>
+      <div class="field-chip">
+        <div class="label">Last Updated</div>
+        <div class="value">${formatDate(contact.updated)}</div>
+      </div>
+    </div>
+
+    <div class="section-title">Activity (${activity.length} events)</div>
+    <div class="activity-feed">${activityHtml}</div>`;
+}
+</script>
+</body>
+</html>
