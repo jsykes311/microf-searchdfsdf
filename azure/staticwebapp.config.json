@@ -12,7 +12,7 @@
   "responseOverrides": {
     "401": {
       "statusCode": 302,
-      "location": "/.auth/login/aad"
+      "redirect": "/.auth/login/aad"
     }
   }
 }
