@@ -25,6 +25,17 @@ load_dotenv()
 
 app = FastAPI()
 
+# Return unhandled exceptions as JSON so errors are readable in the browser/curl
+from fastapi.responses import JSONResponse
+from fastapi.requests import Request
+import traceback
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    print(f"[ERROR] {request.url}\n{tb}")
+    return JSONResponse(status_code=500, content={"detail": str(exc), "type": type(exc).__name__})
+
 # Allow Azure Static Web Apps + SharePoint + localhost for dev.
 app.add_middleware(
     CORSMiddleware,
@@ -294,7 +305,7 @@ async def ac_get_all(path: str, key: str, params: dict = None) -> list:
             else:
                 seen[len(seen)] = item   # fallback for items without id
         if total is None:
-            total = int((data.get("meta") or {}).get("total", 0)) or None
+            total = int((data.get("meta") or {}).get("total") or 0) or None
         offset += limit
         if not page:
             break
