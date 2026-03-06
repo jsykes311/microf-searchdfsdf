@@ -1,0 +1,16 @@
+name: Daily Activations Report
+
+on:
+  schedule:
+    - cron: '0 12 * * 1-5'   # 7:00 AM ET (UTC-5) Mon–Fri
+  workflow_dispatch:           # allow manual trigger from GitHub Actions tab
+
+jobs:
+  send-activations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger activations report
+        run: |
+          curl -f --max-time 120 \
+            -u "${{ secrets.APP_USER }}:${{ secrets.APP_PASS }}" \
+            "https://microf-search.onrender.com/api/send-report/activations"
