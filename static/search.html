@@ -316,6 +316,10 @@
 
       try {
         const res  = await fetch(`/api/global-search?q=${encodeURIComponent(q)}`);
+        if (!res.ok) {
+          status.innerHTML = `⚠️ Search error (${res.status}) — please refresh and try again.`;
+          return;
+        }
         const data = await res.json();
         renderResults(data);
       } catch (err) {

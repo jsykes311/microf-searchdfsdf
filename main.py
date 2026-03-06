@@ -2150,7 +2150,7 @@ async def account_detail(account_id: str):
 # ═══════════════════════════════════════════════════════════════════════════
 
 @app.get("/api/global-search")
-async def global_search(q: str = Query(..., min_length=1), _: None = Depends(require_auth)):
+async def global_search(q: str = Query(..., min_length=1)):
     """Search accounts (by name), contacts (by email only, text queries), and SLPs (by dealer ID or name)."""
     q = q.strip()
     is_numeric = q.isdigit()
