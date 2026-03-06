@@ -289,11 +289,18 @@ async def ac_get(path: str, params: dict = None):
         return r.json()
 
 async def ac_get_all(path: str, key: str, params: dict = None) -> list:
-    """Paginate through all records, deduplicating by id."""
-    seen    = {}   # id → record (preserves last-seen order, eliminates dups)
-    offset  = 0
-    limit   = 100
-    total   = None
+    """Paginate through all records, deduplicating by id.
+
+    Break conditions (whichever comes first):
+      - Empty page returned → no more records
+      - Partial page (< limit) → last page, no need for another round-trip
+    We intentionally ignore meta.total because AC's custom-objects endpoint
+    reports the page count in that field rather than the grand total, which
+    caused early exit and inconsistent result counts.
+    """
+    seen   = {}   # id → record
+    offset = 0
+    limit  = 100
     while True:
         p    = {**(params or {}), "limit": limit, "offset": offset}
         data = await ac_get(path, p)
@@ -304,12 +311,8 @@ async def ac_get_all(path: str, key: str, params: dict = None) -> list:
                 seen[item_id] = item
             else:
                 seen[len(seen)] = item   # fallback for items without id
-        if total is None:
-            total = int((data.get("meta") or {}).get("total") or 0) or None
         offset += limit
-        if not page:
-            break
-        if total and offset >= total:
+        if len(page) < limit:   # empty page OR partial page → we're done
             break
     return list(seen.values())
 
