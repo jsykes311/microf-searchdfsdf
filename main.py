@@ -103,8 +103,10 @@ async def dealer_index_status():
     """Return current index size and age."""
     age = int(_time.time() - _dealer_index_ts) if _dealer_index_ts else None
     return {
-        "indexed_dealers": len(_dealer_id_index),
-        "indexed_accounts": len(_account_to_dealer),
+        "indexed_dealers":   len(_dealer_id_index),
+        "indexed_accounts":  len(_account_to_dealer),
+        "indexed_platforms": len(_account_to_platform),
+        "indexed_bdrs":      len(_account_to_bdr),
         "age_seconds": age,
     }
 
