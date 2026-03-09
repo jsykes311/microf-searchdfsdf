@@ -407,7 +407,7 @@ async def get_fields(object_type: str):
                 if isinstance(opts, str) and opts:
                     obj["options"] = [o.strip() for o in opts.replace("\n", ",").split(",") if o.strip()]
                 elif isinstance(opts, list):
-                    obj["options"] = [str(o.get("value", o)) for o in opts if o]
+                    obj["options"] = [str(o.get("value", o)) if isinstance(o, dict) else str(o) for o in opts if o]
             fields.append(obj)
             ftypes[fid] = obj
         # Cross-object fields
