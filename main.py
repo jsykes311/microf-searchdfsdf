@@ -130,6 +130,8 @@ _cf_meta_ts: float   = 0.0
 # ── Dealer ID ↔ Account index (built at startup, refreshed hourly) ───────────
 _dealer_id_index:  dict  = {}   # dealer_id (str) → {"id": account_id, "name": account_name}
 _account_to_dealer: dict = {}   # account_id (str) → dealer_id (str)
+_account_to_platform: dict = {} # account_id (str) → platform/Dealer Program (customfield 29)
+_account_to_bdr: dict = {}      # account_id (str) → Assigned BDR (customfield 119)
 _dealer_index_ts:  float = 0.0
 
 async def _get_account_cf_meta() -> dict:
@@ -162,9 +164,11 @@ async def _build_dealer_id_index() -> None:
     Phase 2: paginate accounts to get names.
     Runs on server startup; re-triggered via /api/dealer-index/refresh."""
     global _dealer_index_ts
-    DEALER_CF_ID = 18    # customFieldId for "Parent Dealer ID" (field 18)
-    CF_PAGE      = 1000  # records per bulk page (AC accepts up to 1000)
-    CONCURRENCY  = 20    # pages fetched in parallel per batch
+    DEALER_CF_ID   = 18    # customFieldId for "Parent Dealer ID"
+    PLATFORM_CF_ID = 29    # customFieldId for "Dealer Program"
+    BDR_CF_ID      = 119   # customFieldId for "Assigned BDR"
+    CF_PAGE        = 1000  # records per bulk page (AC accepts up to 1000)
+    CONCURRENCY    = 20    # pages fetched in parallel per batch
 
     try:
         print("[dealer-index] Starting build…")
@@ -172,17 +176,25 @@ async def _build_dealer_id_index() -> None:
         # ── Phase 1: bulk accountCustomFieldData ──────────────────────────
         first_page = await ac_get("accountCustomFieldData", {"limit": CF_PAGE, "offset": 0})
         total_cf   = int(first_page.get("meta", {}).get("total", 0))
-        print(f"[dealer-index] {total_cf} CF records total, scanning for dealer IDs…")
+        print(f"[dealer-index] {total_cf} CF records total, scanning…")
 
-        acct_to_dealer: dict = {}
+        acct_to_dealer:   dict = {}
+        acct_to_platform: dict = {}
+        acct_to_bdr:      dict = {}
 
         def _ingest(items: list) -> None:
             for item in items:
-                if int(item.get("customFieldId", 0)) == DEALER_CF_ID:
-                    aid = str(item.get("accountId", ""))
-                    val = (item.get("fieldValue") or "").strip()
-                    if aid and val:
-                        acct_to_dealer[aid] = val
+                cf_id = int(item.get("customFieldId", 0))
+                aid   = str(item.get("accountId", ""))
+                val   = (item.get("fieldValue") or "").strip()
+                if not (aid and val):
+                    continue
+                if cf_id == DEALER_CF_ID:
+                    acct_to_dealer[aid]   = val
+                elif cf_id == PLATFORM_CF_ID:
+                    acct_to_platform[aid] = val
+                elif cf_id == BDR_CF_ID:
+                    acct_to_bdr[aid]      = val
 
         _ingest(first_page.get("accountCustomFieldData", []))
 
@@ -199,7 +211,9 @@ async def _build_dealer_id_index() -> None:
                 if not isinstance(page, Exception):
                     _ingest(page.get("accountCustomFieldData", []))
 
-        print(f"[dealer-index] {len(acct_to_dealer)} accounts have dealer IDs; fetching account names…")
+        print(f"[dealer-index] {len(acct_to_dealer)} dealer IDs, "
+              f"{len(acct_to_platform)} platforms, {len(acct_to_bdr)} BDRs indexed; "
+              f"fetching account names…")
 
         # ── Phase 2: paginate accounts for names ──────────────────────────
         all_accounts = await ac_get_all("accounts", "accounts", {})
@@ -213,8 +227,10 @@ async def _build_dealer_id_index() -> None:
             new_atd[aid] = did
             new_did[did] = {"id": aid, "name": acct_to_name.get(aid, "")}
 
-        _dealer_id_index.clear();   _dealer_id_index.update(new_did)
-        _account_to_dealer.clear(); _account_to_dealer.update(new_atd)
+        _dealer_id_index.clear();    _dealer_id_index.update(new_did)
+        _account_to_dealer.clear();  _account_to_dealer.update(new_atd)
+        _account_to_platform.clear(); _account_to_platform.update(acct_to_platform)
+        _account_to_bdr.clear();     _account_to_bdr.update(acct_to_bdr)
         _dealer_index_ts = _time.time()
         print(f"[dealer-index] Done. {len(new_did)} dealer IDs indexed across {len(new_atd)} accounts.")
 
@@ -2864,18 +2880,13 @@ async def _run_slp_sync(dry_run: bool) -> None:
                         "started": datetime.utcnow().isoformat()}
 
     PAGE_SIZE = 100
-    async def _get_acct_cfs(aid: str) -> dict:
-        """Fetch account custom fields sequentially — avoids memory spikes."""
-        try:
-            cf_r = await ac_get(f"accounts/{aid}/accountCustomFieldData")
-            return {str(i.get("customFieldId", "")): (i.get("fieldValue") or "").strip()
-                    for i in cf_r.get("accountCustomFieldData", [])}
-        except Exception:
-            return {}
 
     scanned = updated = skipped = errors = 0
     preview = []
     offset  = 0
+
+    # Use the in-memory account indexes — no per-record HTTP calls needed
+    # _account_to_dealer / _account_to_platform / _account_to_bdr are built at startup
 
     try:
         while True:
@@ -2884,21 +2895,6 @@ async def _run_slp_sync(dry_run: bool) -> None:
             records = page.get("records", [])
             if not records:
                 break
-
-            # Collect unique account IDs needing CF lookup for this page
-            need_cf: set = set()
-            for r in records:
-                fields = {fo["id"]: fo.get("value") for fo in r.get("fields", [])}
-                if any(not fields.get(fid) for fid, _ in _SLP_SYNC_FIELDS):
-                    rel    = r.get("relationships", {}).get("account", [])
-                    acc_id = str(rel[0]) if rel else None
-                    if acc_id:
-                        need_cf.add(acc_id)
-
-            # Fetch CFs one account at a time to stay within Render memory limits
-            acct_cf_map: dict = {}
-            for aid in need_cf:
-                acct_cf_map[aid] = await _get_acct_cfs(aid)
 
             for r in records:
                 scanned += 1
@@ -2911,10 +2907,14 @@ async def _run_slp_sync(dry_run: bool) -> None:
                 for slp_fid, cf_id in _SLP_SYNC_FIELDS:
                     if fields.get(slp_fid):
                         continue
-                    if cf_id is None:
+                    if cf_id is None:          # dealer-id → dealer index
                         val = _account_to_dealer.get(acc_id, "") if acc_id else ""
+                    elif cf_id == "29":        # platform → platform index
+                        val = _account_to_platform.get(acc_id, "") if acc_id else ""
+                    elif cf_id == "119":       # BDR → BDR index
+                        val = _account_to_bdr.get(acc_id, "") if acc_id else ""
                     else:
-                        val = acct_cf_map.get(acc_id, {}).get(cf_id, "") if acc_id else ""
+                        val = ""
                     if val:
                         to_update.append({"id": slp_fid, "value": val})
 
