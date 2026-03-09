@@ -8,13 +8,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Wake up Render
+        run: |
+          echo "Waking Render (may take up to 60s)..."
+          curl -s --max-time 90 \
+            -u "${{ secrets.APP_USER }}:${{ secrets.APP_PASS }}" \
+            "https://microf-search.onrender.com/api/sync-slp-fields/status"
+          echo ""
+          echo "Render is up"
+
       - name: Start sync
         run: |
-          curl -f --max-time 30 -s \
+          RESP=$(curl -s --max-time 30 \
             -X POST \
             -u "${{ secrets.APP_USER }}:${{ secrets.APP_PASS }}" \
-            "https://microf-search.onrender.com/api/sync-slp-fields"
-          echo "Sync started"
+            "https://microf-search.onrender.com/api/sync-slp-fields")
+          echo "Response: $RESP"
+          echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('status')=='started' else 1)"
 
       - name: Poll until done
         run: |
