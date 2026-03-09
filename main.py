@@ -2933,7 +2933,9 @@ async def _run_slp_sync(dry_run: bool) -> None:
                     updated += 1
                 except Exception as e:
                     errors += 1
-                    print(f"[sync-slp] Error updating record {rec_id}: {e}")
+                    err_str = str(e)
+                    print(f"[sync-slp] Error updating record {rec_id}: {err_str}")
+                    _slp_sync_status["last_error"] = f"record {rec_id}: {err_str}"
 
             # Update live progress
             _slp_sync_status.update({"scanned": scanned, "updated": updated,
