@@ -288,6 +288,12 @@ async def ac_get(path: str, params: dict = None):
         r.raise_for_status()
         return r.json()
 
+async def ac_put(path: str, body: dict):
+    async with httpx.AsyncClient(timeout=60) as client:
+        r = await client.put(ac_url(path), headers=HEADERS, json=body)
+        r.raise_for_status()
+        return r.json()
+
 async def ac_get_all(path: str, key: str, params: dict = None) -> list:
     """Paginate through all records, deduplicating by id.
 
@@ -2827,6 +2833,103 @@ async def trigger_report(report_type: str, _: None = Depends(require_auth)):
         )
     asyncio.create_task(job())
     return {"status": "queued", "report": report_type, "recipients": _RECIPIENTS}
+
+
+# ── SLP field sync ────────────────────────────────────────────────────────────
+# Copies missing field values from the linked account's custom fields into
+# the SLP custom object record.  Fields synced:
+#   dealer-id    ← _account_to_dealer index (account customfield 18)
+#   platform     ← account customfield 29  (Dealer Program)
+#   assigned-bdr ← account customfield 119 (Assigned BDR)
+
+_SLP_SYNC_FIELDS = [
+    # (slp_field_id, account_cf_id_str)  — None means use the dealer-id index
+    ("dealer-id",    None),
+    ("platform",     "29"),
+    ("assigned-bdr", "119"),
+]
+
+@app.post("/api/sync-slp-fields")
+async def sync_slp_fields(
+    dry_run: bool = Query(False, description="Preview changes without writing to AC"),
+    _: None = Depends(require_auth),
+):
+    """Copy missing SLP field values from their linked account.
+
+    Returns counts: scanned / updated / skipped (already filled) / errors.
+    Pass ?dry_run=true to preview without writing anything.
+    """
+    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+
+    # Identify which accounts we need CF data for
+    need_cf: set = set()
+    for r in slp_records:
+        fields = {fo["id"]: fo.get("value") for fo in r.get("fields", [])}
+        if any(not fields.get(fid) for fid, _ in _SLP_SYNC_FIELDS):
+            rel    = r.get("relationships", {}).get("account", [])
+            acc_id = str(rel[0]) if rel else None
+            if acc_id:
+                need_cf.add(acc_id)
+
+    # Batch-fetch account CFs in parallel
+    async def _get_acct_cfs(aid: str) -> tuple:
+        try:
+            cf_r = await ac_get(f"accounts/{aid}/accountCustomFieldData")
+            cfs  = {str(i.get("customFieldId", "")): (i.get("fieldValue") or "").strip()
+                    for i in cf_r.get("accountCustomFieldData", [])}
+            return aid, cfs
+        except Exception:
+            return aid, {}
+
+    acct_cf_map: dict = dict(await asyncio.gather(*[_get_acct_cfs(aid) for aid in need_cf]))
+
+    scanned = updated = skipped = errors = 0
+    changes = []   # populated when dry_run=True
+
+    for r in slp_records:
+        scanned += 1
+        rec_id = r.get("id")
+        fields = {fo["id"]: fo.get("value") for fo in r.get("fields", [])}
+        rel    = r.get("relationships", {}).get("account", [])
+        acc_id = str(rel[0]) if rel else None
+
+        # Build list of fields to fill in
+        to_update = []
+        for slp_fid, cf_id in _SLP_SYNC_FIELDS:
+            if fields.get(slp_fid):           # already has a value — skip
+                continue
+            if cf_id is None:                 # dealer-id: use index
+                val = _account_to_dealer.get(acc_id, "") if acc_id else ""
+            else:
+                cfs = acct_cf_map.get(acc_id, {}) if acc_id else {}
+                val = cfs.get(cf_id, "")
+            if val:
+                to_update.append({"id": slp_fid, "value": val})
+
+        if not to_update:
+            skipped += 1
+            continue
+
+        if dry_run:
+            changes.append({"record_id": rec_id, "account_id": acc_id, "fields": to_update})
+            updated += 1
+            continue
+
+        try:
+            await ac_put(
+                f"customObjects/records/{SLP_SCHEMA_ID}/{rec_id}",
+                {"record": {"fields": to_update}},
+            )
+            updated += 1
+        except Exception as e:
+            errors += 1
+            print(f"[sync-slp] Error updating record {rec_id}: {e}")
+
+    result = {"scanned": scanned, "updated": updated, "skipped": skipped, "errors": errors,
+              "dry_run": dry_run}
+    if dry_run:
+        result["preview"] = changes
+    return result
 
 
 if __name__ == "__main__":
