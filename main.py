@@ -2595,22 +2595,34 @@ async def _job_activations():
             account_ids.add(acc_id)
         candidates.append({"fields": fields, "account_id": acc_id})
 
-    acct_cache: dict = {}
-    for aid in account_ids:
+    async def _fetch_acct_act(aid: str) -> tuple:
         try:
-            ad = await ac_get(f"accounts/{aid}")
-            acct_cache[aid] = ad.get("account", {}).get("name", "")
+            name_r, cf_r = await asyncio.gather(
+                ac_get(f"accounts/{aid}"),
+                ac_get(f"accounts/{aid}/accountCustomFieldData"),
+                return_exceptions=True,
+            )
+            name = name_r.get("account", {}).get("name", "") if isinstance(name_r, dict) else ""
+            cfs: dict = {}
+            if isinstance(cf_r, dict):
+                for item in cf_r.get("accountCustomFieldData", []):
+                    cfs[str(item.get("customFieldId", ""))] = (item.get("fieldValue") or "").strip()
+            return aid, {"name": name, "platform": cfs.get("29", ""), "bdr": cfs.get("119", ""),
+                         "dealer_id": _account_to_dealer.get(aid, "")}
         except Exception:
-            acct_cache[aid] = ""
+            return aid, {"name": "", "platform": "", "bdr": "", "dealer_id": _account_to_dealer.get(aid, "")}
+
+    acct_cache: dict = dict(await asyncio.gather(*[_fetch_acct_act(aid) for aid in account_ids]))
 
     records = []
     for c in candidates:
-        f = c["fields"]
+        f    = c["fields"]
+        acct = acct_cache.get(c["account_id"]) or {}
         records.append({
-            "Account":   acct_cache.get(c["account_id"], ""),
-            "Dealer ID": f.get("dealer-id", ""),
-            "Platform":  f.get("platform", ""),
-            "BDR":       f.get("assigned-bdr", ""),
+            "Account":   acct.get("name") or f.get("name", ""),
+            "Dealer ID": f.get("dealer-id") or acct.get("dealer_id", ""),
+            "Platform":  f.get("platform") or acct.get("platform", ""),
+            "BDR":       f.get("assigned-bdr") or acct.get("bdr", ""),
             "Activated": str(f.get("contractor-activated-date", "") or "")[:10],
         })
     records.sort(key=lambda x: x["Activated"], reverse=True)
@@ -2718,11 +2730,41 @@ async def _job_bdr_summary():
     print(f"[reports] BDR summary {week_start} → {week_end}")
 
     slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
-    bdr_data: dict = defaultdict(lambda: {"activated_week": 0, "total_slps": 0,
-                                           "platforms": defaultdict(int), "accounts": set()})
+
+    # Pass 1 – collect raw data; find accounts where BDR or platform is missing
+    raw_slps = []
+    acct_ids_needed: set = set()
     for r in slp_records:
         fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
-        bdr    = str(fields.get("assigned-bdr", "")).strip() or "Unassigned"
+        bdr    = str(fields.get("assigned-bdr", "")).strip()
+        plat   = str(fields.get("platform", "")).strip()
+        rel    = r.get("relationships", {}).get("account", [])
+        acc_id = str(rel[0]) if rel else None
+        if (not bdr or not plat) and acc_id:
+            acct_ids_needed.add(acc_id)
+        raw_slps.append({"fields": fields, "bdr": bdr, "plat": plat, "acc_id": acc_id})
+
+    # Fetch account CFs for accounts where BDR/platform is missing
+    acct_cf_cache: dict = {}
+    if acct_ids_needed:
+        async def _fetch_cf_bdr(aid: str) -> tuple:
+            try:
+                cf_r = await ac_get(f"accounts/{aid}/accountCustomFieldData")
+                cfs  = {str(i.get("customFieldId", "")): (i.get("fieldValue") or "").strip()
+                        for i in cf_r.get("accountCustomFieldData", [])}
+                return aid, {"bdr": cfs.get("119", ""), "platform": cfs.get("29", "")}
+            except Exception:
+                return aid, {"bdr": "", "platform": ""}
+        acct_cf_cache = dict(await asyncio.gather(*[_fetch_cf_bdr(aid) for aid in acct_ids_needed]))
+
+    # Pass 2 – process with fallbacks
+    bdr_data: dict = defaultdict(lambda: {"activated_week": 0, "total_slps": 0,
+                                           "platforms": defaultdict(int), "accounts": set()})
+    for rd in raw_slps:
+        fields   = rd["fields"]
+        acc_id   = rd["acc_id"]
+        fallback = acct_cf_cache.get(acc_id, {}) if acc_id else {}
+        bdr      = rd["bdr"] or fallback.get("bdr", "") or "Unassigned"
         bdr_data[bdr]["total_slps"] += 1
         if fields.get("slp-status-detail") == "Contractor Activated":
             act_str = str(fields.get("contractor-activated-date", "")).strip()
@@ -2734,12 +2776,11 @@ async def _job_bdr_summary():
                         bdr_data[bdr]["activated_week"] += 1
                 except Exception:
                     pass
-        plat = str(fields.get("platform", "")).strip()
+        plat = rd["plat"] or fallback.get("platform", "")
         if plat:
             bdr_data[bdr]["platforms"][plat] += 1
-        rel = r.get("relationships", {}).get("account", [])
-        if rel:
-            bdr_data[bdr]["accounts"].add(str(rel[0]))
+        if acc_id:
+            bdr_data[bdr]["accounts"].add(acc_id)
 
     records = [
         {"BDR": bdr,
