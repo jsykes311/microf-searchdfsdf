@@ -22,4 +22,40 @@ jobs:
         run: |
           curl -f --max-time 120 \
             -u "${{ secrets.APP_USER }}:${{ secrets.APP_PASS }}" \
-            "https://microf-search.onrender.com/api/send-report/bdr-summary"
+            "https://microf-search.onrender.com/api/send-report/bdr-summary?preset=last_week"
+
+  training-activity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger training activity report
+        run: |
+          curl -f --max-time 120 \
+            -u "${{ secrets.APP_USER }}:${{ secrets.APP_PASS }}" \
+            "https://microf-search.onrender.com/api/send-report/training-activity?preset=last_week"
+
+  platform-breakdown:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger platform breakdown report
+        run: |
+          curl -f --max-time 120 \
+            -u "${{ secrets.APP_USER }}:${{ secrets.APP_PASS }}" \
+            "https://microf-search.onrender.com/api/send-report/platform-breakdown?preset=last_week"
+
+  account-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger account status summary
+        run: |
+          curl -f --max-time 120 \
+            -u "${{ secrets.APP_USER }}:${{ secrets.APP_PASS }}" \
+            "https://microf-search.onrender.com/api/send-report/account-status"
+
+  oracle-missing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Oracle Producer ID missing report
+        run: |
+          curl -f --max-time 120 \
+            -u "${{ secrets.APP_USER }}:${{ secrets.APP_PASS }}" \
+            "https://microf-search.onrender.com/api/send-report/oracle-missing"

@@ -11,7 +11,7 @@ import io
 import asyncio
 import secrets
 import time as _time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from dotenv import load_dotenv
 import json
 from collections import defaultdict
@@ -2589,16 +2589,87 @@ async def _send_email(subject: str, html: str,
         print(f"[reports] Email failed: {exc}")
 
 
+# ── Date-range helpers ────────────────────────────────────────────────────
+
+def _resolve_date_range(
+    start: Optional[date],
+    end:   Optional[date],
+    preset: Optional[str],
+    *,
+    default_start: Optional[date] = None,
+    default_end:   Optional[date] = None,
+) -> tuple:
+    """Resolve start/end from explicit params, a named preset, or defaults.
+    Presets: yesterday | last_week | last_7_days | last_30_days | last_90_days |
+             this_week | this_month | last_month
+    """
+    today = date.today()
+    if preset:
+        p = preset.lower().replace("-", "_")
+        if p == "yesterday":
+            d = today - timedelta(days=1); return d, d
+        if p == "last_week":
+            dow = today.weekday()                      # Mon=0 … Sun=6
+            last_sun = today - timedelta(days=dow + 1)
+            return last_sun - timedelta(days=6), last_sun
+        if p in ("last_7_days", "last_7"):
+            return today - timedelta(days=7), today - timedelta(days=1)
+        if p in ("last_30_days", "last_30"):
+            return today - timedelta(days=30), today - timedelta(days=1)
+        if p in ("last_90_days", "last_90"):
+            return today - timedelta(days=90), today - timedelta(days=1)
+        if p == "this_week":
+            return today - timedelta(days=today.weekday()), today
+        if p in ("this_month", "current_month"):
+            return today.replace(day=1), today
+        if p == "last_month":
+            first_this = today.replace(day=1)
+            last_prev  = first_this - timedelta(days=1)
+            return last_prev.replace(day=1), last_prev
+    return (start or default_start), (end or default_end)
+
+
+async def _fetch_acct_cf_map(field_ids: set) -> dict:
+    """Bulk-fetch account custom fields. Returns {account_id: {field_id_str: value}}."""
+    result: dict   = defaultdict(dict)
+    field_ids_int  = {int(f) for f in field_ids}
+    offset, PAGE   = 0, 100
+    while True:
+        page  = await ac_get("accountCustomFieldData", {"limit": PAGE, "offset": offset})
+        items = page.get("accountCustomFieldData", [])
+        if not items:
+            break
+        for item in items:
+            fid = int(item.get("customFieldId", 0))
+            if fid not in field_ids_int:
+                continue
+            aid = str(item.get("accountId", ""))
+            val = (item.get("fieldValue") or "").strip()
+            if aid and val:
+                result[aid][str(fid)] = val
+        offset += PAGE
+        if len(items) < PAGE:
+            break
+    return dict(result)
+
+
 # ── Activations (daily Mon–Fri) ──────────────────────────────────────────
 
-async def _job_activations():
-    """Email yesterday's new 'Contractor Activated' SLP records."""
-    from datetime import timezone, date as _date
-    tz_utc    = timezone.utc
-    yesterday = (_date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-    from_dt   = datetime.strptime(yesterday, "%Y-%m-%d").replace(tzinfo=tz_utc)
-    to_dt     = from_dt.replace(hour=23, minute=59, second=59)
-    print(f"[reports] Activations for {yesterday}")
+async def _job_activations(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                           preset: Optional[str] = None):
+    """Email 'Contractor Activated' SLP records for a date range (defaults to yesterday)."""
+    from datetime import timezone
+    tz_utc = timezone.utc
+    today  = date.today()
+    _start, _end = _resolve_date_range(start_date, end_date, preset,
+                                       default_start=today - timedelta(days=1))
+    if _start is None: _start = today - timedelta(days=1)
+    if _end   is None: _end   = _start
+    from_dt    = datetime(_start.year, _start.month, _start.day, tzinfo=tz_utc)
+    to_dt      = datetime(_end.year,   _end.month,   _end.day,   23, 59, 59, tzinfo=tz_utc)
+    yesterday  = str(_start)
+    date_label = str(_start) if _start == _end else f"{_start} to {_end}"
+    print(f"[reports] Activations for {date_label}")
 
     slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
     account_ids: set = set()
@@ -2658,28 +2729,35 @@ async def _job_activations():
     cols = [("Account","Account"), ("Dealer ID","Dealer ID"),
             ("Platform","Platform"), ("BDR","BDR"), ("Activated","Activated")]
     html = _HTML_WRAPPER.format(
-        title=f"Activations — {yesterday}",
+        title=f"Activations — {date_label}",
         subtitle=f"{len(records)} new activation{'s' if len(records) != 1 else ''}",
         table=_html_table(records, cols),
         timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
     )
+    csv_label = yesterday if _start == _end else f"{_start}_{_end}"
     await _send_email(
-        subject=f"Activations Report — {yesterday} ({len(records)} records)",
+        subject=f"Activations Report — {date_label} ({len(records)} records)",
         html=html,
         csv_data=_csv_bytes(records),
-        csv_name=f"activations_{yesterday}.csv",
+        csv_name=f"activations_{csv_label}.csv",
     )
 
 
 # ── License Expiration (weekly Monday) ───────────────────────────────────
 
-async def _job_license_expiration():
-    """Email licenses expiring within 90 days or already expired."""
-    from datetime import timezone, date as _date
+async def _job_license_expiration(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                                   preset: Optional[str] = None):
+    """Email licenses expiring in a date window (defaults to already-expired through 90 days out)."""
+    from datetime import timezone
     tz_utc = timezone.utc
     now    = datetime.now(tz_utc)
-    cutoff = now + timedelta(days=90)
-    today  = _date.today().strftime("%Y-%m-%d")
+    today  = date.today()
+    # For license expiration, start/end bound the expiration date itself
+    _start, _end = _resolve_date_range(start_date, end_date, preset,
+                                       default_end=today + timedelta(days=90))
+    cutoff_dt = datetime(_end.year, _end.month, _end.day, 23, 59, 59, tzinfo=tz_utc) if _end else now + timedelta(days=90)
+    floor_dt  = datetime(_start.year, _start.month, _start.day, tzinfo=tz_utc) if _start else None
+    today_str = str(today)
     print("[reports] License expiration report")
 
     lic_records = await ac_get_all(f"customObjects/records/{LICENSE_SCHEMA_ID}", "records", {})
@@ -2696,7 +2774,9 @@ async def _job_license_expiration():
                       else datetime.strptime(str(exp_str)[:10], "%Y-%m-%d").replace(tzinfo=tz_utc))
         except Exception:
             continue
-        if exp_dt > cutoff:
+        if exp_dt > cutoff_dt:
+            continue
+        if floor_dt and exp_dt < floor_dt:
             continue
         is_expired = exp_dt < now
         rel    = r.get("relationships", {}).get("account", [])
@@ -2730,31 +2810,40 @@ async def _job_license_expiration():
 
     cols = [("Account","Account"), ("Expiration","Expiration"),
             ("Status","Status"), ("License #","License #"), ("State","State")]
+    end_label   = str(_end)   if _end   else str(today + timedelta(days=90))
+    start_label = str(_start) if _start else "past"
+    range_label = f"{start_label} – {end_label}"
     html = _HTML_WRAPPER.format(
         title="License Expiration Report",
-        subtitle=f"{len(records)} license{'s' if len(records) != 1 else ''} expiring within 90 days or already expired",
+        subtitle=f"{len(records)} license{'s' if len(records) != 1 else ''} — expiration {range_label}",
         table=_html_table(records, cols),
         timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
     )
     await _send_email(
-        subject=f"License Expiration Report — {today} ({len(records)} records)",
+        subject=f"License Expiration Report — {today_str} ({len(records)} records)",
         html=html,
         csv_data=_csv_bytes(records),
-        csv_name=f"license_expiration_{today}.csv",
+        csv_name=f"license_expiration_{today_str}.csv",
     )
 
 
 # ── BDR Summary (weekly Monday) ──────────────────────────────────────────
 
-async def _job_bdr_summary():
-    """Email past-week activations grouped by BDR."""
-    from datetime import timezone, date as _date
-    tz_utc     = timezone.utc
-    today      = _date.today()
-    week_start = (today - timedelta(days=7)).strftime("%Y-%m-%d")
-    week_end   = (today - timedelta(days=1)).strftime("%Y-%m-%d")
-    from_dt    = datetime.strptime(week_start, "%Y-%m-%d").replace(tzinfo=tz_utc)
-    to_dt      = datetime.strptime(week_end, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=tz_utc)
+async def _job_bdr_summary(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                           preset: Optional[str] = None):
+    """Email activations grouped by BDR for a date range (defaults to past 7 days)."""
+    from datetime import timezone
+    tz_utc = timezone.utc
+    _today = date.today()
+    _start, _end = _resolve_date_range(start_date, end_date, preset,
+                                       default_start=_today - timedelta(days=7),
+                                       default_end=_today - timedelta(days=1))
+    if _start is None: _start = _today - timedelta(days=7)
+    if _end   is None: _end   = _today - timedelta(days=1)
+    week_start = _start.strftime("%Y-%m-%d")
+    week_end   = _end.strftime("%Y-%m-%d")
+    from_dt    = datetime(_start.year, _start.month, _start.day, tzinfo=tz_utc)
+    to_dt      = datetime(_end.year,   _end.month,   _end.day,   23, 59, 59, tzinfo=tz_utc)
     print(f"[reports] BDR summary {week_start} → {week_end}")
 
     slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
@@ -2836,25 +2925,456 @@ async def _job_bdr_summary():
     )
 
 
+# ── Training Activity (weekly Monday) ────────────────────────────────────
+
+async def _job_training_activity(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                                  preset: Optional[str] = None):
+    """Email training sessions conducted in the date window, grouped by trainer."""
+    from datetime import timezone
+    tz_utc = timezone.utc
+    today  = date.today()
+    _start, _end = _resolve_date_range(start_date, end_date, preset,
+                                       default_start=today - timedelta(days=7),
+                                       default_end=today - timedelta(days=1))
+    if _start is None: _start = today - timedelta(days=7)
+    if _end   is None: _end   = today - timedelta(days=1)
+    from_dt    = datetime(_start.year, _start.month, _start.day, tzinfo=tz_utc)
+    to_dt      = datetime(_end.year,   _end.month,   _end.day,   23, 59, 59, tzinfo=tz_utc)
+    date_label = str(_start) if _start == _end else f"{_start} to {_end}"
+    print(f"[reports] Training activity {date_label}")
+
+    training_records = await ac_get_all(f"customObjects/records/{TRAINING_SCHEMA_ID}", "records", {})
+    account_ids: set = set()
+    candidates = []
+    for r in training_records:
+        fields   = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
+        date_str = str(fields.get("date-of-training", "")).strip()
+        if not date_str:
+            continue
+        try:
+            td = (datetime.fromisoformat(date_str.replace("Z", "+00:00")) if "T" in date_str
+                  else datetime.strptime(date_str[:10], "%Y-%m-%d").replace(tzinfo=tz_utc))
+        except Exception:
+            continue
+        if not (from_dt <= td <= to_dt):
+            continue
+        rel    = r.get("relationships", {}).get("account", [])
+        acc_id = str(rel[0]) if rel else None
+        if acc_id:
+            account_ids.add(acc_id)
+        candidates.append({"fields": fields, "account_id": acc_id})
+
+    acct_cache: dict = {}
+    for aid in account_ids:
+        try:
+            d = await ac_get(f"accounts/{aid}")
+            acct_cache[aid] = d.get("account", {}).get("name", "")
+        except Exception:
+            acct_cache[aid] = ""
+
+    records = []
+    for c in candidates:
+        f   = c["fields"]
+        aid = c["account_id"] or ""
+        records.append({
+            "Account":       acct_cache.get(aid, ""),
+            "Dealer ID":     _account_to_dealer.get(aid, ""),
+            "Trained By":    f.get("trained-by", ""),
+            "Training Type": f.get("training-type", ""),
+            "Agenda":        f.get("training-agenda", ""),
+            "Date":          str(f.get("date-of-training", ""))[:10],
+            "Notes":         (f.get("training-notes", "") or "")[:120],
+        })
+    records.sort(key=lambda x: (x["Date"], x["Trained By"]), reverse=True)
+
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Trained By","Trained By"),
+            ("Training Type","Training Type"), ("Agenda","Agenda"), ("Date","Date")]
+    html = _HTML_WRAPPER.format(
+        title=f"Training Activity — {date_label}",
+        subtitle=f"{len(records)} session{'s' if len(records) != 1 else ''}",
+        table=_html_table(records, cols),
+        timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
+    )
+    csv_label = str(_start) if _start == _end else f"{_start}_{_end}"
+    await _send_email(
+        subject=f"Training Activity — {date_label} ({len(records)} sessions)",
+        html=html,
+        csv_data=_csv_bytes(records),
+        csv_name=f"training_activity_{csv_label}.csv",
+    )
+
+
+# ── Stale / Untrained Dealers (monthly) ──────────────────────────────────
+
+async def _job_stale_untrained(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                                preset: Optional[str] = None):
+    """Email activated dealers with no training or last training >90 days ago.
+    start_date/end_date optionally filter by contractor-activated-date."""
+    today = date.today()
+    _start, _end = _resolve_date_range(start_date, end_date, preset)
+    stale_cutoff = today - timedelta(days=90)
+    print("[reports] Stale/untrained dealers")
+
+    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    tr_records  = await ac_get_all(f"customObjects/records/{TRAINING_SCHEMA_ID}", "records", {})
+
+    training_by_acct: dict = defaultdict(list)
+    for r in tr_records:
+        fields   = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
+        date_str = str(fields.get("date-of-training", "")).strip()
+        if not date_str:
+            continue
+        for aid in r.get("relationships", {}).get("account", []):
+            training_by_acct[str(aid)].append(date_str[:10])
+
+    account_ids: set = set()
+    candidates = []
+    for r in slp_records:
+        fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
+        if fields.get("slp-status-detail") != "Contractor Activated":
+            continue
+        act_str  = str(fields.get("contractor-activated-date", "")).strip()
+        act_date = act_str[:10] if act_str else ""
+        if _start and act_date and act_date < str(_start):
+            continue
+        if _end   and act_date and act_date > str(_end):
+            continue
+        rel    = r.get("relationships", {}).get("account", [])
+        acc_id = str(rel[0]) if rel else None
+        if acc_id:
+            account_ids.add(acc_id)
+        trainings  = training_by_acct.get(acc_id or "", [])
+        last_train = max(trainings) if trainings else None
+        is_stale   = (not last_train) or (last_train < str(stale_cutoff))
+        if not is_stale:
+            continue
+        days_stale = (today - date.fromisoformat(last_train)).days if last_train else None
+        candidates.append({"fields": fields, "account_id": acc_id, "act_date": act_date,
+                           "training_count": len(trainings), "last_training": last_train or "",
+                           "days_stale": days_stale})
+
+    acct_cache: dict = {}
+    for aid in account_ids:
+        try:
+            d = await ac_get(f"accounts/{aid}")
+            acct_cache[aid] = d.get("account", {}).get("name", "")
+        except Exception:
+            acct_cache[aid] = ""
+
+    records = []
+    for c in sorted(candidates, key=lambda x: x["days_stale"] or 99999, reverse=True):
+        f   = c["fields"]
+        aid = c["account_id"] or ""
+        records.append({
+            "Account":         acct_cache.get(aid, ""),
+            "Dealer ID":       f.get("dealer-id")    or _account_to_dealer.get(aid, ""),
+            "Platform":        f.get("platform")     or _account_to_platform.get(aid, ""),
+            "BDR":             f.get("assigned-bdr") or _account_to_bdr.get(aid, ""),
+            "Activation Date": c["act_date"],
+            "# Trainings":     c["training_count"],
+            "Last Training":   c["last_training"] or "Never",
+            "Days Stale":      c["days_stale"] if c["days_stale"] is not None else "Never trained",
+        })
+
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Platform","Platform"),
+            ("BDR","BDR"), ("Activation Date","Activation Date"),
+            ("# Trainings","# Trainings"), ("Last Training","Last Training"),
+            ("Days Stale","Days Stale")]
+    html = _HTML_WRAPPER.format(
+        title="Stale / Untrained Dealers",
+        subtitle=f"{len(records)} activated dealer{'s' if len(records) != 1 else ''} with no training or last training >90 days ago",
+        table=_html_table(records, cols),
+        timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
+    )
+    await _send_email(
+        subject=f"Stale/Untrained Dealers — {today} ({len(records)} records)",
+        html=html,
+        csv_data=_csv_bytes(records),
+        csv_name=f"stale_untrained_{today}.csv",
+    )
+
+
+# ── Account Status Summary (weekly Monday) ───────────────────────────────
+
+async def _job_account_status(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                               preset: Optional[str] = None):
+    """Email all accounts with their status and sales region (snapshot, date params unused)."""
+    today = date.today()
+    print("[reports] Account status summary")
+
+    all_accounts = await ac_get_all("accounts", "accounts", {})
+    cf_map       = await _fetch_acct_cf_map({"19", "23"})  # account_status, sales_region
+
+    records = []
+    for a in all_accounts:
+        aid  = str(a.get("id", ""))
+        cfs  = cf_map.get(aid, {})
+        records.append({
+            "Account":      a.get("name", ""),
+            "Dealer ID":    _account_to_dealer.get(aid, ""),
+            "Platform":     _account_to_platform.get(aid, ""),
+            "BDR":          _account_to_bdr.get(aid, ""),
+            "Status":       cfs.get("19", ""),
+            "Sales Region": cfs.get("23", ""),
+        })
+    records.sort(key=lambda x: (x["Status"], x["Sales Region"], x["Account"]))
+
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Platform","Platform"),
+            ("BDR","BDR"), ("Status","Status"), ("Sales Region","Sales Region")]
+    html = _HTML_WRAPPER.format(
+        title="Account Status Summary",
+        subtitle=f"{len(records)} account{'s' if len(records) != 1 else ''} as of {today}",
+        table=_html_table(records, cols),
+        timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
+    )
+    await _send_email(
+        subject=f"Account Status Summary — {today} ({len(records)} accounts)",
+        html=html,
+        csv_data=_csv_bytes(records),
+        csv_name=f"account_status_{today}.csv",
+    )
+
+
+# ── Platform / Dealer Program Breakdown (weekly Monday) ──────────────────
+
+async def _job_platform_breakdown(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                                   preset: Optional[str] = None):
+    """Email new activations and total SLP counts grouped by platform."""
+    from datetime import timezone
+    tz_utc = timezone.utc
+    today  = date.today()
+    _start, _end = _resolve_date_range(start_date, end_date, preset,
+                                       default_start=today - timedelta(days=7),
+                                       default_end=today - timedelta(days=1))
+    if _start is None: _start = today - timedelta(days=7)
+    if _end   is None: _end   = today - timedelta(days=1)
+    from_dt    = datetime(_start.year, _start.month, _start.day, tzinfo=tz_utc)
+    to_dt      = datetime(_end.year,   _end.month,   _end.day,   23, 59, 59, tzinfo=tz_utc)
+    date_label = str(_start) if _start == _end else f"{_start} to {_end}"
+    print(f"[reports] Platform breakdown {date_label}")
+
+    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    plat_data: dict = defaultdict(lambda: {"new_activations": 0, "active_slps": 0,
+                                           "total_slps": 0, "bdrs": defaultdict(int)})
+    for r in slp_records:
+        fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
+        rel    = r.get("relationships", {}).get("account", [])
+        acc_id = str(rel[0]) if rel else None
+        plat   = (str(fields.get("platform", "")).strip()
+                  or _account_to_platform.get(acc_id or "", "") or "Unknown")
+        bdr    = (str(fields.get("assigned-bdr", "")).strip()
+                  or _account_to_bdr.get(acc_id or "", "") or "Unassigned")
+        plat_data[plat]["total_slps"] += 1
+        if fields.get("slp-status-detail") == "Contractor Activated":
+            plat_data[plat]["active_slps"] += 1
+            act_str = str(fields.get("contractor-activated-date", "")).strip()
+            if act_str:
+                try:
+                    act_dt = (datetime.fromisoformat(act_str.replace("Z", "+00:00")) if "T" in act_str
+                              else datetime.strptime(act_str[:10], "%Y-%m-%d").replace(tzinfo=tz_utc))
+                    if from_dt <= act_dt <= to_dt:
+                        plat_data[plat]["new_activations"] += 1
+                        plat_data[plat]["bdrs"][bdr] += 1
+                except Exception:
+                    pass
+
+    records = []
+    for plat, d in sorted(plat_data.items()):
+        top_bdr = max(d["bdrs"], key=d["bdrs"].get) if d["bdrs"] else ""
+        records.append({
+            "Platform":        plat,
+            "New Activations": d["new_activations"],
+            "Active SLPs":     d["active_slps"],
+            "Total SLPs":      d["total_slps"],
+            "Top BDR":         top_bdr,
+        })
+    records.sort(key=lambda x: x["New Activations"], reverse=True)
+
+    total_new = sum(r["New Activations"] for r in records)
+    cols = [("Platform","Platform"), ("New Activations","New Activations"),
+            ("Active SLPs","Active SLPs"), ("Total SLPs","Total SLPs"), ("Top BDR","Top BDR")]
+    html = _HTML_WRAPPER.format(
+        title=f"Platform Breakdown — {date_label}",
+        subtitle=f"{total_new} new activation{'s' if total_new != 1 else ''} across {len(records)} platform{'s' if len(records) != 1 else ''}",
+        table=_html_table(records, cols),
+        timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
+    )
+    csv_label = str(_start) if _start == _end else f"{_start}_{_end}"
+    await _send_email(
+        subject=f"Platform Breakdown — {date_label} ({total_new} new activations)",
+        html=html,
+        csv_data=_csv_bytes(records),
+        csv_name=f"platform_breakdown_{csv_label}.csv",
+    )
+
+
+# ── Partner Activation (monthly) ─────────────────────────────────────────
+
+async def _job_partner_activation(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                                   preset: Optional[str] = None):
+    """Email accounts where partner_activation (CF 26) date falls in the window."""
+    today = date.today()
+    _start, _end = _resolve_date_range(start_date, end_date, preset,
+                                       default_start=today.replace(day=1),
+                                       default_end=today)
+    if _start is None: _start = today.replace(day=1)
+    if _end   is None: _end   = today
+    date_label = str(_start) if _start == _end else f"{_start} to {_end}"
+    print(f"[reports] Partner activation {date_label}")
+
+    cf_map       = await _fetch_acct_cf_map({"26"})
+    all_accounts = await ac_get_all("accounts", "accounts", {})
+    acct_by_id   = {str(a.get("id", "")): a for a in all_accounts}
+
+    records = []
+    for aid, cfs in cf_map.items():
+        pa_val = cfs.get("26", "")
+        if not pa_val:
+            continue
+        pa_str = str(pa_val)[:10]
+        try:
+            pa_date = date.fromisoformat(pa_str)
+            if pa_date < _start or pa_date > _end:
+                continue
+        except Exception:
+            if start_date or end_date or preset:
+                continue           # skip unparseable dates when a filter is active
+            pa_str = str(pa_val)  # show raw value when no filter
+        a = acct_by_id.get(aid, {})
+        records.append({
+            "Account":            a.get("name", ""),
+            "Dealer ID":          _account_to_dealer.get(aid, ""),
+            "Platform":           _account_to_platform.get(aid, ""),
+            "BDR":                _account_to_bdr.get(aid, ""),
+            "Partner Activation": pa_str,
+        })
+    records.sort(key=lambda x: x["Partner Activation"], reverse=True)
+
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Platform","Platform"),
+            ("BDR","BDR"), ("Partner Activation","Partner Activation")]
+    html = _HTML_WRAPPER.format(
+        title=f"Partner Activations — {date_label}",
+        subtitle=f"{len(records)} partner activation{'s' if len(records) != 1 else ''}",
+        table=_html_table(records, cols),
+        timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
+    )
+    csv_label = str(_start) if _start == _end else f"{_start}_{_end}"
+    await _send_email(
+        subject=f"Partner Activations — {date_label} ({len(records)} records)",
+        html=html,
+        csv_data=_csv_bytes(records),
+        csv_name=f"partner_activation_{csv_label}.csv",
+    )
+
+
+# ── Oracle Producer ID Missing (weekly Monday) ────────────────────────────
+
+async def _job_oracle_missing(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                               preset: Optional[str] = None):
+    """Email activated SLPs whose account has no Oracle Producer ID (CF 118).
+    start_date/end_date optionally filter by contractor-activated-date."""
+    today = date.today()
+    _start, _end = _resolve_date_range(start_date, end_date, preset)
+    print("[reports] Oracle Producer ID missing")
+
+    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    cf_map      = await _fetch_acct_cf_map({"118"})  # oracle_producer_id
+
+    account_ids: set = set()
+    candidates = []
+    for r in slp_records:
+        fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
+        if fields.get("slp-status-detail") != "Contractor Activated":
+            continue
+        rel    = r.get("relationships", {}).get("account", [])
+        acc_id = str(rel[0]) if rel else None
+        if cf_map.get(acc_id or "", {}).get("118"):
+            continue   # oracle_producer_id already set
+        act_str  = str(fields.get("contractor-activated-date", "")).strip()
+        act_date = act_str[:10] if act_str else ""
+        if _start and act_date and act_date < str(_start):
+            continue
+        if _end   and act_date and act_date > str(_end):
+            continue
+        if acc_id:
+            account_ids.add(acc_id)
+        candidates.append({"fields": fields, "account_id": acc_id, "act_date": act_date})
+
+    acct_cache: dict = {}
+    for aid in account_ids:
+        try:
+            d = await ac_get(f"accounts/{aid}")
+            acct_cache[aid] = d.get("account", {}).get("name", "")
+        except Exception:
+            acct_cache[aid] = ""
+
+    records = []
+    for c in candidates:
+        f   = c["fields"]
+        aid = c["account_id"] or ""
+        records.append({
+            "Account":         acct_cache.get(aid, ""),
+            "Dealer ID":       f.get("dealer-id")    or _account_to_dealer.get(aid, ""),
+            "Platform":        f.get("platform")     or _account_to_platform.get(aid, ""),
+            "BDR":             f.get("assigned-bdr") or _account_to_bdr.get(aid, ""),
+            "Activation Date": c["act_date"],
+        })
+    records.sort(key=lambda x: (x["Platform"], x["BDR"], x["Account"]))
+
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Platform","Platform"),
+            ("BDR","BDR"), ("Activation Date","Activation Date")]
+    html = _HTML_WRAPPER.format(
+        title="Oracle Producer ID Missing",
+        subtitle=f"{len(records)} activated dealer{'s' if len(records) != 1 else ''} missing Oracle Producer ID",
+        table=_html_table(records, cols),
+        timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
+    )
+    await _send_email(
+        subject=f"Oracle Producer ID Missing — {today} ({len(records)} records)",
+        html=html,
+        csv_data=_csv_bytes(records),
+        csv_name=f"oracle_missing_{today}.csv",
+    )
+
+
 # ── Manual / GitHub Actions trigger ──────────────────────────────────────
 
 _REPORT_JOBS = {
-    "activations":        _job_activations,
-    "license-expiration": _job_license_expiration,
-    "bdr-summary":        _job_bdr_summary,
+    "activations":          _job_activations,
+    "license-expiration":   _job_license_expiration,
+    "bdr-summary":          _job_bdr_summary,
+    "training-activity":    _job_training_activity,
+    "stale-untrained":      _job_stale_untrained,
+    "account-status":       _job_account_status,
+    "platform-breakdown":   _job_platform_breakdown,
+    "partner-activation":   _job_partner_activation,
+    "oracle-missing":       _job_oracle_missing,
 }
 
 @app.get("/api/send-report/{report_type}")
-async def trigger_report(report_type: str, _: None = Depends(require_auth)):
-    """Manually trigger a report email. Also called by GitHub Actions on schedule."""
+async def trigger_report(
+    report_type: str,
+    start_date: Optional[date] = Query(None, description="Start of date range (YYYY-MM-DD)"),
+    end_date:   Optional[date] = Query(None, description="End of date range (YYYY-MM-DD)"),
+    preset: Optional[str] = Query(None,
+        description="Date preset: yesterday | last_week | last_7_days | last_30_days | "
+                    "last_90_days | this_week | this_month | last_month"),
+    _: None = Depends(require_auth),
+):
+    """Manually trigger a report email. Also called by GitHub Actions on schedule.
+    Use preset OR explicit start_date/end_date to override the default date window."""
     job = _REPORT_JOBS.get(report_type)
     if not job:
         raise HTTPException(
             status_code=404,
             detail=f"Unknown report '{report_type}'. Valid: {list(_REPORT_JOBS)}"
         )
-    asyncio.create_task(job())
-    return {"status": "queued", "report": report_type, "recipients": _RECIPIENTS}
+    asyncio.create_task(job(start_date=start_date, end_date=end_date, preset=preset))
+    return {"status": "queued", "report": report_type,
+            "start_date": str(start_date) if start_date else None,
+            "end_date":   str(end_date)   if end_date   else None,
+            "preset":     preset,
+            "recipients": _RECIPIENTS}
 
 
 # ── SLP field sync ────────────────────────────────────────────────────────────

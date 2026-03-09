@@ -197,6 +197,36 @@ tr:hover td { background: #fafafa; }
 
 .btn-row { display: flex; gap: 8px; }
 
+/* ── Email Reports ── */
+.email-section-header {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 20px 0 12px; margin-top: 12px;
+  border-top: 2px solid #e5e7eb;
+}
+.email-section-header h2 { font-size: 1rem; font-weight: 700; color: #111827; }
+.email-section-header span { font-size: 0.8rem; color: #6b7280; }
+
+.email-cred-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 18px;
+}
+.email-cred-bar label { font-size: 0.78rem; font-weight: 600; color: #374151; }
+.email-cred-bar input {
+  padding: 6px 8px; border: 1px solid #e5e7eb; border-radius: 5px;
+  font-size: 0.82rem; outline: none; width: 140px;
+}
+.email-cred-bar input:focus { border-color: #356ae6; }
+
+.email-report-card { border-left: 4px solid #059669; position: relative; }
+.schedule-badge {
+  position: absolute; top: 16px; right: 16px;
+  font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  background: #ecfdf5; color: #065f46; padding: 3px 7px; border-radius: 10px;
+}
+.btn-email { background: #059669; color: white; }
+.btn-email:hover { background: #047857; }
+
 /* ── Dealer Profile ── */
 .profile-search { display: flex; gap: 10px; margin-bottom: 20px; }
 .profile-search input { flex: 1; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; outline: none; }
@@ -648,6 +678,8 @@ select, input { font-family: inherit; }
       <p>SLP records with "Contractor Activated" status, joined to account data. Filter by date range, platform, or BDR.</p>
       <div class="period-row">
         <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('yesterday','act-from','act-to',this)">Yesterday</button>
+        <button class="period-btn" onclick="applyPeriod('last_week','act-from','act-to',this)">Last Week</button>
         <button class="period-btn" onclick="applyPeriod('last_month','act-from','act-to',this)">Last Month</button>
         <button class="period-btn" onclick="applyPeriod('this_month','act-from','act-to',this)">This Month</button>
         <button class="period-btn" onclick="applyPeriod('last_quarter','act-from','act-to',this)">Last Qtr</button>
@@ -714,6 +746,7 @@ select, input { font-family: inherit; }
       <p>Activation counts, account counts, and platform breakdowns per Business Development Rep.</p>
       <div class="period-row">
         <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_week','bdr-from','bdr-to',this)">Last Week</button>
         <button class="period-btn" onclick="applyPeriod('last_month','bdr-from','bdr-to',this)">Last Month</button>
         <button class="period-btn" onclick="applyPeriod('this_month','bdr-from','bdr-to',this)">This Month</button>
         <button class="period-btn" onclick="applyPeriod('last_quarter','bdr-from','bdr-to',this)">Last Qtr</button>
@@ -745,6 +778,7 @@ select, input { font-family: inherit; }
       <p>Training records joined with account data. Filter by date, trainer, or training type.</p>
       <div class="period-row">
         <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_week','trn-from','trn-to',this)">Last Week</button>
         <button class="period-btn" onclick="applyPeriod('last_month','trn-from','trn-to',this)">Last Month</button>
         <button class="period-btn" onclick="applyPeriod('this_month','trn-from','trn-to',this)">This Month</button>
         <button class="period-btn" onclick="applyPeriod('last_quarter','trn-from','trn-to',this)">Last Qtr</button>
@@ -789,6 +823,7 @@ select, input { font-family: inherit; }
       <p>Per-account summary of notes activity, deals, and contact count. Great for identifying cold or active accounts.</p>
       <div class="period-row">
         <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_week','acta-from','acta-to',this)">Last Week</button>
         <button class="period-btn" onclick="applyPeriod('last_month','acta-from','acta-to',this)">Last Month</button>
         <button class="period-btn" onclick="applyPeriod('this_month','acta-from','acta-to',this)">This Month</button>
         <button class="period-btn" onclick="applyPeriod('last_quarter','acta-from','acta-to',this)">Last Qtr</button>
@@ -828,6 +863,7 @@ select, input { font-family: inherit; }
       <p>Notes activity broken down by team member — who's engaging accounts, how many accounts they're touching, and when they were last active.</p>
       <div class="period-row">
         <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_week','team-from','team-to',this)">Last Week</button>
         <button class="period-btn" onclick="applyPeriod('last_month','team-from','team-to',this)">Last Month</button>
         <button class="period-btn" onclick="applyPeriod('this_month','team-from','team-to',this)">This Month</button>
         <button class="period-btn" onclick="applyPeriod('last_quarter','team-from','team-to',this)">Last Qtr</button>
@@ -850,6 +886,157 @@ select, input { font-family: inherit; }
         <button class="btn btn-success" onclick="downloadPrebuilt('team')">⬇ CSV</button>
       </div>
       <div id="team-result" style="margin-top:12px;"></div>
+    </div>
+
+  </div>
+
+  <!-- Email Reports -->
+  <div class="email-section-header">
+    <h2>📧 Email Reports</h2>
+    <span>Triggers a send to your configured recipients — results arrive in your inbox</span>
+  </div>
+
+  <div class="email-cred-bar">
+    <label>Auth</label>
+    <input type="text"     id="email-user" placeholder="Username (APP_USER)" autocomplete="username"/>
+    <input type="password" id="email-pass" placeholder="Password (APP_PASS)"  autocomplete="current-password"/>
+    <button class="btn btn-sm btn-secondary" onclick="saveEmailCreds()">Save for session</button>
+    <span id="email-cred-status" style="font-size:0.78rem; color:#059669;"></span>
+  </div>
+
+  <div class="prebuilt-grid">
+
+    <!-- Training Activity -->
+    <div class="report-card email-report-card">
+      <span class="schedule-badge">Weekly Mon</span>
+      <span class="badge-icon">🎓</span>
+      <h3>Training Activity</h3>
+      <p>Training sessions conducted in the date window, grouped by trainer and account.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_week','ta-from','ta-to',this)">Last Week</button>
+        <button class="period-btn" onclick="applyPeriod('last_month','ta-from','ta-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','ta-from','ta-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','ta-from','ta-to',this)">Last Qtr</button>
+      </div>
+      <div class="form-row">
+        <label>From Date</label>
+        <input type="date" id="ta-from"/>
+      </div>
+      <div class="form-row">
+        <label>To Date</label>
+        <input type="date" id="ta-to"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-email" onclick="sendEmailReport('training-activity','ta-from','ta-to','ta-result')">✉ Send Email</button>
+      </div>
+      <div id="ta-result" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Stale / Untrained Dealers -->
+    <div class="report-card email-report-card">
+      <span class="schedule-badge">Monthly</span>
+      <span class="badge-icon">⚠️</span>
+      <h3>Stale / Untrained Dealers</h3>
+      <p>Activated dealers with no training on record, or last training more than 90 days ago.</p>
+      <div class="form-row" style="margin-top:4px;">
+        <label>Activation From Date (optional)</label>
+        <input type="date" id="su-from"/>
+      </div>
+      <div class="form-row">
+        <label>Activation To Date (optional)</label>
+        <input type="date" id="su-to"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-email" onclick="sendEmailReport('stale-untrained','su-from','su-to','su-result')">✉ Send Email</button>
+      </div>
+      <div id="su-result" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Account Status Summary -->
+    <div class="report-card email-report-card">
+      <span class="schedule-badge">Weekly Mon</span>
+      <span class="badge-icon">📋</span>
+      <h3>Account Status Summary</h3>
+      <p>All accounts with their current status and sales region — a full snapshot of the account base.</p>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-email" onclick="sendEmailReport('account-status',null,null,'as-result')">✉ Send Email</button>
+      </div>
+      <div id="as-result" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Platform Breakdown -->
+    <div class="report-card email-report-card">
+      <span class="schedule-badge">Weekly Mon</span>
+      <span class="badge-icon">📊</span>
+      <h3>Platform Breakdown</h3>
+      <p>New activations and total SLP counts grouped by platform / dealer program for the date window.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_week','pb-from','pb-to',this)">Last Week</button>
+        <button class="period-btn" onclick="applyPeriod('last_month','pb-from','pb-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','pb-from','pb-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','pb-from','pb-to',this)">YTD</button>
+      </div>
+      <div class="form-row">
+        <label>From Date</label>
+        <input type="date" id="pb-from"/>
+      </div>
+      <div class="form-row">
+        <label>To Date</label>
+        <input type="date" id="pb-to"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-email" onclick="sendEmailReport('platform-breakdown','pb-from','pb-to','pb-result')">✉ Send Email</button>
+      </div>
+      <div id="pb-result" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Partner Activation -->
+    <div class="report-card email-report-card">
+      <span class="schedule-badge">Monthly</span>
+      <span class="badge-icon">🤝</span>
+      <h3>Partner Activation</h3>
+      <p>Accounts where the Partner Activation date falls within the selected window.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_month','pa-from','pa-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','pa-from','pa-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','pa-from','pa-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','pa-from','pa-to',this)">YTD</button>
+      </div>
+      <div class="form-row">
+        <label>From Date</label>
+        <input type="date" id="pa-from"/>
+      </div>
+      <div class="form-row">
+        <label>To Date</label>
+        <input type="date" id="pa-to"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-email" onclick="sendEmailReport('partner-activation','pa-from','pa-to','pa-result')">✉ Send Email</button>
+      </div>
+      <div id="pa-result" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Oracle Producer ID Missing -->
+    <div class="report-card email-report-card">
+      <span class="schedule-badge">Weekly Mon</span>
+      <span class="badge-icon">🔍</span>
+      <h3>Oracle Producer ID Missing</h3>
+      <p>Activated SLPs whose linked account has no Oracle Producer ID on file.</p>
+      <div class="form-row" style="margin-top:4px;">
+        <label>Activation From Date (optional)</label>
+        <input type="date" id="om-from"/>
+      </div>
+      <div class="form-row">
+        <label>Activation To Date (optional)</label>
+        <input type="date" id="om-to"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-email" onclick="sendEmailReport('oracle-missing','om-from','om-to','om-result')">✉ Send Email</button>
+      </div>
+      <div id="om-result" style="margin-top:10px;"></div>
     </div>
 
   </div>
@@ -1457,6 +1644,12 @@ function computeDateRange(period) {
     case 'yesterday': {  const d = new Date(now); d.setDate(d.getDate()-1); const s=fmt(d); return { from:s, to:s }; }
     case 'this_week': {  const d = new Date(now); d.setDate(d.getDate() - (d.getDay()===0?6:d.getDay()-1)); return { from:fmt(d), to:today }; }
     case 'last_7_days':  { const d=new Date(now); d.setDate(d.getDate()-7);  return { from:fmt(d), to:today }; }
+    case 'last_week': {
+      const dow = now.getDay() === 0 ? 7 : now.getDay();
+      const lastSun = new Date(now); lastSun.setDate(now.getDate() - dow);
+      const lastMon = new Date(lastSun); lastMon.setDate(lastSun.getDate() - 6);
+      return { from: fmt(lastMon), to: fmt(lastSun) };
+    }
     case 'last_30_days': { const d=new Date(now); d.setDate(d.getDate()-30); return { from:fmt(d), to:today }; }
     case 'last_90_days': { const d=new Date(now); d.setDate(d.getDate()-90); return { from:fmt(d), to:today }; }
     case 'this_month':   return { from:`${now.getFullYear()}-${pad(now.getMonth()+1)}-01`, to:today };
@@ -1586,6 +1779,56 @@ function renderPrebuiltTable(records) {
   document.getElementById('prebuilt-results-card').style.display = 'block';
   document.getElementById('prebuilt-results-card').scrollIntoView({ behavior: 'smooth' });
 }
+
+// ── Email Reports ──────────────────────────────────────────────
+function saveEmailCreds() {
+  const user = document.getElementById('email-user').value.trim();
+  const pass = document.getElementById('email-pass').value;
+  if (!user || !pass) return;
+  sessionStorage.setItem('email_user', user);
+  sessionStorage.setItem('email_pass', pass);
+  document.getElementById('email-user').value = '';
+  document.getElementById('email-pass').value = '';
+  document.getElementById('email-cred-status').textContent = '✓ Saved for this session';
+}
+
+async function sendEmailReport(type, fromId, toId, resultId) {
+  const user = sessionStorage.getItem('email_user') || '';
+  const pass = sessionStorage.getItem('email_pass') || '';
+  const el   = document.getElementById(resultId);
+  if (!user || !pass) {
+    el.innerHTML = '<span style="color:#dc2626;font-size:0.82rem;">⚠ Enter and save credentials above first</span>';
+    return;
+  }
+  const p = new URLSearchParams();
+  const from = fromId && document.getElementById(fromId)?.value;
+  const to   = toId   && document.getElementById(toId)?.value;
+  if (from) p.set('start_date', from);
+  if (to)   p.set('end_date',   to);
+  el.innerHTML = '<span style="color:#6b7280;font-size:0.82rem;">Queuing…</span>';
+  try {
+    const res  = await fetch(`/api/send-report/${type}?${p}`, {
+      headers: { 'Authorization': 'Basic ' + btoa(user + ':' + pass) }
+    });
+    const data = await res.json();
+    if (res.ok) {
+      const recips = (data.recipients || []).join(', ') || 'configured recipients';
+      el.innerHTML = `<span style="color:#059669;font-size:0.82rem;">✓ Queued → ${esc(recips)}</span>`;
+    } else {
+      el.innerHTML = `<span style="color:#dc2626;font-size:0.82rem;">✕ ${esc(String(data.detail || res.status))}</span>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<span style="color:#dc2626;font-size:0.82rem;">✕ ${esc(e.message)}</span>`;
+  }
+}
+
+// Restore cred status indicator on load
+document.addEventListener('DOMContentLoaded', () => {
+  if (sessionStorage.getItem('email_user')) {
+    const el = document.getElementById('email-cred-status');
+    if (el) el.textContent = '✓ Credentials saved for this session';
+  }
+});
 
 // ── Dealer Profile ─────────────────────────────────────────────
 async function lookupProfile() {

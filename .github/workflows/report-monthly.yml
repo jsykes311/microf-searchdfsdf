@@ -1,0 +1,25 @@
+name: Monthly Reports
+
+on:
+  schedule:
+    - cron: '0 12 1 * *'   # 7:00 AM ET (UTC-5) 1st of every month
+  workflow_dispatch:         # allow manual trigger from GitHub Actions tab
+
+jobs:
+  stale-untrained:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger stale/untrained dealers report
+        run: |
+          curl -f --max-time 180 \
+            -u "${{ secrets.APP_USER }}:${{ secrets.APP_PASS }}" \
+            "https://microf-search.onrender.com/api/send-report/stale-untrained"
+
+  partner-activation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger partner activation report
+        run: |
+          curl -f --max-time 120 \
+            -u "${{ secrets.APP_USER }}:${{ secrets.APP_PASS }}" \
+            "https://microf-search.onrender.com/api/send-report/partner-activation?preset=last_month"
