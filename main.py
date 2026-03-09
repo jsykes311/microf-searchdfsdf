@@ -2862,15 +2862,18 @@ def _csv_bytes(records: list) -> bytes:
 
 
 async def _send_email(subject: str, html: str,
-                      csv_data: bytes = None, csv_name: str = None):
-    """Send an HTML email with an optional CSV attachment via SMTP STARTTLS."""
-    if not _SMTP_USER or not _RECIPIENTS:
+                      csv_data: bytes = None, csv_name: str = None,
+                      recipients: list = None):
+    """Send an HTML email with an optional CSV attachment via SMTP STARTTLS.
+    Pass recipients to override the default REPORT_RECIPIENTS env list."""
+    to = recipients or _RECIPIENTS
+    if not _SMTP_USER or not to:
         print(f"[reports] Email not configured — skipping: {subject}")
         return
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
     msg["From"]    = f"{_SMTP_FROM} <{_SMTP_USER}>"
-    msg["To"]      = ", ".join(_RECIPIENTS)
+    msg["To"]      = ", ".join(to)
     msg.attach(MIMEText(html, "html"))
     if csv_data:
         part = MIMEBase("application", "octet-stream")
@@ -2887,7 +2890,7 @@ async def _send_email(subject: str, html: str,
             password=_SMTP_PASS,
             start_tls=True,
         )
-        print(f"[reports] Sent '{subject}' → {_RECIPIENTS}")
+        print(f"[reports] Sent '{subject}' → {to}")
     except Exception as exc:
         print(f"[reports] Email failed: {exc}")
 
@@ -2959,7 +2962,7 @@ async def _fetch_acct_cf_map(field_ids: set) -> dict:
 # ── Activations (daily Mon–Fri) ──────────────────────────────────────────
 
 async def _job_activations(start_date: Optional[date] = None, end_date: Optional[date] = None,
-                           preset: Optional[str] = None):
+                           preset: Optional[str] = None, recipients: list = None):
     """Email 'Contractor Activated' SLP records for a date range (defaults to yesterday)."""
     from datetime import timezone
     tz_utc = timezone.utc
@@ -3043,13 +3046,14 @@ async def _job_activations(start_date: Optional[date] = None, end_date: Optional
         html=html,
         csv_data=_csv_bytes(records),
         csv_name=f"activations_{csv_label}.csv",
+        recipients=recipients,
     )
 
 
 # ── License Expiration (weekly Monday) ───────────────────────────────────
 
 async def _job_license_expiration(start_date: Optional[date] = None, end_date: Optional[date] = None,
-                                   preset: Optional[str] = None):
+                                   preset: Optional[str] = None, recipients: list = None):
     """Email licenses expiring in a date window (defaults to already-expired through 90 days out)."""
     from datetime import timezone
     tz_utc = timezone.utc
@@ -3127,13 +3131,14 @@ async def _job_license_expiration(start_date: Optional[date] = None, end_date: O
         html=html,
         csv_data=_csv_bytes(records),
         csv_name=f"license_expiration_{today_str}.csv",
+        recipients=recipients,
     )
 
 
 # ── BDR Summary (weekly Monday) ──────────────────────────────────────────
 
 async def _job_bdr_summary(start_date: Optional[date] = None, end_date: Optional[date] = None,
-                           preset: Optional[str] = None):
+                           preset: Optional[str] = None, recipients: list = None):
     """Email activations grouped by BDR for a date range (defaults to past 7 days)."""
     from datetime import timezone
     tz_utc = timezone.utc
@@ -3225,13 +3230,14 @@ async def _job_bdr_summary(start_date: Optional[date] = None, end_date: Optional
         html=html,
         csv_data=_csv_bytes(records),
         csv_name=f"bdr_summary_{week_start}.csv",
+        recipients=recipients,
     )
 
 
 # ── Training Activity (weekly Monday) ────────────────────────────────────
 
 async def _job_training_activity(start_date: Optional[date] = None, end_date: Optional[date] = None,
-                                  preset: Optional[str] = None):
+                                  preset: Optional[str] = None, recipients: list = None):
     """Email training sessions conducted in the date window, grouped by trainer."""
     from datetime import timezone
     tz_utc = timezone.utc
@@ -3304,13 +3310,14 @@ async def _job_training_activity(start_date: Optional[date] = None, end_date: Op
         html=html,
         csv_data=_csv_bytes(records),
         csv_name=f"training_activity_{csv_label}.csv",
+        recipients=recipients,
     )
 
 
 # ── Stale / Untrained Dealers (monthly) ──────────────────────────────────
 
 async def _job_stale_untrained(start_date: Optional[date] = None, end_date: Optional[date] = None,
-                                preset: Optional[str] = None):
+                                preset: Optional[str] = None, recipients: list = None):
     """Email activated dealers with no training or last training >90 days ago.
     start_date/end_date optionally filter by contractor-activated-date."""
     today = date.today()
@@ -3394,13 +3401,14 @@ async def _job_stale_untrained(start_date: Optional[date] = None, end_date: Opti
         html=html,
         csv_data=_csv_bytes(records),
         csv_name=f"stale_untrained_{today}.csv",
+        recipients=recipients,
     )
 
 
 # ── Account Status Summary (weekly Monday) ───────────────────────────────
 
 async def _job_account_status(start_date: Optional[date] = None, end_date: Optional[date] = None,
-                               preset: Optional[str] = None):
+                               preset: Optional[str] = None, recipients: list = None):
     """Email all accounts with their status and sales region (snapshot, date params unused)."""
     today = date.today()
     print("[reports] Account status summary")
@@ -3435,13 +3443,14 @@ async def _job_account_status(start_date: Optional[date] = None, end_date: Optio
         html=html,
         csv_data=_csv_bytes(records),
         csv_name=f"account_status_{today}.csv",
+        recipients=recipients,
     )
 
 
 # ── Platform / Dealer Program Breakdown (weekly Monday) ──────────────────
 
 async def _job_platform_breakdown(start_date: Optional[date] = None, end_date: Optional[date] = None,
-                                   preset: Optional[str] = None):
+                                   preset: Optional[str] = None, recipients: list = None):
     """Email new activations and total SLP counts grouped by platform."""
     from datetime import timezone
     tz_utc = timezone.utc
@@ -3508,13 +3517,14 @@ async def _job_platform_breakdown(start_date: Optional[date] = None, end_date: O
         html=html,
         csv_data=_csv_bytes(records),
         csv_name=f"platform_breakdown_{csv_label}.csv",
+        recipients=recipients,
     )
 
 
 # ── Partner Activation (monthly) ─────────────────────────────────────────
 
 async def _job_partner_activation(start_date: Optional[date] = None, end_date: Optional[date] = None,
-                                   preset: Optional[str] = None):
+                                   preset: Optional[str] = None, recipients: list = None):
     """Email accounts where partner_activation (CF 26) date falls in the window."""
     today = date.today()
     _start, _end = _resolve_date_range(start_date, end_date, preset,
@@ -3567,13 +3577,14 @@ async def _job_partner_activation(start_date: Optional[date] = None, end_date: O
         html=html,
         csv_data=_csv_bytes(records),
         csv_name=f"partner_activation_{csv_label}.csv",
+        recipients=recipients,
     )
 
 
 # ── Oracle Producer ID Missing (weekly Monday) ────────────────────────────
 
 async def _job_oracle_missing(start_date: Optional[date] = None, end_date: Optional[date] = None,
-                               preset: Optional[str] = None):
+                               preset: Optional[str] = None, recipients: list = None):
     """Email activated SLPs whose account has no Oracle Producer ID (CF 118).
     start_date/end_date optionally filter by contractor-activated-date."""
     today = date.today()
@@ -3637,6 +3648,7 @@ async def _job_oracle_missing(start_date: Optional[date] = None, end_date: Optio
         html=html,
         csv_data=_csv_bytes(records),
         csv_name=f"oracle_missing_{today}.csv",
+        recipients=recipients,
     )
 
 
@@ -3657,27 +3669,33 @@ _REPORT_JOBS = {
 @app.get("/api/send-report/{report_type}")
 async def trigger_report(
     report_type: str,
-    start_date: Optional[date] = Query(None, description="Start of date range (YYYY-MM-DD)"),
-    end_date:   Optional[date] = Query(None, description="End of date range (YYYY-MM-DD)"),
-    preset: Optional[str] = Query(None,
+    start_date:  Optional[date] = Query(None, description="Start of date range (YYYY-MM-DD)"),
+    end_date:    Optional[date] = Query(None, description="End of date range (YYYY-MM-DD)"),
+    preset:      Optional[str]  = Query(None,
         description="Date preset: yesterday | last_week | last_7_days | last_30_days | "
                     "last_90_days | this_week | this_month | last_month"),
+    to:          Optional[str]  = Query(None,
+        description="Override recipients — comma-separated email addresses"),
     _: None = Depends(require_auth),
 ):
     """Manually trigger a report email. Also called by GitHub Actions on schedule.
-    Use preset OR explicit start_date/end_date to override the default date window."""
+    Use preset OR explicit start_date/end_date to override the default date window.
+    Pass to= to override the configured REPORT_RECIPIENTS list."""
     job = _REPORT_JOBS.get(report_type)
     if not job:
         raise HTTPException(
             status_code=404,
             detail=f"Unknown report '{report_type}'. Valid: {list(_REPORT_JOBS)}"
         )
-    asyncio.create_task(job(start_date=start_date, end_date=end_date, preset=preset))
+    override_recipients = [r.strip() for r in to.split(",") if r.strip()] if to else None
+    final_recipients    = override_recipients or _RECIPIENTS
+    asyncio.create_task(job(start_date=start_date, end_date=end_date, preset=preset,
+                            recipients=override_recipients))
     return {"status": "queued", "report": report_type,
             "start_date": str(start_date) if start_date else None,
             "end_date":   str(end_date)   if end_date   else None,
             "preset":     preset,
-            "recipients": _RECIPIENTS}
+            "recipients": final_recipients}
 
 
 # ── SLP field sync ────────────────────────────────────────────────────────────

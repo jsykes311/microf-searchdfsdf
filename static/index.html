@@ -899,7 +899,9 @@ select, input { font-family: inherit; }
   <div class="email-cred-bar">
     <label>Auth</label>
     <input type="text"     id="email-user" placeholder="Username (APP_USER)" autocomplete="username"/>
-    <input type="password" id="email-pass" placeholder="Password (APP_PASS)"  autocomplete="current-password"/>
+    <input type="password" id="email-pass" placeholder="Password (APP_PASS)" autocomplete="current-password"/>
+    <label style="margin-left:6px;">To</label>
+    <input type="text" id="email-to" placeholder="recipient@co.com, other@co.com" style="width:280px;"/>
     <button class="btn btn-sm btn-secondary" onclick="saveEmailCreds()">Save for session</button>
     <span id="email-cred-status" style="font-size:0.78rem; color:#059669;"></span>
   </div>
@@ -1840,9 +1842,11 @@ function renderPrebuiltTable(records) {
 function saveEmailCreds() {
   const user = document.getElementById('email-user').value.trim();
   const pass = document.getElementById('email-pass').value;
+  const to   = document.getElementById('email-to').value.trim();
   if (!user || !pass) return;
   sessionStorage.setItem('email_user', user);
   sessionStorage.setItem('email_pass', pass);
+  if (to) sessionStorage.setItem('email_to', to);
   document.getElementById('email-user').value = '';
   document.getElementById('email-pass').value = '';
   document.getElementById('email-cred-status').textContent = '✓ Saved for this session';
@@ -1858,9 +1862,13 @@ async function sendEmailReport(type, fromId, toId, resultId) {
   }
   const p = new URLSearchParams();
   const from = fromId && document.getElementById(fromId)?.value;
-  const to   = toId   && document.getElementById(toId)?.value;
+  const end  = toId   && document.getElementById(toId)?.value;
   if (from) p.set('start_date', from);
-  if (to)   p.set('end_date',   to);
+  if (end)  p.set('end_date',   end);
+  // Use the To field value directly (live), falling back to saved session value
+  const toVal = (document.getElementById('email-to')?.value.trim())
+                || sessionStorage.getItem('email_to') || '';
+  if (toVal) p.set('to', toVal);
   el.innerHTML = '<span style="color:#6b7280;font-size:0.82rem;">Queuing…</span>';
   try {
     const res  = await fetch(`/api/send-report/${type}?${p}`, {
@@ -1878,11 +1886,16 @@ async function sendEmailReport(type, fromId, toId, resultId) {
   }
 }
 
-// Restore cred status indicator on load
+// Restore cred status + To field on load
 document.addEventListener('DOMContentLoaded', () => {
   if (sessionStorage.getItem('email_user')) {
     const el = document.getElementById('email-cred-status');
     if (el) el.textContent = '✓ Credentials saved for this session';
+  }
+  const savedTo = sessionStorage.getItem('email_to');
+  if (savedTo) {
+    const el = document.getElementById('email-to');
+    if (el) el.value = savedTo;
   }
 });
 
