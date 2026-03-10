@@ -110,6 +110,23 @@ async def dealer_index_status():
         "age_seconds": age,
     }
 
+@app.get("/api/dealer-index/diagnose")
+async def dealer_index_diagnose(_: None = Depends(require_auth)):
+    """Fetch first page of accountCustomFieldData and first SLP record raw — debug only."""
+    cf_page  = await ac_get("accountCustomFieldData", {"limit": 5, "offset": 0})
+    slp_page = await ac_get(f"customObjects/records/{SLP_SCHEMA_ID}", {"limit": 1})
+    slp_rec  = slp_page.get("records", [{}])[0] if slp_page.get("records") else {}
+    return {
+        "cf_total":    cf_page.get("meta", {}).get("total"),
+        "cf_sample":   cf_page.get("accountCustomFieldData", [])[:3],
+        "slp_sample":  slp_rec,
+        "index_sizes": {
+            "dealers":   len(_account_to_dealer),
+            "platforms": len(_account_to_platform),
+            "bdrs":      len(_account_to_bdr),
+        },
+    }
+
 AC_BASE_URL = (os.getenv("AC_BASE_URL") or os.getenv("PROD_URL", "")).rstrip("/")
 AC_API_KEY  = os.getenv("AC_API_KEY") or os.getenv("PROD_KEY", "")
 HEADERS     = {"Api-Token": AC_API_KEY, "Content-Type": "application/json"}
