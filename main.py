@@ -3937,7 +3937,19 @@ async def _run_slp_sync(dry_run: bool) -> None:
                 rec_id = r.get("id")
                 fields = {fo["id"]: fo.get("value") for fo in r.get("fields", [])}
                 rel    = r.get("relationships", {}).get("account", [])
-                acc_id = str(rel[0]) if rel else None
+                # rel may be list of ints OR list of dicts — normalise to string id
+                if rel:
+                    first = rel[0]
+                    acc_id = str(first.get("id", first) if isinstance(first, dict) else first)
+                else:
+                    acc_id = None
+
+                # Debug first 3 records so we can verify structure
+                if scanned <= 3:
+                    print(f"[sync-slp][debug] rec={rec_id} acc_id={acc_id} "
+                          f"fields={list(fields.keys())} "
+                          f"dealer_lookup={_account_to_dealer.get(acc_id,'MISS')} "
+                          f"platform_lookup={_account_to_platform.get(acc_id,'MISS')}")
 
                 to_update = []
                 for slp_fid, cf_id in _SLP_SYNC_FIELDS:
@@ -3956,6 +3968,12 @@ async def _run_slp_sync(dry_run: bool) -> None:
 
                 if not to_update:
                     skipped += 1
+                    # Track why first few records were skipped for diagnostics
+                    if skipped <= 5:
+                        reason = "no_account" if not acc_id else "no_index_match"
+                        _slp_sync_status.setdefault("skip_samples", []).append(
+                            {"rec": rec_id, "acc_id": acc_id, "reason": reason,
+                             "field_keys": list(fields.keys())})
                     continue
 
                 if dry_run:
