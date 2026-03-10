@@ -6,7 +6,7 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 360
     steps:
       - name: Wake up Render
         run: |
@@ -25,7 +25,7 @@ jobs:
 
       - name: Poll until done
         run: |
-          for i in $(seq 1 55); do
+          for i in $(seq 1 700); do
             sleep 30
             STATUS=$(curl -s --max-time 20 \
               "https://microf-search.onrender.com/api/sync-slp-fields/status?token=${{ secrets.SYNC_TOKEN }}")
