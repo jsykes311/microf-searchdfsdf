@@ -186,8 +186,8 @@ async def _build_dealer_id_index() -> None:
     DEALER_CF_ID   = 18    # customFieldId for "Parent Dealer ID"
     PLATFORM_CF_ID = 29    # customFieldId for "Dealer Program"
     BDR_CF_ID      = 119   # customFieldId for "Assigned BDR"
-    CF_PAGE        = 1000  # records per bulk page (AC accepts up to 1000)
-    CONCURRENCY    = 20    # pages fetched in parallel per batch
+    CF_PAGE        = 100   # smaller pages to keep memory low on Render
+    CONCURRENCY    = 3     # 3 concurrent requests max to avoid OOM
 
     try:
         print("[dealer-index] Starting build…")
