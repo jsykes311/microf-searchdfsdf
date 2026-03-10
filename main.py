@@ -3916,8 +3916,13 @@ async def _run_slp_sync(dry_run: bool) -> None:
     preview = []
     offset  = 0
 
-    # Use the in-memory account indexes — no per-record HTTP calls needed
-    # _account_to_dealer / _account_to_platform / _account_to_bdr are built at startup
+    # Ensure the in-memory account indexes are populated before scanning
+    if not _account_to_dealer:
+        _slp_sync_status["status_detail"] = "building account index…"
+        print("[sync-slp] Account index empty — rebuilding before sync")
+        await _build_dealer_id_index()
+        print(f"[sync-slp] Index ready: {len(_account_to_dealer)} accounts")
+    _slp_sync_status["indexed_accounts"] = len(_account_to_dealer)
 
     try:
         while True:

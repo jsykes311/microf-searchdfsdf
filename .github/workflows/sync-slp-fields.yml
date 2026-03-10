@@ -16,25 +16,43 @@ jobs:
           echo ""
           echo "Render is up"
 
-      - name: Start sync
+      - name: Sync with auto-restart on server crash
         run: |
-          RESP=$(curl -s --max-time 30 -X POST \
-            "https://microf-search.onrender.com/api/sync-slp-fields?token=${{ secrets.SYNC_TOKEN }}")
-          echo "Response: $RESP"
-          echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('status') in ('started','already_running') else 1)"
+          start_sync() {
+            RESP=$(curl -s --max-time 60 -X POST \
+              "https://microf-search.onrender.com/api/sync-slp-fields?token=${{ secrets.SYNC_TOKEN }}")
+            echo "Start response: $RESP"
+            echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('status') in ('started','already_running') else 1)"
+          }
 
-      - name: Poll until done
-        run: |
+          start_sync
+
+          LAST_STATE="running"
           for i in $(seq 1 700); do
             sleep 30
             STATUS=$(curl -s --max-time 20 \
               "https://microf-search.onrender.com/api/sync-slp-fields/status?token=${{ secrets.SYNC_TOKEN }}")
             echo "[$i] $STATUS"
-            STATE=$(echo "$STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))")
-            if [ "$STATE" = "done" ] || [ "$STATE" = "error" ]; then
-              echo "Sync finished with status: $STATE"
+            STATE=$(echo "$STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "unknown")
+
+            if [ "$STATE" = "done" ]; then
+              echo "Sync finished successfully"
               exit 0
             fi
+
+            if [ "$STATE" = "error" ]; then
+              echo "Sync finished with error"
+              exit 1
+            fi
+
+            # Detect server restart: was running, now idle → re-trigger
+            if [ "$STATE" = "idle" ] && [ "$LAST_STATE" = "running" ]; then
+              echo "Server restarted mid-sync — re-triggering..."
+              sleep 30   # let Render finish booting
+              start_sync
+            fi
+
+            LAST_STATE="$STATE"
           done
           echo "Timed out waiting for sync to complete"
           exit 1
