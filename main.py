@@ -224,9 +224,12 @@ async def _build_dealer_id_index() -> None:
 
         def _ingest(items: list) -> None:
             for item in items:
-                cf_id = int(item.get("customFieldId", 0))
-                aid   = str(item.get("accountId", ""))
-                val   = (item.get("fieldValue") or "").strip()
+                cf_id   = int(item.get("customFieldId", 0))
+                aid     = str(item.get("accountId", ""))
+                raw     = item.get("fieldValue")
+                if isinstance(raw, list):
+                    raw = ", ".join(str(v) for v in raw if v)
+                val = (str(raw) if raw is not None else "").strip()
                 if not (aid and val):
                     continue
                 if cf_id == DEALER_CF_ID:
