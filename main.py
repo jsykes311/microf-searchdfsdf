@@ -275,42 +275,7 @@ async def _build_dealer_id_index() -> None:
         _account_to_platform.clear(); _account_to_platform.update(acct_to_platform)
         _account_to_bdr.clear();     _account_to_bdr.update(acct_to_bdr)
         _dealer_index_ts = _time.time()
-        print(f"[dealer-index] Done (bulk). {len(new_did)} dealer IDs. "
-              f"Starting background fallback for missed accounts…")
-
-        # ── Phase 2b: per-account fallback — runs in background, low concurrency ──
-        # Finds accounts whose CF data isn't in the bulk endpoint (e.g. test accounts).
-        missed_ids = [str(a.get("id", "")) for a in all_accounts
-                      if str(a.get("id", "")) not in _account_to_dealer]
-        print(f"[dealer-index] {len(missed_ids)} accounts to check via per-account fallback")
-
-        FALL_CONCURRENCY = 5   # low — this runs in background, no need to rush
-
-        async def _fetch_per_account_cfs(aid: str) -> None:
-            try:
-                d = await ac_get(f"accounts/{aid}/accountCustomFieldData")
-                for cf in d.get("customerAccountCustomFieldData", []):
-                    cf_id = int(cf.get("custom_field_id", 0))
-                    val   = (cf.get("custom_field_text_value") or "").strip()
-                    if not val:
-                        continue
-                    name = acct_to_name.get(aid, "")
-                    if cf_id == DEALER_CF_ID and aid not in _account_to_dealer:
-                        _account_to_dealer[aid] = val
-                        _dealer_id_index[val]   = {"id": aid, "name": name}
-                    elif cf_id == PLATFORM_CF_ID and aid not in _account_to_platform:
-                        _account_to_platform[aid] = val
-                    elif cf_id == BDR_CF_ID and aid not in _account_to_bdr:
-                        _account_to_bdr[aid] = val
-            except Exception:
-                pass
-
-        for i in range(0, len(missed_ids), FALL_CONCURRENCY):
-            await asyncio.gather(*[_fetch_per_account_cfs(aid)
-                                   for aid in missed_ids[i : i + FALL_CONCURRENCY]])
-            await asyncio.sleep(0.1)   # yield to event loop between batches
-
-        print(f"[dealer-index] Fallback done. {len(_dealer_id_index)} total dealer IDs.")
+        print(f"[dealer-index] Done. {len(new_did)} dealer IDs indexed across {len(new_atd)} accounts.")
 
     except Exception as _build_exc:
         import traceback
