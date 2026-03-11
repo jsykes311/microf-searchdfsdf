@@ -382,14 +382,17 @@ async def ac_get_all(path: str, key: str, params: dict = None) -> list:
         p    = {**(params or {}), "limit": limit, "offset": offset}
         data = await ac_get(path, p)
         page = data.get(key, [])
+        size_before = len(seen)
         for item in page:
             item_id = item.get("id")
             if item_id is not None:
                 seen[item_id] = item
             else:
                 seen[len(seen)] = item   # fallback for items without id
+        new_items = len(seen) - size_before
         offset += limit
-        if len(page) < limit:   # empty page OR partial page → we're done
+        # Stop if: empty/partial page, OR full page but no new unique records
+        if len(page) < limit or new_items == 0:
             break
     return list(seen.values())
 
