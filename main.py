@@ -184,7 +184,7 @@ async def _build_dealer_id_index() -> None:
              customFieldId-18 (dealer ID) records — ~10-15 s for ~190k records.
     Phase 2: paginate accounts to get names.
     Runs on server startup; re-triggered via /api/dealer-index/refresh."""
-    global _dealer_index_ts
+    global _dealer_index_ts, _dealer_index_error
     DEALER_CF_ID   = 18    # customFieldId for "Parent Dealer ID"
     PLATFORM_CF_ID = 29    # customFieldId for "Dealer Program"
     BDR_CF_ID      = 119   # customFieldId for "Assigned BDR"
@@ -257,7 +257,6 @@ async def _build_dealer_id_index() -> None:
 
     except Exception as _build_exc:
         import traceback
-        global _dealer_index_error
         _dealer_index_error = f"{type(_build_exc).__name__}: {_build_exc}"
         print(f"[dealer-index] BUILD FAILED: {_build_exc}")
         traceback.print_exc()
