@@ -107,7 +107,8 @@ async def dealer_index_status():
         "indexed_accounts":  len(_account_to_dealer),
         "indexed_platforms": len(_account_to_platform),
         "indexed_bdrs":      len(_account_to_bdr),
-        "age_seconds": age,
+        "age_seconds":       age,
+        "last_error":        _dealer_index_error or None,
     }
 
 @app.get("/api/dealer-index/diagnose")
@@ -152,6 +153,7 @@ _account_to_dealer: dict = {}   # account_id (str) → dealer_id (str)
 _account_to_platform: dict = {} # account_id (str) → platform/Dealer Program (customfield 29)
 _account_to_bdr: dict = {}      # account_id (str) → Assigned BDR (customfield 119)
 _dealer_index_ts:  float = 0.0
+_dealer_index_error: str = ""   # last build error message, for /api/dealer-index/status
 
 async def _get_account_cf_meta() -> dict:
     """Return {str(field_id): label} cached for 1 hour."""
@@ -255,6 +257,8 @@ async def _build_dealer_id_index() -> None:
 
     except Exception as _build_exc:
         import traceback
+        global _dealer_index_error
+        _dealer_index_error = f"{type(_build_exc).__name__}: {_build_exc}"
         print(f"[dealer-index] BUILD FAILED: {_build_exc}")
         traceback.print_exc()
 
