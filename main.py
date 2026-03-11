@@ -91,6 +91,25 @@ async def search_page(_: None = Depends(require_auth)):
 async def _startup():
     """Kick off the dealer ID index build in the background so it doesn't block startup."""
     asyncio.create_task(_build_dealer_id_index())
+    asyncio.create_task(_keep_alive())
+
+async def _keep_alive() -> None:
+    """Ping this app's own health endpoint every 10 minutes to prevent Render from
+    spinning down the instance due to inactivity."""
+    import os as _os
+    self_url = _os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+    if not self_url:
+        print("[keep-alive] RENDER_EXTERNAL_URL not set — skipping keep-alive pings")
+        return
+    await asyncio.sleep(120)   # wait 2 min after boot before first ping
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=10) as _hc:
+                await _hc.get(f"{self_url}/api/dealer-index/status")
+            print("[keep-alive] pinged OK")
+        except Exception as _e:
+            print(f"[keep-alive] ping failed: {_e}")
+        await asyncio.sleep(600)   # 10 minutes
 
 @app.get("/api/dealer-index/refresh")
 async def dealer_index_refresh(_: None = Depends(require_auth)):
