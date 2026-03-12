@@ -365,43 +365,40 @@ async def ac_put(path: str, body: dict):
             raise Exception(f"HTTP {r.status_code} {r.text[:300]}")
         return r.json()
 
-async def _ac_get_all_pass(path: str, key: str, params: dict) -> dict:
-    """Single pagination pass — returns id→record dict."""
-    seen   = {}
-    offset = 0
-    limit  = 100
-    while True:
-        p    = {**params, "limit": limit, "offset": offset}
-        data = await ac_get(path, p)
-        page = data.get(key, [])
-        if not page:
-            break
-        for item in page:
-            item_id = item.get("id")
-            if item_id is not None:
-                seen[item_id] = item
-            else:
-                seen[len(seen)] = item
-        offset += limit
-    return seen
-
-
 async def ac_get_all(path: str, key: str, params: dict = None) -> list:
     """Paginate through all records, deduplicating by id.
 
     AC's custom-objects endpoint has non-deterministic pagination: pages overlap
-    heavily and meta.total is inflated (~4855 vs ~3500 unique records).
-    Two independent passes are unioned to catch records that slip through in
-    either pass due to AC's reordering between requests.
+    heavily and meta.total is inflated. For custom-object endpoints we run two
+    SEQUENTIAL passes and union results to catch records that slip through due
+    to AC's page reordering. Standard endpoints (accounts, contacts, etc.) only
+    need one pass.
     """
-    p = params or {}
-    pass1, pass2 = await asyncio.gather(
-        _ac_get_all_pass(path, key, p),
-        _ac_get_all_pass(path, key, p),
-    )
-    merged = {**pass1, **pass2}
-    print(f"[ac_get_all] pass1={len(pass1)} pass2={len(pass2)} merged={len(merged)}")
-    return list(merged.values())
+    is_custom_obj = "customObjects" in path
+    num_passes    = 2 if is_custom_obj else 1
+
+    seen  = {}
+    p     = params or {}
+    limit = 100
+
+    for pass_num in range(num_passes):
+        offset = 0
+        while True:
+            data = await ac_get(path, {**p, "limit": limit, "offset": offset})
+            page = data.get(key, [])
+            if not page:
+                break
+            for item in page:
+                item_id = item.get("id")
+                if item_id is not None:
+                    seen[item_id] = item
+                else:
+                    seen[len(seen)] = item
+            offset += limit
+        if is_custom_obj:
+            print(f"[ac_get_all] {path} pass {pass_num+1} done, total unique={len(seen)}")
+
+    return list(seen.values())
 
 
 # ═══════════════════════════════════════════════════════════════════════════
