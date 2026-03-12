@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.requests import Request as _Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Optional
 import httpx
 import os
@@ -11,6 +13,8 @@ import io
 import asyncio
 import secrets
 import time as _time
+import base64
+import urllib.parse
 from datetime import datetime, timedelta, date
 from dotenv import load_dotenv
 import json
@@ -20,6 +24,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders as _enc
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 load_dotenv()
 
@@ -45,16 +50,24 @@ app.add_middleware(
     ],
     allow_origin_regex=r"https://.*\.(azurestaticapps\.net|sharepoint\.com|sharepoint\.us)$",
     allow_credentials=True,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+# Auth middleware — added after CORS so CORS headers are still sent on 401s
+app.add_middleware(_MSAuthMiddleware)
 
-# ── Optional HTTP Basic Auth ─────────────────────────────────────────────────
-# Set APP_USER and APP_PASS environment variables to enable password protection.
-# If neither is set (e.g. local dev), auth is skipped entirely.
-_basic = HTTPBasic(auto_error=False)
-_APP_USER   = os.getenv("APP_USER", "")
-_APP_PASS   = os.getenv("APP_PASS", "")
+# ── Microsoft OAuth (Azure AD) ────────────────────────────────────────────────
+# Set these on Render. AZURE_CLIENT_ID is required to enable auth;
+# if missing the app runs open (local dev mode).
+_AZ_CLIENT_ID  = os.getenv("AZURE_CLIENT_ID",     "")
+_AZ_CLIENT_SEC = os.getenv("AZURE_CLIENT_SECRET",  "")
+_AZ_TENANT_ID  = os.getenv("AZURE_TENANT_ID",      "common")
+_SESSION_SECRET = os.getenv("SESSION_SECRET",      "dev-secret-please-set-me")
+_ALLOWED_DOMAIN = os.getenv("ALLOWED_EMAIL_DOMAIN", "microf.com")
+_COOKIE_MAX_AGE = 8 * 3600   # 8 hours
+
+_signer = URLSafeTimedSerializer(_SESSION_SECRET)
+
 # Separate token for internal/automated endpoints (no special chars needed).
 # Set SYNC_TOKEN on Render and in GitHub Secrets.
 _SYNC_TOKEN = os.getenv("SYNC_TOKEN", "")
@@ -69,19 +82,136 @@ _SMTP_PASS  = os.getenv("SMTP_PASS",      "")
 _SMTP_FROM  = os.getenv("SMTP_FROM_NAME", "Moogle Reports")
 _RECIPIENTS = [r.strip() for r in os.getenv("REPORT_RECIPIENTS", "").split(",") if r.strip()]
 
-def require_auth(credentials: HTTPBasicCredentials = Depends(_basic)):
-    if not _APP_USER:          # no creds configured → open (local dev)
-        return
-    ok_user = secrets.compare_digest(credentials.username if credentials else "", _APP_USER)
-    ok_pass = secrets.compare_digest(credentials.password if credentials else "", _APP_PASS)
-    if not (ok_user and ok_pass):
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized",
-            headers={"WWW-Authenticate": 'Basic realm="AC Reporter"'},
-        )
+
+def _redirect_uri() -> str:
+    base = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000").rstrip("/")
+    return f"{base}/auth/callback"
+
+
+def _get_session_email(request: _Request) -> Optional[str]:
+    """Return the authenticated email from the session cookie, or None."""
+    token = request.cookies.get("session")
+    if not token:
+        return None
+    try:
+        return _signer.loads(token, max_age=_COOKIE_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        return None
+
+
+def require_auth(request: _Request):
+    """Dependency: returns the current user email. Middleware enforces blocking."""
+    if not _AZ_CLIENT_ID:          # no Azure configured → open (local dev)
+        return "dev@microf.com"
+    return _get_session_email(request) or "unknown"
+
+
+class _MSAuthMiddleware(BaseHTTPMiddleware):
+    """Block unauthenticated requests. Redirects pages → /login, 401s for APIs."""
+    _PUBLIC = {"/login", "/auth/start", "/auth/callback", "/logout", "/health",
+               "/api/dealer-index/status"}
+
+    async def dispatch(self, request: _Request, call_next):
+        path = request.url.path
+        # Always allow public paths and static assets
+        if path in self._PUBLIC or path.startswith("/static"):
+            return await call_next(request)
+        # Dev mode — no Azure client ID configured
+        if not _AZ_CLIENT_ID:
+            return await call_next(request)
+        # Automated endpoints: accept SYNC_TOKEN header/query instead of cookie
+        bearer = request.headers.get("Authorization", "")
+        sync_q = request.query_params.get("token", "")
+        if _SYNC_TOKEN and (bearer == f"Bearer {_SYNC_TOKEN}" or sync_q == _SYNC_TOKEN):
+            return await call_next(request)
+        # Check session cookie
+        email = _get_session_email(request)
+        if not email:
+            if path.startswith("/api/"):
+                return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+            return RedirectResponse(url="/login", status_code=302)
+        return await call_next(request)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+# ── Auth routes ───────────────────────────────────────────────────────────────
+
+@app.get("/login")
+async def login_page():
+    return FileResponse("static/login.html")
+
+
+@app.get("/auth/start")
+async def auth_start():
+    """Redirect browser to Microsoft login."""
+    params = {
+        "client_id":     _AZ_CLIENT_ID,
+        "response_type": "code",
+        "redirect_uri":  _redirect_uri(),
+        "scope":         "openid email profile",
+        "response_mode": "query",
+    }
+    ms_url = (
+        f"https://login.microsoftonline.com/{_AZ_TENANT_ID}"
+        f"/oauth2/v2.0/authorize?{urllib.parse.urlencode(params)}"
+    )
+    return RedirectResponse(url=ms_url)
+
+
+@app.get("/auth/callback")
+async def auth_callback(
+    code:  Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+):
+    """Exchange code for token, validate @microf.com, set session cookie."""
+    if error or not code:
+        return RedirectResponse(url="/login?error=cancelled")
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            f"https://login.microsoftonline.com/{_AZ_TENANT_ID}/oauth2/v2.0/token",
+            data={
+                "client_id":     _AZ_CLIENT_ID,
+                "client_secret": _AZ_CLIENT_SEC,
+                "code":          code,
+                "redirect_uri":  _redirect_uri(),
+                "grant_type":    "authorization_code",
+                "scope":         "openid email profile",
+            },
+        )
+    token_data = resp.json()
+
+    # Decode the id_token JWT (middle segment) — no signature verification needed
+    # since we got it directly from Microsoft over TLS.
+    id_token = token_data.get("id_token", "")
+    try:
+        seg = id_token.split(".")[1]
+        seg += "=" * (-len(seg) % 4)           # re-pad base64
+        payload = json.loads(base64.urlsafe_b64decode(seg))
+    except Exception:
+        return RedirectResponse(url="/login?error=token")
+
+    email = (payload.get("email") or payload.get("preferred_username", "")).lower()
+
+    if not email.endswith(f"@{_ALLOWED_DOMAIN}"):
+        return RedirectResponse(url=f"/login?error=domain&email={urllib.parse.quote(email)}")
+
+    session_token = _signer.dumps(email)
+    response = RedirectResponse(url="/search", status_code=302)
+    response.set_cookie(
+        "session", session_token,
+        max_age=_COOKIE_MAX_AGE, httponly=True, samesite="lax", secure=True,
+    )
+    return response
+
+
+@app.get("/logout")
+async def logout():
+    response = RedirectResponse(url="/login", status_code=302)
+    response.delete_cookie("session")
+    return response
+
 
 @app.get("/search")
 async def search_page(_: None = Depends(require_auth)):

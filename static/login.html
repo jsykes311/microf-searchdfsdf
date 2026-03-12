@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moogle – Sign In</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f3f4f6;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.10);
+      padding: 48px 40px 40px;
+      width: 360px;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: #1d4ed8;
+      letter-spacing: -1px;
+      margin-bottom: 6px;
+    }
+
+    .tagline {
+      font-size: 0.85rem;
+      color: #6b7280;
+      margin-bottom: 36px;
+    }
+
+    .ms-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 13px 24px;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: background .15s;
+      width: 100%;
+      justify-content: center;
+    }
+    .ms-btn:hover { background: #1d4ed8; }
+
+    .ms-btn svg { flex-shrink: 0; }
+
+    .error-box {
+      display: none;
+      background: #fee2e2;
+      color: #991b1b;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      margin-bottom: 20px;
+    }
+
+    .footer {
+      margin-top: 32px;
+      font-size: 0.75rem;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Moogle</div>
+  <div class="tagline">Microf Dealer Search &amp; Reports</div>
+
+  <div class="error-box" id="err"></div>
+
+  <a class="ms-btn" href="/auth/start">
+    <!-- Microsoft "M" mark -->
+    <svg width="20" height="20" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="1"  y="1"  width="9" height="9" fill="#f25022"/>
+      <rect x="11" y="1"  width="9" height="9" fill="#7fba00"/>
+      <rect x="1"  y="11" width="9" height="9" fill="#00a4ef"/>
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+    </svg>
+    Sign in with Microsoft
+  </a>
+
+  <div class="footer">Access restricted to @microf.com accounts</div>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const err = document.getElementById('err');
+  const msgs = {
+    domain:    'This Microsoft account is not authorized. Please sign in with your @microf.com email.',
+    token:     'There was a problem verifying your account. Please try again.',
+    cancelled: 'Sign-in was cancelled. Please try again.',
+  };
+  const key = params.get('error');
+  if (key && msgs[key]) {
+    err.textContent = msgs[key];
+    err.style.display = 'block';
+  }
+</script>
+</body>
+</html>
