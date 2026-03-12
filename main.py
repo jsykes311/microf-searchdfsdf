@@ -2414,6 +2414,15 @@ async def account_detail(account_id: str):
 async def global_search(q: str = Query(..., min_length=1)):
     """Search accounts (by name), contacts (by email only, text queries), and SLPs (by dealer ID or name)."""
     q = q.strip()
+
+    # Normalize phone-like queries: strip dashes, spaces, dots, parens so
+    # "225-681-1638" → "2256811638" matches how AC stores phone numbers.
+    import re as _re
+    q_digits = _re.sub(r"[\s\-().+]", "", q)
+    is_phone_like = (not q.isdigit()) and q_digits.isdigit() and len(q_digits) >= 7
+    if is_phone_like:
+        q = q_digits   # search AC with the stripped version
+
     is_numeric = q.isdigit()
 
     # For numeric queries:
