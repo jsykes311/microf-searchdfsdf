@@ -954,7 +954,7 @@ select, input { font-family: inherit; }
     <div class="report-card">
       <span class="badge-icon">📋</span>
       <h3>Account Activity</h3>
-      <p>Per-account summary of notes activity, deals, and contact count. Great for identifying cold or active accounts.</p>
+      <p>Activity counts grouped by type (Call, Email, etc.) and by who logged them — pulled from the Account Activity custom object.</p>
       <div class="period-row">
         <span class="period-label">Period</span>
         <button class="period-btn" onclick="applyPeriod('last_week','acta-from','acta-to',this)">Last Week</button>
@@ -968,25 +968,27 @@ select, input { font-family: inherit; }
         <button class="period-btn" onclick="applyPeriod('all','acta-from','acta-to',this)">All Time</button>
       </div>
       <div class="form-row">
-        <label>Notes From Date</label>
+        <label>From Date</label>
         <input type="date" id="acta-from"/>
       </div>
       <div class="form-row">
-        <label>Notes To Date</label>
+        <label>To Date</label>
         <input type="date" id="acta-to"/>
       </div>
       <div class="form-row">
-        <label>Min Note Count</label>
-        <input type="number" id="acta-min" placeholder="0" min="0" style="width:80px;"/>
-      </div>
-      <div class="form-row" style="align-items:center; gap:8px;">
-        <label style="margin:0;">Active Accounts Only</label>
-        <input type="checkbox" id="acta-active"/>
+        <label>Activity Type</label>
+        <select id="acta-type">
+          <option value="">— all —</option>
+          <option>Call</option>
+          <option>Email</option>
+          <option>Meeting</option>
+          <option>Text</option>
+          <option>Other</option>
+        </select>
       </div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="runPrebuilt('acta')">▶ Run</button>
         <button class="btn btn-success" onclick="downloadPrebuilt('acta')">⬇ CSV</button>
-        <button class="btn btn-email btn-sm" onclick="sendEmailReport('account-activity','acta-from','acta-to','acta-result')">✉ Email</button>
       </div>
       <div id="acta-result" style="margin-top:12px;"></div>
     </div>
@@ -995,7 +997,7 @@ select, input { font-family: inherit; }
     <div class="report-card">
       <span class="badge-icon">🏆</span>
       <h3>Team Performance</h3>
-      <p>Notes activity broken down by team member — who's engaging accounts, how many accounts they're touching, and when they were last active.</p>
+      <p>Who's doing the most — combines Notes (reliable author) with Account Activity (performed-by) to show total actions per team member.</p>
       <div class="period-row">
         <span class="period-label">Period</span>
         <button class="period-btn" onclick="applyPeriod('last_week','team-from','team-to',this)">Last Week</button>
@@ -1962,14 +1964,12 @@ function prebuiltParams(type) {
     return { endpoint: 'training-summary', params: p };
   }
   if (type === 'acta') {
-    const from   = document.getElementById('acta-from').value;
-    const to     = document.getElementById('acta-to').value;
-    const min    = document.getElementById('acta-min').value;
-    const active = document.getElementById('acta-active').checked;
-    if (from)   p.set('from_date', from);
-    if (to)     p.set('to_date', to);
-    if (min)    p.set('min_notes', min);
-    if (active) p.set('has_activity', 'true');
+    const from = document.getElementById('acta-from').value;
+    const to   = document.getElementById('acta-to').value;
+    const atype = document.getElementById('acta-type').value;
+    if (from)  p.set('from_date', from);
+    if (to)    p.set('to_date', to);
+    if (atype) p.set('activity_type', atype);
     return { endpoint: 'account-activity', params: p };
   }
   if (type === 'team') {
@@ -2043,6 +2043,63 @@ async function runPrebuilt(type) {
   try {
     const res  = await fetch(`/api/report/${endpoint}?${params}`);
     const data = await res.json();
+
+    // ── Account Activity: grouped view ──────────────────────────────
+    if (type === 'acta') {
+      const byType   = data.by_type   || [];
+      const byPerson = data.by_person || [];
+      const total    = data.total || 0;
+      let html = `<div style="font-size:0.82rem; color:#059669; margin-bottom:8px;">✓ ${total} activities</div>`;
+      if (byType.length) {
+        html += `<div style="font-weight:600; font-size:0.8rem; margin-bottom:4px; color:#374151;">By Activity Type</div>
+        <table style="width:100%; border-collapse:collapse; font-size:0.8rem; margin-bottom:12px;">
+          <thead><tr style="background:#f3f4f6;"><th style="padding:4px 8px;text-align:left;">Type</th><th style="padding:4px 8px;text-align:right;">Count</th><th style="padding:4px 8px;text-align:right;">Accounts</th></tr></thead>
+          <tbody>${byType.map(r => `<tr><td style="padding:4px 8px;">${esc(r.activity_type)}</td><td style="padding:4px 8px;text-align:right;">${r.count}</td><td style="padding:4px 8px;text-align:right;">${r.unique_accounts}</td></tr>`).join('')}</tbody>
+        </table>`;
+      }
+      if (byPerson.length) {
+        html += `<div style="font-weight:600; font-size:0.8rem; margin-bottom:4px; color:#374151;">By Performed By</div>
+        <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+          <thead><tr style="background:#f3f4f6;"><th style="padding:4px 8px;text-align:left;">Person</th><th style="padding:4px 8px;text-align:right;">Total</th><th style="padding:4px 8px;text-align:left;">Breakdown</th></tr></thead>
+          <tbody>${byPerson.map(r => `<tr><td style="padding:4px 8px;">${esc(r.performed_by)}</td><td style="padding:4px 8px;text-align:right;">${r.count}</td><td style="padding:4px 8px;color:#6b7280;">${Object.entries(r.breakdown||{}).map(([t,c])=>`${esc(t)}: ${c}`).join(' · ')}</td></tr>`).join('')}</tbody>
+        </table>`;
+      }
+      document.getElementById(resultId).innerHTML = html;
+      return;
+    }
+
+    // ── Team Performance: combined notes + activity ──────────────────
+    if (type === 'team') {
+      const records   = data.records   || [];
+      const unmatched = data.unmatched_activity || [];
+      let html = `<div style="font-size:0.82rem; color:#059669; margin-bottom:8px;">✓ ${records.length} team members</div>`;
+      if (records.length) {
+        html += `<table style="width:100%; border-collapse:collapse; font-size:0.8rem; margin-bottom:12px;">
+          <thead><tr style="background:#f3f4f6;">
+            <th style="padding:4px 8px;text-align:left;">Name</th>
+            <th style="padding:4px 8px;text-align:right;" title="Notes written (reliable)">Notes</th>
+            <th style="padding:4px 8px;text-align:right;" title="Account Activity records matched to this user">Activities</th>
+            <th style="padding:4px 8px;text-align:right;">Total</th>
+            <th style="padding:4px 8px;text-align:right;">Accounts</th>
+            <th style="padding:4px 8px;">Last Active</th>
+          </tr></thead>
+          <tbody>${records.map(r => `<tr>
+            <td style="padding:4px 8px;font-weight:500;">${esc(r.user_name)}</td>
+            <td style="padding:4px 8px;text-align:right;">${r.notes_written}</td>
+            <td style="padding:4px 8px;text-align:right;">${r.activities_logged}</td>
+            <td style="padding:4px 8px;text-align:right;font-weight:600;">${r.total_actions}</td>
+            <td style="padding:4px 8px;text-align:right;">${r.accounts_touched}</td>
+            <td style="padding:4px 8px;color:#6b7280;">${esc(r.latest_activity_date)}</td>
+          </tr>`).join('')}</tbody>
+        </table>`;
+      }
+      if (unmatched.length) {
+        html += `<div style="font-size:0.75rem; color:#9ca3af; margin-top:4px;">⚠ Unmatched performed-by values (couldn't tie to a user): ${unmatched.map(u=>`${esc(u.performed_by)} (${u.activity_count})`).join(', ')}</div>`;
+      }
+      document.getElementById(resultId).innerHTML = html;
+      return;
+    }
+
     const records = data.records || [];
     document.getElementById(resultId).innerHTML = `<span style="color:#059669; font-size:0.82rem;">✓ ${records.length} records</span>`;
     renderPrebuiltTable(records);

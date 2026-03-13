@@ -429,9 +429,10 @@ async def _build_dealer_id_index() -> None:
         traceback.print_exc()
 
 
-SLP_SCHEMA_ID      = "d5ccf74f-981f-40ff-8a03-23cd0309808f"
-LICENSE_SCHEMA_ID  = "4bc17cb1-31be-4c15-a186-853ea85b1d40"
-TRAINING_SCHEMA_ID = "9368fee4-ccef-407b-a0d3-4b72c346b2af"
+SLP_SCHEMA_ID           = "d5ccf74f-981f-40ff-8a03-23cd0309808f"
+LICENSE_SCHEMA_ID       = "4bc17cb1-31be-4c15-a186-853ea85b1d40"
+TRAINING_SCHEMA_ID      = "9368fee4-ccef-407b-a0d3-4b72c346b2af"
+ACCT_ACTIVITY_SCHEMA_ID = "3a11374e-4b3d-47b8-b423-17ebcb7b1f4b"
 
 # Known account custom field IDs (from field_id_mapping.csv)
 ACCT_FIELD = {
@@ -2034,114 +2035,89 @@ async def dealer_profile(
 
 @app.get("/api/report/account-activity")
 async def account_activity_report(
-    from_date:   Optional[str] = Query(None, description="YYYY-MM-DD — filter notes by created date"),
-    to_date:     Optional[str] = Query(None, description="YYYY-MM-DD — filter notes by created date"),
-    min_notes:   int           = Query(0, description="Only return accounts with at least N notes"),
-    has_activity:bool          = Query(False, description="Only accounts with at least 1 note"),
-    format:      str           = Query("json"),
+    from_date:     Optional[str] = Query(None, description="YYYY-MM-DD"),
+    to_date:       Optional[str] = Query(None, description="YYYY-MM-DD"),
+    activity_type: Optional[str] = Query(None, description="Filter by activity type"),
+    performed_by:  Optional[str] = Query(None, description="Filter by performed-by value"),
+    format:        str           = Query("json"),
 ):
-    """Per-account activity summary: aggregated notes + deal info + contact count."""
-    from datetime import timezone
-    print("\nAccount activity report...")
+    """Account Activity custom object — counts grouped by type and performed-by."""
+    print("\nAccount activity report (custom object)...")
 
-    # Fetch everything in parallel
-    accounts_data, all_contacts, all_notes, all_deals = await asyncio.gather(
-        ac_get_all("accounts", "accounts", {}),
-        ac_get_all("contacts", "contacts", {}),
-        ac_get_all("notes",    "notes",    {}),
-        ac_get_all("deals",    "deals",    {}),
+    all_records = await ac_get_all(
+        f"customObjects/records/{ACCT_ACTIVITY_SCHEMA_ID}", "records", {}
     )
 
-    # contact_id → account_id   +   account_id → [contacts]
-    contact_to_account:  dict = {}
-    contacts_by_account: dict = defaultdict(list)
-    for c in all_contacts:
-        aid = str(c.get("account", ""))
-        cid = str(c.get("id", ""))
-        if aid:
-            contact_to_account[cid] = aid
-            contacts_by_account[aid].append(c)
+    from_d = datetime.strptime(from_date, "%Y-%m-%d").date() if from_date else None
+    to_d   = datetime.strptime(to_date,   "%Y-%m-%d").date() if to_date   else None
 
-    # Group notes by account (via their contact)
-    from_dt = (datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-               if from_date else None)
-    to_dt   = (datetime.strptime(to_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
-               if to_date else None)
+    counts_by_type:   dict = defaultdict(int)
+    accounts_by_type: dict = defaultdict(set)
+    counts_by_person: dict = defaultdict(int)
+    type_by_person:   dict = defaultdict(lambda: defaultdict(int))
+    total = 0
 
-    notes_by_account: dict = defaultdict(list)
-    for n in all_notes:
-        if (n.get("reltype") or "").lower() != "contact":
-            continue
-        cid = str(n.get("rel_id", ""))
-        aid = contact_to_account.get(cid)
-        if not aid:
-            continue
-        if from_dt or to_dt:
-            raw_date = n.get("cdate", "")
+    for r in all_records:
+        fmap         = {f["id"]: f.get("value") for f in r.get("fields", [])}
+        act_type     = (fmap.get("activity-type") or "Unknown").strip()
+        act_date     = (fmap.get("activity-date") or "")[:10]
+        performed    = (fmap.get("performed-by")  or "").strip()
+        account_id   = next(iter(r.get("relationships", {}).get("account", [])), "")
+
+        # Date filter
+        if act_date and (from_d or to_d):
             try:
-                nd = (datetime.fromisoformat(raw_date.replace("Z", "+00:00")) if "T" in raw_date
-                      else datetime.strptime(raw_date[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc))
-                if from_dt and nd < from_dt:
-                    continue
-                if to_dt and nd > to_dt:
-                    continue
+                ad = datetime.strptime(act_date, "%Y-%m-%d").date()
+                if from_d and ad < from_d: continue
+                if to_d   and ad > to_d:   continue
             except Exception:
-                continue
-        notes_by_account[aid].append(n)
+                pass
 
-    # Group deals by account
-    deals_by_account: dict = defaultdict(list)
-    for d in all_deals:
-        aid = str(d.get("account", ""))
-        if aid:
-            deals_by_account[aid].append(d)
-
-    # Build result rows
-    results = []
-    for acc in accounts_data:
-        aid          = str(acc.get("id", ""))
-        account_name = acc.get("name", "")
-
-        account_notes    = sorted(notes_by_account.get(aid, []),
-                                  key=lambda n: n.get("cdate", ""), reverse=True)
-        account_contacts = contacts_by_account.get(aid, [])
-        account_deals    = deals_by_account.get(aid, [])
-
-        note_count = len(account_notes)
-        if has_activity and note_count == 0:
-            continue
-        if note_count < min_notes:
+        # Activity type filter
+        if activity_type and act_type.lower() != activity_type.lower():
             continue
 
-        last_note = account_notes[0] if account_notes else None
-        last_deal = (max(account_deals, key=lambda d: d.get("cdate", ""), default=None)
-                     if account_deals else None)
+        # Performed-by filter
+        if performed_by and performed_by.lower() not in performed.lower():
+            continue
 
-        results.append({
-            "account_id":         aid,
-            "account_name":       account_name,
-            "contact_count":      len(account_contacts),
-            "note_count":         note_count,
-            "latest_note_date":   last_note.get("cdate", "")                    if last_note else "",
-            "latest_note":        (last_note.get("note", "") or "")[:300]       if last_note else "",
-            "deal_count":         len(account_deals),
-            "latest_deal_title":  last_deal.get("title", "")                    if last_deal else "",
-            "latest_deal_status": last_deal.get("status", "")                   if last_deal else "",
-            "latest_deal_date":   last_deal.get("cdate", "")                    if last_deal else "",
-        })
+        counts_by_type[act_type] += 1
+        accounts_by_type[act_type].add(account_id)
+        if performed:
+            counts_by_person[performed] += 1
+            type_by_person[performed][act_type] += 1
+        total += 1
 
-    results.sort(key=lambda x: x.get("latest_note_date", ""), reverse=True)
+    by_type = sorted(
+        [{"activity_type": t, "count": c, "unique_accounts": len(accounts_by_type[t])}
+         for t, c in counts_by_type.items()],
+        key=lambda x: -x["count"]
+    )
+    by_person = sorted(
+        [{"performed_by": p, "count": c,
+          "breakdown": dict(sorted(type_by_person[p].items(), key=lambda x: -x[1]))}
+         for p, c in counts_by_person.items()],
+        key=lambda x: -x["count"]
+    )
 
     if format == "csv":
+        rows = []
+        for row in by_person:
+            for atype, cnt in row["breakdown"].items():
+                rows.append({"performed_by": row["performed_by"],
+                             "activity_type": atype, "count": cnt})
+        if not rows:
+            rows = [{"performed_by": "", "activity_type": t, "count": c}
+                    for t, c in counts_by_type.items()]
         out = io.StringIO()
-        if results:
-            w = csv.DictWriter(out, fieldnames=results[0].keys())
-            w.writeheader()
-            w.writerows(results)
+        if rows:
+            w = csv.DictWriter(out, fieldnames=rows[0].keys())
+            w.writeheader(); w.writerows(rows)
         fn = f"account_activity_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
                                  headers={"Content-Disposition": f"attachment; filename={fn}"})
-    return {"count": len(results), "records": results}
+
+    return {"total": total, "by_type": by_type, "by_person": by_person}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2150,19 +2126,19 @@ async def account_activity_report(
 
 @app.get("/api/report/team-activity")
 async def team_activity_report(
-    from_date: Optional[str] = Query(None, description="YYYY-MM-DD — filter notes by created date"),
-    to_date:   Optional[str] = Query(None, description="YYYY-MM-DD — filter notes by created date"),
+    from_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    to_date:   Optional[str] = Query(None, description="YYYY-MM-DD"),
     format:    str           = Query("json"),
 ):
-    """Per-user activity summary: who is writing notes, how many accounts they touch."""
+    """Per-user activity summary combining Notes (reliable author) + Account Activity (performed-by)."""
     from datetime import timezone
     print("\nTeam activity report...")
 
-    # Fetch users, raw notes, and contacts in parallel
-    users_data, all_notes_raw, all_contacts = await asyncio.gather(
+    users_data, all_notes_raw, all_contacts, all_activity = await asyncio.gather(
         ac_get("users"),
         ac_get_all("notes", "notes", {}),
         ac_get_all("contacts", "contacts", {}),
+        ac_get_all(f"customObjects/records/{ACCT_ACTIVITY_SCHEMA_ID}", "records", {}),
     )
 
     # Build user map: userid → display name
@@ -2172,7 +2148,25 @@ async def team_activity_report(
         name = f"{u.get('firstName','').strip()} {u.get('lastName','').strip()}".strip()
         users[uid] = name or u.get("email", f"User {uid}")
 
-    # Build contact → account map
+    # Try to match a free-text performed-by value to a known user name
+    def match_user(val: str) -> Optional[str]:
+        if not val: return None
+        v = val.strip().lower()
+        for uid, name in users.items():
+            if name.lower() == v: return uid           # exact match
+        if len(v) == 2 and v.isalpha():                # initials e.g. "TB"
+            for uid, name in users.items():
+                parts = name.split()
+                if (len(parts) >= 2
+                        and parts[0][:1].lower() == v[0]
+                        and parts[-1][:1].lower() == v[1]):
+                    return uid
+        for uid, name in users.items():                # first-name or contains
+            parts = name.split()
+            if parts and parts[0].lower() == v: return uid
+            if v in name.lower(): return uid
+        return None
+
     contact_to_account: dict = {}
     for c in all_contacts:
         cid = str(c.get("id", ""))
@@ -2180,79 +2174,100 @@ async def team_activity_report(
         if aid and aid != "0":
             contact_to_account[cid] = aid
 
-    # Date filter setup
     from_dt = (datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
                if from_date else None)
-    to_dt   = (datetime.strptime(to_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+    to_dt   = (datetime.strptime(to_date, "%Y-%m-%d").replace(
+                   hour=23, minute=59, second=59, tzinfo=timezone.utc)
                if to_date else None)
+    from_d  = from_dt.date() if from_dt else None
+    to_d    = to_dt.date()   if to_dt   else None
 
-    # Aggregate notes by the user who wrote them
     user_stats: dict = defaultdict(lambda: {
-        "note_count": 0, "accounts": set(), "latest_date": "", "latest_note": ""
+        "notes": 0, "activities": 0, "accounts": set(), "latest_date": ""
     })
 
-    total_contact_notes = 0
+    # ── Notes (reliable author via userid) ───────────────────────────────
     for n in all_notes_raw:
         reltype = (n.get("reltype") or "").lower()
-        if reltype not in ("contact", "deal"):
+        if reltype not in ("contact", "customeraccount", "deal"):
             continue
-        if reltype == "contact":
-            total_contact_notes += 1
-
         raw_date = n.get("cdate", "")
-        # Apply date filter
         if from_dt or to_dt:
             try:
                 nd = (datetime.fromisoformat(raw_date.replace("Z", "+00:00")) if "T" in raw_date
                       else datetime.strptime(raw_date[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc))
-                if from_dt and nd < from_dt:
-                    continue
-                if to_dt and nd > to_dt:
-                    continue
+                if from_dt and nd < from_dt: continue
+                if to_dt   and nd > to_dt:   continue
             except Exception:
                 continue
+        uid = str(n.get("userid", "") or "")
+        if not uid: continue
+        cid = str(n.get("rel_id", "") or "")
+        aid = contact_to_account.get(cid, "")
+        s   = user_stats[uid]
+        s["notes"] += 1
+        if aid: s["accounts"].add(aid)
+        if raw_date > s["latest_date"]: s["latest_date"] = raw_date
 
-        uid  = str(n.get("userid", "") or "")
-        cid  = str(n.get("rel_id", "") or "") if reltype == "contact" else ""
-        aid  = contact_to_account.get(cid, "")
-        note_text = ((n.get("note", "") or "")[:150]).strip()
+    # ── Account Activity (performed-by, fuzzy-matched to users) ──────────
+    unmatched_activity: dict = defaultdict(int)   # raw performed-by → count
+    for r in all_activity:
+        fmap      = {f["id"]: f.get("value") for f in r.get("fields", [])}
+        act_date  = (fmap.get("activity-date") or "")[:10]
+        performed = (fmap.get("performed-by")  or "").strip()
+        account_id = next(iter(r.get("relationships", {}).get("account", [])), "")
 
+        if act_date and (from_d or to_d):
+            try:
+                ad = datetime.strptime(act_date, "%Y-%m-%d").date()
+                if from_d and ad < from_d: continue
+                if to_d   and ad > to_d:   continue
+            except Exception:
+                pass
+
+        uid = match_user(performed)
         if uid:
             s = user_stats[uid]
-            s["note_count"] += 1
-            if aid:
-                s["accounts"].add(aid)
-            if raw_date > s["latest_date"]:
-                s["latest_date"] = raw_date
-                s["latest_note"] = note_text
+            s["activities"] += 1
+            if account_id: s["accounts"].add(account_id)
+            if act_date and act_date > s["latest_date"][:10]:
+                s["latest_date"] = act_date
+        elif performed:
+            unmatched_activity[performed] += 1
 
-    # Build result rows sorted by note count desc
+    # Build result rows
     user_rows = []
-    for uid, s in sorted(user_stats.items(), key=lambda x: x[1]["note_count"], reverse=True):
+    all_uids  = set(user_stats.keys()) | set(users.keys())
+    for uid in all_uids:
+        s = user_stats.get(uid, {"notes": 0, "activities": 0, "accounts": set(), "latest_date": ""})
+        total = s["notes"] + s["activities"]
+        if total == 0: continue
         user_rows.append({
             "user_name":            users.get(uid, f"User {uid}"),
-            "user_id":              uid,
-            "notes_written":        s["note_count"],
+            "notes_written":        s["notes"],
+            "activities_logged":    s["activities"],
+            "total_actions":        total,
             "accounts_touched":     len(s["accounts"]),
             "latest_activity_date": s["latest_date"][:10] if s["latest_date"] else "",
-            "latest_note_preview":  s["latest_note"],
         })
+    user_rows.sort(key=lambda x: -x["total_actions"])
+
+    # Unmatched performed-by values (couldn't tie to a user)
+    unmatched = sorted(
+        [{"performed_by": k, "activity_count": v} for k, v in unmatched_activity.items()],
+        key=lambda x: -x["activity_count"]
+    )
 
     if format == "csv":
         out = io.StringIO()
         if user_rows:
             w = csv.DictWriter(out, fieldnames=user_rows[0].keys())
-            w.writeheader()
-            w.writerows(user_rows)
+            w.writeheader(); w.writerows(user_rows)
         fn = f"team_activity_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
                                  headers={"Content-Disposition": f"attachment; filename={fn}"})
 
-    return {
-        "count":      len(user_rows),
-        "total_notes": total_contact_notes,
-        "records":    user_rows,
-    }
+    return {"count": len(user_rows), "records": user_rows, "unmatched_activity": unmatched}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
