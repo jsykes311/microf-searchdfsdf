@@ -177,6 +177,7 @@ body {
   background: #ddf4ff; color: #0550ae; font-weight: 600;
 }
 .field-item .badge.related { background: #dff6dd; color: #107c10; }
+.check-all-row { border-bottom: 1px solid var(--ms-g30); margin-bottom: 4px; padding-bottom: 6px; }
 
 .selected-tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 32px; }
 .tag {
@@ -1585,6 +1586,34 @@ function renderFieldList(query = '') {
 
   const primary  = state.fields.filter(f => f.type === 'primary'  && (!q || f.label.toLowerCase().includes(q)));
   const related  = state.fields.filter(f => f.type === 'related'  && (!q || f.label.toLowerCase().includes(q)));
+  const visible  = [...primary, ...related];
+
+  if (!primary.length && !related.length) {
+    list.innerHTML = '<div style="padding:12px; color:#9ca3af; font-size:0.83rem;">No fields match.</div>';
+    return;
+  }
+
+  // ── Check All / Check None toggle ──────────────────────────
+  const allChecked = visible.every(f => state.selected.includes(f.id));
+  const toggleRow  = document.createElement('div');
+  toggleRow.className = 'field-item check-all-row';
+  toggleRow.innerHTML = `
+    <input type="checkbox" id="check-all-toggle" ${allChecked ? 'checked' : ''}/>
+    <label for="check-all-toggle" style="font-weight:600; color:var(--ms-blue);">
+      ${allChecked ? 'Uncheck All' : 'Check All'}
+    </label>`;
+  const toggleCb = toggleRow.querySelector('input');
+  toggleCb.onchange = () => {
+    const nowAll = toggleCb.checked;
+    visible.forEach(f => {
+      if (nowAll && !state.selected.includes(f.id)) state.selected.push(f.id);
+      if (!nowAll) state.selected = state.selected.filter(s => s !== f.id);
+    });
+    renderSelectedTags();
+    updateDedup();
+    renderFieldList(query);   // re-render to sync all checkboxes + label
+  };
+  list.appendChild(toggleRow);
 
   function renderGroup(fields, label, badgeClass) {
     if (!fields.length) return;
@@ -1600,17 +1629,23 @@ function renderFieldList(query = '') {
         <input type="checkbox" id="f_${CSS.escape(f.id)}" ${checked}/>
         <label for="f_${CSS.escape(f.id)}">${f.label}</label>
         <span class="badge ${badgeClass}">${f.dataType || 'text'}</span>`;
-      item.querySelector('input').onchange = e => toggleField(f.id, e.target.checked);
+      item.querySelector('input').onchange = e => {
+        toggleField(f.id, e.target.checked);
+        // Update the Check All toggle state after each individual change
+        const allNow = state.fields
+          .filter(x => !q || x.label.toLowerCase().includes(q))
+          .every(x => state.selected.includes(x.id));
+        const cb = document.getElementById('check-all-toggle');
+        const lbl = cb && cb.nextElementSibling;
+        if (cb) { cb.checked = allNow; }
+        if (lbl) { lbl.textContent = allNow ? 'Uncheck All' : 'Check All'; }
+      };
       list.appendChild(item);
     });
   }
 
   renderGroup(primary, 'Primary Fields', '');
   renderGroup(related, 'Cross-Object Fields', 'related');
-
-  if (!primary.length && !related.length) {
-    list.innerHTML = '<div style="padding:12px; color:#9ca3af; font-size:0.83rem;">No fields match.</div>';
-  }
 }
 
 function filterFields() {
