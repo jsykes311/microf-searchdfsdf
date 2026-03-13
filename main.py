@@ -2134,10 +2134,11 @@ async def team_activity_report(
     from datetime import timezone
     print("\nTeam activity report...")
 
-    users_data, all_notes_raw, all_contacts, all_activity = await asyncio.gather(
+    users_data, all_notes_raw, all_contacts, all_accounts_raw, all_activity = await asyncio.gather(
         ac_get("users"),
         ac_get_all("notes", "notes", {}),
         ac_get_all("contacts", "contacts", {}),
+        ac_get_all("accounts", "accounts", {}),
         ac_get_all(f"customObjects/records/{ACCT_ACTIVITY_SCHEMA_ID}", "records", {}),
     )
 
@@ -2173,6 +2174,14 @@ async def team_activity_report(
         aid = str(c.get("account", "") or "")
         if aid and aid != "0":
             contact_to_account[cid] = aid
+
+    # account_id → owner user_id (fallback when performed-by is blank)
+    account_owner: dict = {}
+    for a in all_accounts_raw:
+        aid   = str(a.get("id", ""))
+        owner = str(a.get("owner", "") or "")
+        if aid and owner and owner != "0":
+            account_owner[aid] = owner
 
     from_dt = (datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
                if from_date else None)
@@ -2226,6 +2235,9 @@ async def team_activity_report(
                 pass
 
         uid = match_user(performed)
+        if not uid and account_id:
+            # Fall back to the account's owner
+            uid = account_owner.get(account_id)
         if uid:
             s = user_stats[uid]
             s["activities"] += 1
