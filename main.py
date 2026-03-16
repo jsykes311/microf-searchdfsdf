@@ -200,7 +200,7 @@ async def auth_callback(
         return RedirectResponse(url=f"/login?error=domain&email={urllib.parse.quote(email)}")
 
     session_token = _signer.dumps(email)
-    response = RedirectResponse(url="/reports", status_code=302)
+    response = RedirectResponse(url="/search", status_code=302)
     response.set_cookie(
         "session", session_token,
         max_age=_COOKIE_MAX_AGE, httponly=True, samesite="lax", secure=True,
