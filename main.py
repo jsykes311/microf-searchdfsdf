@@ -322,6 +322,19 @@ async def _get_account_cf_meta() -> dict:
     _cf_meta_ts = _time.time()
     return _cf_meta_cache
 
+def _normalize_platform(val: str) -> str:
+    """Normalize platform/program display names for reporting.
+    Microf (LTO Only), LTO → Microf
+    Optimus 2.0, OPTIMUS 3.0, etc. → OPTIMUS
+    """
+    v = val.strip().lower()
+    if "optimus" in v:
+        return "OPTIMUS"
+    if "microf" in v or v == "lto":
+        return "Microf"
+    return val.strip()
+
+
 def _extract_cf_value(cf: dict) -> str:
     """Read the first non-empty value across all custom field value types."""
     for key in ("custom_field_text_value", "custom_field_date_value",
@@ -1630,10 +1643,11 @@ async def activations_report(
 
         if fields.get("slp-status-detail") != "Contractor Activated":
             continue
-        plat = str(fields.get("platform", "")).strip()
-        if platform and plat != platform:
+        plat      = str(fields.get("platform", "")).strip()
+        plat_norm = _normalize_platform(plat)
+        if platform and plat_norm != _normalize_platform(platform):
             continue
-        if plat in exclude_set:
+        if plat_norm in exclude_set or plat in exclude_set:
             continue
 
         # Resolve acc_id early so we can fall back to account-level BDR
@@ -1693,14 +1707,14 @@ async def activations_report(
             "account_name":              acc["name"],
             "dba_name":                  cfs.get(ACCT_FIELD["dba_name"], ""),
             "dealer_id":                 f.get("dealer-id", ""),
-            "platform":                  f.get("platform", ""),
+            "platform":                  _normalize_platform(f.get("platform", "")),
             "platforms":                 f.get("platforms", ""),
             "slp_status":                f.get("slp-status-detail", ""),
             "contractor_activated_date": f.get("contractor-activated-date", ""),
             "original_owner":            f.get("original-owner", ""),
             "assigned_bdr":              c.get("eff_bdr") or f.get("assigned-bdr", ""),
             "sales_region":              cfs.get(ACCT_FIELD["sales_region"], ""),
-            "dealer_program":            cfs.get(ACCT_FIELD["dealer_program"], ""),
+            "dealer_program":            _normalize_platform(cfs.get(ACCT_FIELD["dealer_program"], "")),
             "oracle_producer_id":        cfs.get(ACCT_FIELD["oracle_producer_id"], ""),
             "doing_business_in_states":  cfs.get(ACCT_FIELD["doing_business_in"], "") or f.get("doing-business-in-states", ""),
             "ein":                       f.get("ein", ""),
