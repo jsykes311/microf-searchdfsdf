@@ -1,9 +1,7 @@
 name: Monthly Reports
 
 on:
-  schedule:
-    - cron: '0 12 1 * *'   # 7:00 AM ET (UTC-5) 1st of every month
-  workflow_dispatch:         # allow manual trigger from GitHub Actions tab
+  workflow_dispatch:   # manual trigger only — run from GitHub Actions tab
 
 jobs:
   stale-untrained:
