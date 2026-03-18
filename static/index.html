@@ -1233,6 +1233,18 @@ select, input { font-family: inherit; }
       <div id="om-result" style="margin-top:10px;"></div>
     </div>
 
+    <!-- ARS 360 Finance Contacts -->
+    <div class="report-card">
+      <span class="badge-icon">🏢</span>
+      <h3>ARS 360 Finance Contacts</h3>
+      <p>All ARS dealers on the 360 Finance program with their linked contacts.</p>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-primary" onclick="runPrebuilt('ars-360')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('ars-360')">⬇ CSV</button>
+      </div>
+      <div id="ars360-result" style="margin-top:10px;"></div>
+    </div>
+
   </div>
 
   <!-- Prebuilt Results Table -->
@@ -2027,6 +2039,9 @@ function prebuiltParams(type) {
     if (bdr)  p.set('bdr', bdr);
     return { endpoint: 'oracle-missing', params: p };
   }
+  if (type === 'ars-360') {
+    return { endpoint: 'ars-360', params: p };
+  }
 }
 
 async function runPrebuilt(type) {
@@ -2037,6 +2052,7 @@ async function runPrebuilt(type) {
     'training-activity': 'ta-result', 'stale-untrained': 'su-result',
     'account-status': 'as-result', 'platform-breakdown': 'pb-result',
     'partner-activation': 'pa-result', 'oracle-missing': 'om-result',
+    'ars-360': 'ars360-result',
   }[type];
   document.getElementById(resultId).innerHTML = '<span style="color:#6b7280; font-size:0.82rem;">Loading…</span>';
 
