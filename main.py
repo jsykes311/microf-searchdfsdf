@@ -524,7 +524,7 @@ async def ac_get_all(path: str, key: str, params: dict = None) -> list:
     need one pass.
     """
     is_custom_obj = "customObjects" in path
-    num_passes    = 2 if is_custom_obj else 1
+    num_passes    = 3 if is_custom_obj else 1
 
     seen  = {}
     p     = params or {}
