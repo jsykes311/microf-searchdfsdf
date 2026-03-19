@@ -460,7 +460,7 @@ select, input { font-family: inherit; }
 /* About card */
 .acui-about {
   margin: 14px 0 0 14px;
-  background: #f8fafc; border: 1px solid var(--ms-g30); border-radius: 3px; overflow: hidden;
+  background: var(--ms-white); border: 1px solid var(--ms-g30); border-radius: 3px; overflow: hidden;
 }
 .acui-about-header {
   padding: 12px 16px; font-size: 0.82rem; font-weight: 600; color: var(--ms-g130);
@@ -2929,7 +2929,7 @@ function abRenderDetail(d) {
       <div class="acui-about-header" style="border-top:1px solid #e2e8f0;">
         SLP Records <span style="font-weight:400;color:#94a3b8;font-size:0.78rem;">(${s.slp_count})</span>
       </div>
-      <div style="background:#f8fafc;border-radius:0 0 8px 8px;">${coTable(d.slps, slpCols)}</div>
+      <div>${coTable(d.slps, slpCols)}</div>
     </div>`;
 
   // ── Right sidebar ─────────────────────────────────────────────
