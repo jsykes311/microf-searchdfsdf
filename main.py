@@ -2779,7 +2779,8 @@ async def global_search_export(q: str = Query(default=" "),
                     "oracle_ids":     f.get("oracle-producer-ids", ""),
                     "assigned_bdr":   f.get("assigned-bdr", ""),
                 })
-        else:
+        elif not program:
+            # Only include accounts with no matching SLPs when there's no program filter
             rows.append({
                 "account_name":   acct_name,
                 "account_id":     aid,
