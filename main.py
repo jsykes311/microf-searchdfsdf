@@ -80,9 +80,6 @@ _SMTP_PASS  = os.getenv("SMTP_PASS",      "")
 _SMTP_FROM  = os.getenv("SMTP_FROM_NAME", "Moogle Reports")
 _RECIPIENTS = [r.strip() for r in os.getenv("REPORT_RECIPIENTS", "").split(",") if r.strip()]
 
-# ── Resend (transactional email) ──────────────────────────────────────────
-_RESEND_API_KEY  = os.getenv("RESEND_API_KEY", "")
-_RESEND_FROM     = "marketing@microf.com"
 
 
 def _redirect_uri() -> str:
@@ -2832,14 +2829,14 @@ async def global_search_export_contacts(q: str = Query(default=" "),
 
 @app.post("/api/global-search/email")
 async def global_search_email(
-    recipients: str  = Query(..., description="Comma-separated email addresses"),
-    q:          str  = Query(default=" "),
-    program:    Optional[str] = Query(None),
-    report_type: str = Query(default="accounts", description="accounts or contacts"),
+    recipients:  str          = Query(..., description="Comma-separated email addresses"),
+    q:           str          = Query(default=" "),
+    program:     Optional[str]= Query(None),
+    report_type: str          = Query(default="accounts", description="accounts or contacts"),
 ):
-    """Generate a search export CSV and email it via Resend."""
-    if not _RESEND_API_KEY:
-        raise HTTPException(status_code=503, detail="Email not configured (RESEND_API_KEY missing)")
+    """Generate a search export CSV and email it via Gmail SMTP."""
+    if not _SMTP_USER or not _SMTP_PASS:
+        raise HTTPException(status_code=503, detail="Email not configured (SMTP_USER / SMTP_PASS missing)")
 
     to_list = [r.strip() for r in recipients.split(",") if r.strip()]
     if not to_list:
@@ -2849,42 +2846,44 @@ async def global_search_email(
 
     # Generate CSV using existing export logic
     if report_type == "contacts":
-        resp = await global_search_export_contacts(q=effective_q, program=program)
-        fname = f"contacts_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        resp        = await global_search_export_contacts(q=effective_q, program=program)
+        fname       = f"contacts_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         subject_tag = "Contacts"
     else:
-        resp = await global_search_export(q=effective_q, program=program)
-        fname = f"accounts_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        resp        = await global_search_export(q=effective_q, program=program)
+        fname       = f"accounts_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         subject_tag = "Accounts"
 
-    # Read CSV bytes from the StreamingResponse
     csv_bytes = b"".join([chunk async for chunk in resp.body_iterator])
-    csv_b64   = base64.b64encode(csv_bytes).decode()
 
     label   = f'"{effective_q.strip()}"' + (f" · {program}" if program else "")
     subject = f"Microf Search Export — {subject_tag} {label}"
-    body    = (f"<p>Please find the attached {subject_tag.lower()} export for search: "
-               f"<strong>{label}</strong>.</p>"
-               f"<p style='color:#6b7280;font-size:0.85em;'>Sent from microf-search</p>")
 
-    payload = {
-        "from":    _RESEND_FROM,
-        "to":      to_list,
-        "subject": subject,
-        "html":    body,
-        "attachments": [{"filename": fname, "content": csv_b64}],
-    }
+    msg = MIMEMultipart()
+    msg["From"]    = f"Microf Search <{_SMTP_USER}>"
+    msg["To"]      = ", ".join(to_list)
+    msg["Subject"] = subject
+    msg.attach(MIMEText(
+        f"<p>Please find the attached {subject_tag.lower()} export for search: "
+        f"<strong>{label}</strong>.</p>"
+        f"<p style='color:#6b7280;font-size:0.85em;'>Sent from microf-search</p>",
+        "html"
+    ))
 
-    async with httpx.AsyncClient() as client:
-        r = await client.post(
-            "https://api.resend.com/emails",
-            headers={"Authorization": f"Bearer {_RESEND_API_KEY}", "Content-Type": "application/json"},
-            json=payload,
-            timeout=15,
-        )
+    part = MIMEBase("application", "octet-stream")
+    part.set_payload(csv_bytes)
+    _enc.encode_base64(part)
+    part.add_header("Content-Disposition", f'attachment; filename="{fname}"')
+    msg.attach(part)
 
-    if r.status_code not in (200, 201):
-        raise HTTPException(status_code=502, detail=f"Resend error {r.status_code}: {r.text}")
+    await aiosmtplib.send(
+        msg,
+        hostname="smtp.gmail.com",
+        port=587,
+        start_tls=True,
+        username=_SMTP_USER,
+        password=_SMTP_PASS,
+    )
 
     return {"ok": True, "to": to_list, "filename": fname}
 
