@@ -25,6 +25,9 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders as _enc
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+import uuid as _uuid
 
 load_dotenv()
 
@@ -80,6 +83,73 @@ _SMTP_PASS  = os.getenv("SMTP_PASS",      "")
 _SMTP_FROM  = os.getenv("SMTP_FROM_NAME", "Microf Reports")
 _RECIPIENTS = [r.strip() for r in os.getenv("REPORT_RECIPIENTS", "").split(",") if r.strip()]
 
+# ── Admin / Scheduler ─────────────────────────────────────────────────────
+_ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL", "jsykes@microf.com")
+_SCHEDULES_FILE = os.path.join(os.path.dirname(__file__), "schedules.json")
+_scheduler      = AsyncIOScheduler()
+_schedules: dict = {}   # job_id → schedule dict
+
+
+def _load_schedules_from_disk():
+    if not os.path.exists(_SCHEDULES_FILE):
+        return
+    try:
+        with open(_SCHEDULES_FILE) as f:
+            saved = json.load(f)
+        for s in saved:
+            _register_schedule(s, persist=False)
+    except Exception as e:
+        print(f"[scheduler] Failed to load schedules: {e}")
+
+
+def _save_schedules_to_disk():
+    try:
+        with open(_SCHEDULES_FILE, "w") as f:
+            json.dump(list(_schedules.values()), f, indent=2)
+    except Exception as e:
+        print(f"[scheduler] Failed to save schedules: {e}")
+
+
+def _register_schedule(s: dict, persist: bool = True):
+    job_id = s["id"]
+    freq   = s["frequency"]       # daily | weekly | monthly
+    hour   = int(s.get("hour", 9))
+    minute = int(s.get("minute", 0))
+
+    if freq == "daily":
+        trigger = CronTrigger(hour=hour, minute=minute)
+    elif freq == "weekly":
+        trigger = CronTrigger(day_of_week=s.get("day_of_week", "mon"), hour=hour, minute=minute)
+    else:  # monthly
+        trigger = CronTrigger(day=int(s.get("day_of_month", 1)), hour=hour, minute=minute)
+
+    report_type = s["report_type"]
+    recipients  = s["recipients"]
+
+    async def _run():
+        job = _REPORT_JOBS.get(report_type)
+        if not job:
+            print(f"[scheduler] Unknown report type: {report_type}")
+            return
+        try:
+            await job(recipients=recipients)
+            print(f"[scheduler] Sent '{report_type}' → {recipients}")
+        except Exception as exc:
+            print(f"[scheduler] Job '{report_type}' failed: {exc}")
+
+    _scheduler.add_job(_run, trigger=trigger, id=job_id, replace_existing=True)
+    _schedules[job_id] = s
+    if persist:
+        _save_schedules_to_disk()
+
+
+def _require_admin(request: _Request):
+    email = _get_session_email(request)
+    if not _AZ_CLIENT_ID:          # no Azure → local dev, allow all
+        return "local"
+    if not email or email.lower() != _ADMIN_EMAIL.lower():
+        raise HTTPException(status_code=403, detail="Admin only")
+    return email
 
 
 def _redirect_uri() -> str:
@@ -225,6 +295,9 @@ async def _startup():
     """Kick off the dealer ID index build in the background so it doesn't block startup."""
     asyncio.create_task(_build_dealer_id_index())
     asyncio.create_task(_keep_alive())
+    _load_schedules_from_disk()
+    _scheduler.start()
+    print(f"[scheduler] Started with {len(_schedules)} job(s)")
 
 async def _keep_alive() -> None:
     """Ping this app's own health endpoint every 10 minutes to prevent Render from
@@ -2886,6 +2959,69 @@ async def global_search_email(
     )
 
     return {"ok": True, "to": to_list, "filename": fname}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ADMIN / SCHEDULER
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/me")
+async def get_me(request: _Request):
+    email = _get_session_email(request)
+    is_admin = (not _AZ_CLIENT_ID) or (email and email.lower() == _ADMIN_EMAIL.lower())
+    return {"email": email or "anonymous", "is_admin": bool(is_admin)}
+
+
+@app.get("/api/admin/schedules")
+async def list_schedules(admin=Depends(_require_admin)):
+    return {"schedules": list(_schedules.values())}
+
+
+@app.post("/api/admin/schedules")
+async def create_schedule(
+    report_type:  str          = Query(...),
+    frequency:    str          = Query(..., description="daily | weekly | monthly"),
+    hour:         int          = Query(9),
+    minute:       int          = Query(0),
+    day_of_week:  Optional[str]= Query(None, description="mon-sun for weekly"),
+    day_of_month: Optional[int]= Query(None, description="1-28 for monthly"),
+    recipients:   str          = Query(..., description="Comma-separated emails"),
+    label:        Optional[str]= Query(None),
+    admin=Depends(_require_admin),
+):
+    if report_type not in _REPORT_JOBS:
+        raise HTTPException(400, f"Unknown report type. Valid: {list(_REPORT_JOBS)}")
+    if frequency not in ("daily", "weekly", "monthly"):
+        raise HTTPException(400, "frequency must be daily, weekly, or monthly")
+
+    job_id = str(_uuid.uuid4())[:8]
+    s = {
+        "id":           job_id,
+        "report_type":  report_type,
+        "frequency":    frequency,
+        "hour":         hour,
+        "minute":       minute,
+        "day_of_week":  day_of_week or "mon",
+        "day_of_month": day_of_month or 1,
+        "recipients":   [r.strip() for r in recipients.split(",") if r.strip()],
+        "label":        label or report_type,
+        "created_at":   datetime.now().isoformat(),
+    }
+    _register_schedule(s)
+    return {"ok": True, "schedule": s}
+
+
+@app.delete("/api/admin/schedules/{job_id}")
+async def delete_schedule(job_id: str, admin=Depends(_require_admin)):
+    if job_id not in _schedules:
+        raise HTTPException(404, "Schedule not found")
+    try:
+        _scheduler.remove_job(job_id)
+    except Exception:
+        pass
+    del _schedules[job_id]
+    _save_schedules_to_disk()
+    return {"ok": True}
 
 
 # ═══════════════════════════════════════════════════════════════════════════

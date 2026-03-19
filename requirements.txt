@@ -5,3 +5,4 @@ python-dotenv>=1.2.1
 pydantic>=2.12.5
 aiosmtplib>=3.0.0
 itsdangerous>=2.1.2
+apscheduler>=3.10.0

@@ -632,6 +632,8 @@ select, input { font-family: inherit; }
     <button onclick="showTab('profile', this)"><i class="nav-icon">🔎</i> Dealer Profile</button>
     <button onclick="showTab('analytics', this)"><i class="nav-icon">📊</i> Analytics</button>
     <button onclick="showTab('smartquery', this)"><i class="nav-icon">💡</i> Smart Search</button>
+    <div class="nav-divider" id="scheduler-nav-divider" style="display:none;"></div>
+    <button id="scheduler-nav-btn" onclick="showTab('scheduler', this)" style="display:none;"><i class="nav-icon">🕐</i> Scheduler</button>
   </nav>
   <button class="nav-search-btn" onclick="openGlobalSearch()">⌕ &nbsp;Global Search</button>
 </div>
@@ -1561,8 +1563,82 @@ select, input { font-family: inherit; }
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SCHEDULER TAB (admin only)                                 -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="tab-scheduler" class="tab-panel">
+  <div class="card" style="max-width:720px;">
+    <div class="card-title">🕐 Report Scheduler</div>
+    <p style="font-size:0.84rem;color:#6b7280;margin-bottom:16px;">Schedule any report to be emailed automatically on a recurring basis.</p>
+
+    <!-- Create form -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Report</label>
+        <select id="sch-report" style="width:100%;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          <option value="activations">Activations</option>
+          <option value="license-expiration">License Expiration</option>
+          <option value="bdr-summary">BDR Summary</option>
+          <option value="training-activity">Training Activity</option>
+          <option value="team-activity">Team Activity</option>
+          <option value="account-status">Account Status</option>
+          <option value="platform-breakdown">Platform Breakdown</option>
+          <option value="partner-activation">Partner Activation</option>
+          <option value="oracle-missing">Oracle Missing</option>
+          <option value="stale-untrained">Stale Untrained</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Frequency</label>
+        <select id="sch-freq" onchange="schUpdateFreqFields()" style="width:100%;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div id="sch-dow-wrap">
+        <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Day of Week</label>
+        <select id="sch-dow" style="width:100%;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          <option value="mon">Monday</option><option value="tue">Tuesday</option>
+          <option value="wed">Wednesday</option><option value="thu">Thursday</option>
+          <option value="fri">Friday</option><option value="sat">Saturday</option><option value="sun">Sunday</option>
+        </select>
+      </div>
+      <div id="sch-dom-wrap" style="display:none;">
+        <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Day of Month</label>
+        <input id="sch-dom" type="number" min="1" max="28" value="1" style="width:100%;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Time</label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input id="sch-hour" type="number" min="0" max="23" value="9" style="width:70px;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          <span style="font-size:0.82rem;color:#6b7280;">:</span>
+          <input id="sch-minute" type="number" min="0" max="59" value="0" style="width:70px;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          <span style="font-size:0.78rem;color:#6b7280;">(24h)</span>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Recipients</label>
+        <input id="sch-recipients" type="text" placeholder="email@example.com, other@example.com" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+      </div>
+      <div>
+        <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Label (optional)</label>
+        <input id="sch-label" type="text" placeholder="e.g. Weekly BDR report" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+      </div>
+    </div>
+    <button onclick="schCreate()" style="padding:7px 18px;font-size:0.82rem;background:#356ae6;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;">+ Add Schedule</button>
+    <span id="sch-create-status" style="margin-left:10px;font-size:0.8rem;color:#6b7280;"></span>
+
+    <!-- Schedule list -->
+    <div style="margin-top:24px;">
+      <div style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">Active Schedules</div>
+      <div id="sch-list"><span style="font-size:0.82rem;color:#9ca3af;">Loading…</span></div>
+    </div>
+  </div>
+</div>
+
 <script>
-// v2026031901
+// v2026031902
 // ── State ──────────────────────────────────────────────────────
 const state = {
   object: null,
@@ -1582,10 +1658,11 @@ function showTab(id, btn) {
   document.getElementById('tab-' + id).classList.add('active');
   btn.classList.add('active');
   // Update command bar breadcrumb
+  if (id === 'scheduler') schLoad();
   const pageNames = {
     accounts: 'Accounts', builder: 'Report Builder', prebuilt: 'Pre-Built Reports',
     profile: 'Dealer Profile', analytics: 'Analytics', smartquery: 'Smart Search',
-    globalsearch: 'Global Search',
+    scheduler: 'Scheduler', globalsearch: 'Global Search',
   };
   const bc = document.getElementById('ms-page-name');
   if (bc) bc.textContent = pageNames[id] || id;
@@ -2265,13 +2342,93 @@ async function _doSendReport(type, fromId, toId, resultId) {
   }
 }
 
-// Restore To field on load; populate BDR dropdowns
+// ── Scheduler ──────────────────────────────────────────────────
+const _DOW_LABELS = {mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday',sun:'Sunday'};
+const _REPORT_LABELS = {
+  'activations':'Activations','license-expiration':'License Expiration',
+  'bdr-summary':'BDR Summary','training-activity':'Training Activity',
+  'team-activity':'Team Activity','account-status':'Account Status',
+  'platform-breakdown':'Platform Breakdown','partner-activation':'Partner Activation',
+  'oracle-missing':'Oracle Missing','stale-untrained':'Stale Untrained',
+};
+
+function schUpdateFreqFields() {
+  const freq = document.getElementById('sch-freq').value;
+  document.getElementById('sch-dow-wrap').style.display  = freq === 'weekly'  ? '' : 'none';
+  document.getElementById('sch-dom-wrap').style.display  = freq === 'monthly' ? '' : 'none';
+}
+
+async function schLoad() {
+  const list = document.getElementById('sch-list');
+  try {
+    const res  = await fetch('/api/admin/schedules');
+    const data = await res.json();
+    if (!res.ok) { list.innerHTML = `<span style="color:#ef4444;font-size:0.82rem;">${esc(data.detail||'Error')}</span>`; return; }
+    const schedules = data.schedules || [];
+    if (!schedules.length) { list.innerHTML = '<span style="font-size:0.82rem;color:#9ca3af;">No schedules yet.</span>'; return; }
+    list.innerHTML = schedules.map(s => {
+      const freq = s.frequency === 'weekly'  ? `Weekly on ${_DOW_LABELS[s.day_of_week]||s.day_of_week}` :
+                   s.frequency === 'monthly' ? `Monthly on day ${s.day_of_month}` : 'Daily';
+      const time = `${String(s.hour).padStart(2,'0')}:${String(s.minute).padStart(2,'0')}`;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;margin-bottom:6px;">
+        <div>
+          <div style="font-size:0.82rem;font-weight:600;color:#111827;">${esc(s.label||_REPORT_LABELS[s.report_type]||s.report_type)}</div>
+          <div style="font-size:0.76rem;color:#6b7280;">${freq} at ${time} → ${esc(s.recipients.join(', '))}</div>
+        </div>
+        <button onclick="schDelete('${s.id}')" style="padding:3px 8px;font-size:0.74rem;background:#fee2e2;color:#dc2626;border:none;border-radius:3px;cursor:pointer;">Delete</button>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = `<span style="color:#ef4444;font-size:0.82rem;">Error: ${esc(e.message)}</span>`;
+  }
+}
+
+async function schCreate() {
+  const status = document.getElementById('sch-create-status');
+  const p = new URLSearchParams({
+    report_type:  document.getElementById('sch-report').value,
+    frequency:    document.getElementById('sch-freq').value,
+    hour:         document.getElementById('sch-hour').value,
+    minute:       document.getElementById('sch-minute').value,
+    day_of_week:  document.getElementById('sch-dow').value,
+    day_of_month: document.getElementById('sch-dom').value,
+    recipients:   document.getElementById('sch-recipients').value.trim(),
+    label:        document.getElementById('sch-label').value.trim(),
+  });
+  if (!p.get('recipients')) { status.textContent = 'Enter at least one recipient.'; status.style.color='#ef4444'; return; }
+  status.textContent = 'Saving…'; status.style.color = '#6b7280';
+  try {
+    const res  = await fetch(`/api/admin/schedules?${p}`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) { status.textContent = data.detail||'Error'; status.style.color='#ef4444'; return; }
+    status.textContent = '✓ Scheduled'; status.style.color = '#059669';
+    document.getElementById('sch-label').value = '';
+    schLoad();
+  } catch(e) {
+    status.textContent = e.message; status.style.color='#ef4444';
+  }
+}
+
+async function schDelete(id) {
+  if (!confirm('Delete this schedule?')) return;
+  await fetch(`/api/admin/schedules/${id}`, { method: 'DELETE' });
+  schLoad();
+}
+
+// Restore To field on load; populate BDR dropdowns; check admin
 document.addEventListener('DOMContentLoaded', () => {
   const savedTo = sessionStorage.getItem('email_to');
   if (savedTo) {
     const el = document.getElementById('email-to');
     if (el) el.value = savedTo;
   }
+  // Show scheduler nav only for admin
+  fetch('/api/me').then(r=>r.json()).then(d => {
+    if (d.is_admin) {
+      document.getElementById('scheduler-nav-btn').style.display = '';
+      document.getElementById('scheduler-nav-divider').style.display = '';
+    }
+  }).catch(()=>{});
   populateBdrDropdowns();
 });
 
