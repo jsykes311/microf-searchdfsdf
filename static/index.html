@@ -2888,7 +2888,8 @@ async function abLoad(q) {
     for (const c of (data.contacts||[])) {
       ab.results.push({ type:'contact', id:c.id, accountId:c.account_id, name:`${c.name||c.email}`, sub:`Contact · ${c.email}` });
     }
-    count.textContent = `${data.total} result${data.total!==1?'s':''} for "${q}"${program?' · '+program:''}`;
+    const acctCount = (data.accounts||[]).length;
+    count.textContent = `${data.total} result${data.total!==1?'s':''} (${acctCount} account${acctCount!==1?'s':''}) for "${q}"${program?' · '+program:''}`;
     abRenderList();
     if (ab.results.length) { exportBtn.style.display = 'block'; exportContactsBtn.style.display = 'block'; }
   } catch(e) {
