@@ -1562,6 +1562,7 @@ select, input { font-family: inherit; }
 </div>
 
 <script>
+// v2026031901
 // ── State ──────────────────────────────────────────────────────
 const state = {
   object: null,
@@ -2224,16 +2225,26 @@ async function sendEmailReport(type, fromId, toId, resultId) {
   const end  = toId   && document.getElementById(toId)?.value;
   if (from) p.set('start_date', from);
   if (end)  p.set('end_date',   end);
-  const toVal = (document.getElementById('email-to')?.value.trim())
-                || sessionStorage.getItem('email_to') || '';
-  if (toVal) p.set('to', toVal);
-  el.innerHTML = '<span style="color:#6b7280;font-size:0.82rem;">Queuing…</span>';
+
+  // Ask for recipient if not already saved
+  let toVal = (document.getElementById('email-to')?.value.trim())
+              || sessionStorage.getItem('email_to') || '';
+  if (!toVal) {
+    toVal = (window.prompt('Send report to (email address):') || '').trim();
+    if (!toVal) { el.innerHTML = '<span style="color:#6b7280;font-size:0.82rem;">Cancelled.</span>'; return; }
+    sessionStorage.setItem('email_to', toVal);
+    const globalTo = document.getElementById('email-to');
+    if (globalTo) globalTo.value = toVal;
+  }
+  p.set('to', toVal);
+
+  el.innerHTML = '<span style="color:#6b7280;font-size:0.82rem;">Sending…</span>';
   try {
     const res  = await fetch(`/api/send-report/${type}?${p}`);
     const data = await res.json();
     if (res.ok) {
-      const recips = (data.recipients || []).join(', ') || 'configured recipients';
-      el.innerHTML = `<span style="color:#059669;font-size:0.82rem;">✓ Queued → ${esc(recips)}</span>`;
+      const recips = (data.recipients || []).join(', ') || toVal;
+      el.innerHTML = `<span style="color:#059669;font-size:0.82rem;">✓ Sent → ${esc(recips)}</span>`;
     } else {
       el.innerHTML = `<span style="color:#dc2626;font-size:0.82rem;">✕ ${esc(String(data.detail || res.status))}</span>`;
     }
