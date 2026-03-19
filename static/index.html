@@ -1026,6 +1026,38 @@ select, input { font-family: inherit; }
       <div id="team-result" style="margin-top:12px;"></div>
     </div>
 
+    <!-- Account + Program Search -->
+    <div class="report-card">
+      <span class="badge-icon">🔎</span>
+      <h3>Account Program Search</h3>
+      <p>Find accounts by name (fuzzy) and dealer program from their SLPs. Search "ARS" with OPTIMUS to get all ARS accounts on OPTIMUS.</p>
+      <div class="form-row">
+        <label>Account Name</label>
+        <input type="text" id="aps-name" placeholder="e.g. ARS, American Residential"/>
+      </div>
+      <div class="form-row">
+        <label>Dealer Program (optional)</label>
+        <select id="aps-program">
+          <option value="">— all programs —</option>
+          <option>OPTIMUS</option>
+          <option>Optimus 2.0</option>
+          <option>360 Finance</option>
+          <option>ComfortConnect</option>
+          <option>Comfort Connect</option>
+          <option>Microf</option>
+          <option>LTO</option>
+          <option>SpectrumAC</option>
+          <option>Microf (LTO Only)</option>
+          <option>Microf (Wells Fargo)</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runPrebuilt('account-program-search')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('account-program-search')">⬇ CSV</button>
+      </div>
+      <div id="aps-result" style="margin-top:12px;"></div>
+    </div>
+
   </div>
 
   <!-- Email Reports -->
@@ -2042,6 +2074,13 @@ function prebuiltParams(type) {
   if (type === 'ars-360') {
     return { endpoint: 'ars-360', params: p };
   }
+  if (type === 'account-program-search') {
+    const name = document.getElementById('aps-name').value.trim();
+    const prog = document.getElementById('aps-program').value;
+    if (name) p.set('account_name', name);
+    if (prog) p.set('program', prog);
+    return { endpoint: 'account-program-search', params: p };
+  }
 }
 
 async function runPrebuilt(type) {
@@ -2053,6 +2092,7 @@ async function runPrebuilt(type) {
     'account-status': 'as-result', 'platform-breakdown': 'pb-result',
     'partner-activation': 'pa-result', 'oracle-missing': 'om-result',
     'ars-360': 'ars360-result',
+    'account-program-search': 'aps-result',
   }[type];
   document.getElementById(resultId).innerHTML = '<span style="color:#6b7280; font-size:0.82rem;">Loading…</span>';
 

@@ -3146,6 +3146,85 @@ async def report_oracle_missing(
     return {"count": len(results), "records": results}
 
 
+@app.get("/api/report/account-program-search")
+async def report_account_program_search(
+    account_name: str           = Query("", description="Fuzzy account name filter"),
+    program:      Optional[str] = Query(None, description="SLP platform/dealer program"),
+    format:       str           = Query("json"),
+):
+    """Search accounts by name (fuzzy) and dealer program (from SLP platform)."""
+    import re as _re
+
+    name_q   = account_name.strip().lower()
+    # Split into words for multi-term matching (e.g. "ARS optimus" → ["ars", "optimus"])
+    name_terms = [t for t in _re.split(r'\s+', name_q) if t] if name_q else []
+
+    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+
+    # Build account_id → list of SLP summaries
+    slp_by_account: dict = {}
+    for r in slp_records:
+        fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
+        slp_plat = str(fields.get("platform", "")).strip()
+        if program and slp_plat.lower() != program.lower():
+            continue
+        rel    = r.get("relationships", {}).get("account", [])
+        acc_id = str(rel[0]) if rel else None
+        if not acc_id:
+            continue
+        if acc_id not in slp_by_account:
+            slp_by_account[acc_id] = []
+        slp_by_account[acc_id].append({
+            "dealer_id":        fields.get("dealer-id", ""),
+            "platform":         slp_plat,
+            "slp_status":       fields.get("slp-status-detail", ""),
+            "activated_date":   str(fields.get("contractor-activated-date", ""))[:10],
+            "program_name":     fields.get("program-name-1", ""),
+            "oracle_ids":       fields.get("oracle-producer-ids", ""),
+            "assigned_bdr":     fields.get("assigned-bdr", ""),
+        })
+
+    if not slp_by_account:
+        if format == "csv":
+            return _csv_response([], "account_program_search.csv")
+        return {"count": 0, "records": []}
+
+    # Fetch account names — use in-memory index where possible
+    results = []
+    for acc_id, slps in slp_by_account.items():
+        acct_name = _account_to_name.get(acc_id, "")
+        if not acct_name:
+            try:
+                d = await ac_get(f"accounts/{acc_id}")
+                acct_name = d.get("account", {}).get("name", "")
+            except Exception:
+                pass
+
+        # Fuzzy name filter — all terms must appear in the name
+        if name_terms:
+            name_lower = acct_name.lower()
+            if not all(t in name_lower for t in name_terms):
+                continue
+
+        for slp in slps:
+            results.append({
+                "account_name":    acct_name,
+                "account_id":      acc_id,
+                "dealer_id":       slp["dealer_id"],
+                "platform":        slp["platform"],
+                "slp_status":      slp["slp_status"],
+                "activated_date":  slp["activated_date"],
+                "program_name":    slp["program_name"],
+                "oracle_ids":      slp["oracle_ids"],
+                "assigned_bdr":    slp["assigned_bdr"],
+            })
+
+    results.sort(key=lambda x: (x["account_name"].lower(), x["platform"]))
+    if format == "csv":
+        return _csv_response(results, f"account_program_search_{datetime.now().strftime('%Y%m%d')}.csv")
+    return {"count": len(results), "records": results}
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SCHEDULED EMAIL REPORTS
 # Triggered by GitHub Actions cron → /api/send-report/{type}
