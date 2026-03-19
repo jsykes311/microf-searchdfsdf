@@ -2585,11 +2585,15 @@ async def global_search(q: str = Query(..., min_length=1),
         fmap       = {f.get("id"): f.get("value") for f in r.get("fields", [])}
         account_id = next(iter(r.get("relationships", {}).get("account", [])), "")
         matched_slps.append({
-            "record_id":   r.get("id"),
-            "dealer_id":   fmap.get("dealer-id", ""),
-            "platform":    fmap.get("platform", ""),
-            "account_id":  account_id,
-            "account_url": ac_account_url(account_id),
+            "record_id":      r.get("id"),
+            "dealer_id":      fmap.get("dealer-id", ""),
+            "platform":       fmap.get("platform", ""),
+            "account_id":     account_id,
+            "account_url":    ac_account_url(account_id),
+            "slp_status":     fmap.get("slp-status-detail", ""),
+            "activated_date": str(fmap.get("contractor-activated-date", ""))[:10],
+            "oracle_ids":     fmap.get("oracle-producer-ids", ""),
+            "assigned_bdr":   fmap.get("assigned-bdr", ""),
         })
 
     # ── Contacts (text queries only) ───────────────────────────────────────
@@ -2734,10 +2738,7 @@ async def global_search(q: str = Query(..., min_length=1),
 @app.get("/api/global-search/export")
 async def global_search_export(q: str = Query(default=" "),
                                program: Optional[str] = Query(None)):
-    """Export global search results as CSV.
-    Uses the fast in-memory search to get matched account IDs, then fetches
-    only those accounts' SLPs from AC (not the full 5000+ record set).
-    """
+    """Export global search results as CSV using the same in-memory data as the sidebar."""
     effective_q = q.strip() or " "
     search_data = await global_search(q=effective_q, program=program)
 
@@ -2746,46 +2747,35 @@ async def global_search_export(q: str = Query(default=" "),
         fname = f"search_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         return _csv_response([], fname)
 
-    # Fetch SLPs only for the matched account IDs (one request each, in parallel)
-    slp_tasks = [
-        ac_get(f"customObjects/records/{SLP_SCHEMA_ID}",
-               {"filters[relationships.account]": aid, "limit": 50})
-        for aid in matched_accounts
-    ]
-    slp_results = await asyncio.gather(*slp_tasks, return_exceptions=True)
+    # Group already-filtered SLPs by account_id (same data the sidebar shows)
+    slps_by_account: dict = defaultdict(list)
+    for s in search_data.get("slps", []):
+        slps_by_account[str(s.get("account_id", ""))].append(s)
 
     rows = []
-    for aid, slp_resp in zip(matched_accounts.keys(), slp_results):
-        acct = matched_accounts[aid]
+    for aid, acct in matched_accounts.items():
         acct_name = acct.get("name") or _account_to_name.get(aid, "")
-        slp_list = []
-        if isinstance(slp_resp, dict):
-            for r in slp_resp.get("records", []):
-                f = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
-                plat = str(f.get("platform", "")).strip()
-                if program and plat.lower() != program.lower():
-                    continue
-                slp_list.append(f)
+        slp_list  = slps_by_account.get(aid, [])
 
         if slp_list:
-            for f in slp_list:
+            for s in slp_list:
                 rows.append({
                     "account_name":   acct_name,
                     "account_id":     aid,
-                    "dealer_id":      f.get("dealer-id", ""),
-                    "dealer_program": f.get("platform", ""),
-                    "slp_status":     f.get("slp-status-detail", ""),
-                    "activated_date": str(f.get("contractor-activated-date", ""))[:10],
-                    "oracle_ids":     f.get("oracle-producer-ids", ""),
-                    "assigned_bdr":   f.get("assigned-bdr", ""),
+                    "dealer_id":      s.get("dealer_id", ""),
+                    "dealer_program": s.get("platform", ""),
+                    "slp_status":     s.get("slp_status", ""),
+                    "activated_date": str(s.get("activated_date", ""))[:10],
+                    "oracle_ids":     s.get("oracle_ids", ""),
+                    "assigned_bdr":   s.get("assigned_bdr", ""),
                 })
-        elif not program:
-            # Only include accounts with no matching SLPs when there's no program filter
+        else:
+            # Account matched (by name or SLP) but no SLP data in index — still include it
             rows.append({
                 "account_name":   acct_name,
                 "account_id":     aid,
                 "dealer_id":      acct.get("dealer_id", ""),
-                "dealer_program": acct.get("dealer_program", _account_to_platform.get(aid, "")),
+                "dealer_program": _account_to_platform.get(aid, ""),
                 "slp_status":     "",
                 "activated_date": "",
                 "oracle_ids":     "",
