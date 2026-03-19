@@ -2746,6 +2746,7 @@ async function runGlobalSearch() {
 
 // ── Global Search Overlay ────────────────────────────────────────
 let gsOverlayTimer = null;
+let _gsController = null;
 
 function openGlobalSearch() {
   document.getElementById('gs-overlay').classList.add('open');
@@ -2765,15 +2766,18 @@ function gsOverlayBgClick(e) {
 
 async function gsOverlaySearch(q) {
   clearTimeout(gsOverlayTimer);
+  if (_gsController) { _gsController.abort(); }
   const results = document.getElementById('gs-overlay-results');
   if (!q.trim()) {
     results.innerHTML = '<div class="gs-modal-empty">Start typing to search across all of AC</div>';
     return;
   }
   gsOverlayTimer = setTimeout(async () => {
+    _gsController = new AbortController();
+    const signal = _gsController.signal;
     results.innerHTML = '<div class="gs-modal-empty">Searching…</div>';
     try {
-      const res  = await fetch(`/api/global-search?q=${encodeURIComponent(q)}`);
+      const res  = await fetch(`/api/global-search?q=${encodeURIComponent(q)}`, { signal });
       const data = await res.json();
       if (data.total === 0) {
         results.innerHTML = `<div class="gs-modal-empty">No results for "${esc(q)}"</div>`;
@@ -2809,7 +2813,7 @@ async function gsOverlaySearch(q) {
       }
       results.innerHTML = html;
     } catch(e) {
-      results.innerHTML = `<div class="gs-modal-empty">Error: ${esc(e.message)}</div>`;
+      if (e.name !== 'AbortError') results.innerHTML = `<div class="gs-modal-empty">Error: ${esc(e.message)}</div>`;
     }
   }, 300);
 }
