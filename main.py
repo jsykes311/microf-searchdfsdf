@@ -2718,64 +2718,61 @@ async def global_search(q: str = Query(..., min_length=1),
 @app.get("/api/global-search/export")
 async def global_search_export(q: str = Query(default=" "),
                                program: Optional[str] = Query(None)):
-    """Export global search results (accounts + SLPs + contacts) as CSV."""
-    import re as _re
-    q = q.strip()
-    name_terms = [t for t in _re.split(r'\s+', q.lower()) if t] if q else []
+    """Export global search results as CSV.
+    Uses the fast in-memory search to get matched account IDs, then fetches
+    only those accounts' SLPs from AC (not the full 5000+ record set).
+    """
+    effective_q = q.strip() or " "
+    search_data = await global_search(q=effective_q, program=program)
 
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    matched_accounts = {str(a["id"]): a for a in search_data.get("accounts", [])}
+    if not matched_accounts:
+        fname = f"search_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return _csv_response([], fname)
 
-    # Build account_id → SLPs (filtered by program)
-    slp_by_account: dict = {}
-    for r in slp_records:
-        fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
-        slp_plat = str(fields.get("platform", "")).strip()
-        if program and slp_plat.lower() != program.lower():
-            continue
-        rel    = r.get("relationships", {}).get("account", [])
-        acc_id = str(rel[0]) if rel else None
-        if not acc_id:
-            continue
-        slp_by_account.setdefault(acc_id, []).append(fields)
+    # Fetch SLPs only for the matched account IDs (one request each, in parallel)
+    slp_tasks = [
+        ac_get(f"customObjects/records/{SLP_SCHEMA_ID}",
+               {"filters[relationships.account]": aid, "limit": 50})
+        for aid in matched_accounts
+    ]
+    slp_results = await asyncio.gather(*slp_tasks, return_exceptions=True)
 
     rows = []
-    for acc_id, slps in slp_by_account.items():
-        acct_name = _account_to_name.get(acc_id, "")
-        if not acct_name:
-            try:
-                d = await ac_get(f"accounts/{acc_id}")
-                acct_name = d.get("account", {}).get("name", "")
-            except Exception:
-                pass
+    for aid, slp_resp in zip(matched_accounts.keys(), slp_results):
+        acct = matched_accounts[aid]
+        acct_name = acct.get("name") or _account_to_name.get(aid, "")
+        slp_list = []
+        if isinstance(slp_resp, dict):
+            for r in slp_resp.get("records", []):
+                f = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
+                plat = str(f.get("platform", "")).strip()
+                if program and plat.lower() != program.lower():
+                    continue
+                slp_list.append(f)
 
-        if name_terms and not all(t in acct_name.lower() for t in name_terms):
-            continue
-
-        # Fetch contacts for this account
-        try:
-            con_data = await ac_get(f"accounts/{acc_id}/contacts")
-            contact_ids = [ac.get("contact") for ac in con_data.get("accountContacts", [])]
-            con_results = await asyncio.gather(*[ac_get(f"contacts/{cid}") for cid in contact_ids[:5]], return_exceptions=True)
-            contacts = []
-            for cr in con_results:
-                if isinstance(cr, dict):
-                    c = cr.get("contact", {})
-                    contacts.append(f"{c.get('firstName','')} {c.get('lastName','')} <{c.get('email','')}>".strip())
-        except Exception:
-            contacts = []
-
-        for slp in slps:
+        if slp_list:
+            for f in slp_list:
+                rows.append({
+                    "account_name":   acct_name,
+                    "account_id":     aid,
+                    "dealer_id":      f.get("dealer-id", ""),
+                    "dealer_program": f.get("platform", ""),
+                    "slp_status":     f.get("slp-status-detail", ""),
+                    "activated_date": str(f.get("contractor-activated-date", ""))[:10],
+                    "oracle_ids":     f.get("oracle-producer-ids", ""),
+                    "assigned_bdr":   f.get("assigned-bdr", ""),
+                })
+        else:
             rows.append({
                 "account_name":   acct_name,
-                "account_id":     acc_id,
-                "dealer_id":      slp.get("dealer-id", ""),
-                "dealer_program": slp.get("platform", ""),
-                "slp_status":     slp.get("slp-status-detail", ""),
-                "activated_date": str(slp.get("contractor-activated-date", ""))[:10],
-                "program_name":   slp.get("program-name-1", ""),
-                "oracle_ids":     slp.get("oracle-producer-ids", ""),
-                "assigned_bdr":   slp.get("assigned-bdr", ""),
-                "contacts":       " | ".join(contacts),
+                "account_id":     aid,
+                "dealer_id":      acct.get("dealer_id", ""),
+                "dealer_program": acct.get("dealer_program", _account_to_platform.get(aid, "")),
+                "slp_status":     "",
+                "activated_date": "",
+                "oracle_ids":     "",
+                "assigned_bdr":   "",
             })
 
     rows.sort(key=lambda x: x["account_name"].lower())
