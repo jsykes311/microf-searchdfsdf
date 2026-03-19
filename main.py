@@ -80,6 +80,10 @@ _SMTP_PASS  = os.getenv("SMTP_PASS",      "")
 _SMTP_FROM  = os.getenv("SMTP_FROM_NAME", "Moogle Reports")
 _RECIPIENTS = [r.strip() for r in os.getenv("REPORT_RECIPIENTS", "").split(",") if r.strip()]
 
+# ── Resend (transactional email) ──────────────────────────────────────────
+_RESEND_API_KEY  = os.getenv("RESEND_API_KEY", "")
+_RESEND_FROM     = "marketing@microf.com"
+
 
 def _redirect_uri() -> str:
     base = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000").rstrip("/")
@@ -2824,6 +2828,65 @@ async def global_search_export_contacts(q: str = Query(default=" "),
     rows.sort(key=lambda x: (x["account_name"].lower(), x["last_name"].lower()))
     fname = f"contacts_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     return _csv_response(rows, fname)
+
+
+@app.post("/api/global-search/email")
+async def global_search_email(
+    recipients: str  = Query(..., description="Comma-separated email addresses"),
+    q:          str  = Query(default=" "),
+    program:    Optional[str] = Query(None),
+    report_type: str = Query(default="accounts", description="accounts or contacts"),
+):
+    """Generate a search export CSV and email it via Resend."""
+    if not _RESEND_API_KEY:
+        raise HTTPException(status_code=503, detail="Email not configured (RESEND_API_KEY missing)")
+
+    to_list = [r.strip() for r in recipients.split(",") if r.strip()]
+    if not to_list:
+        raise HTTPException(status_code=400, detail="No valid recipients provided")
+
+    effective_q = q.strip() or " "
+
+    # Generate CSV using existing export logic
+    if report_type == "contacts":
+        resp = await global_search_export_contacts(q=effective_q, program=program)
+        fname = f"contacts_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        subject_tag = "Contacts"
+    else:
+        resp = await global_search_export(q=effective_q, program=program)
+        fname = f"accounts_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        subject_tag = "Accounts"
+
+    # Read CSV bytes from the StreamingResponse
+    csv_bytes = b"".join([chunk async for chunk in resp.body_iterator])
+    csv_b64   = base64.b64encode(csv_bytes).decode()
+
+    label   = f'"{effective_q.strip()}"' + (f" · {program}" if program else "")
+    subject = f"Microf Search Export — {subject_tag} {label}"
+    body    = (f"<p>Please find the attached {subject_tag.lower()} export for search: "
+               f"<strong>{label}</strong>.</p>"
+               f"<p style='color:#6b7280;font-size:0.85em;'>Sent from microf-search</p>")
+
+    payload = {
+        "from":    _RESEND_FROM,
+        "to":      to_list,
+        "subject": subject,
+        "html":    body,
+        "attachments": [{"filename": fname, "content": csv_b64}],
+    }
+
+    async with httpx.AsyncClient() as client:
+        r = await client.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {_RESEND_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=15,
+        )
+
+    if r.status_code not in (200, 201):
+        raise HTTPException(status_code=502, detail=f"Resend error {r.status_code}: {r.text}")
+
+    return {"ok": True, "to": to_list, "filename": fname}
 
 
 # ═══════════════════════════════════════════════════════════════════════════

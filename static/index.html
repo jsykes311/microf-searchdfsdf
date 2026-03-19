@@ -681,6 +681,16 @@ select, input { font-family: inherit; }
       <div style="padding:6px 10px;border-bottom:1px solid var(--ms-g30);">
         <button id="ab-export-btn" onclick="abExport()" style="display:none;width:100%;padding:5px 8px;font-size:0.74rem;background:#059669;color:#fff;border:none;border-radius:2px;cursor:pointer;font-family:inherit;">⬇ Export Accounts (CSV)</button>
         <button id="ab-export-contacts-btn" onclick="abExportContacts()" style="display:none;width:100%;margin-top:4px;padding:5px 8px;font-size:0.74rem;background:#0369a1;color:#fff;border:none;border-radius:2px;cursor:pointer;font-family:inherit;">⬇ Export Contacts (CSV)</button>
+        <button id="ab-email-btn" onclick="abToggleEmailPanel()" style="display:none;width:100%;margin-top:4px;padding:5px 8px;font-size:0.74rem;background:#7c3aed;color:#fff;border:none;border-radius:2px;cursor:pointer;font-family:inherit;">✉ Email Report</button>
+        <div id="ab-email-panel" style="display:none;margin-top:6px;padding:8px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:4px;">
+          <input id="ab-email-to" type="text" placeholder="recipient@example.com, another@example.com"
+            style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:0.74rem;border:1px solid #c4b5fd;border-radius:3px;font-family:inherit;margin-bottom:5px;">
+          <div style="display:flex;gap:4px;">
+            <button onclick="abSendEmail('accounts')" style="flex:1;padding:4px 6px;font-size:0.72rem;background:#7c3aed;color:#fff;border:none;border-radius:2px;cursor:pointer;font-family:inherit;">Send Accounts</button>
+            <button onclick="abSendEmail('contacts')" style="flex:1;padding:4px 6px;font-size:0.72rem;background:#5b21b6;color:#fff;border:none;border-radius:2px;cursor:pointer;font-family:inherit;">Send Contacts</button>
+          </div>
+          <div id="ab-email-status" style="margin-top:5px;font-size:0.72rem;color:#6b7280;"></div>
+        </div>
       </div>
       <div class="ab-list" id="ab-list"></div>
     </div>
@@ -2853,9 +2863,12 @@ async function abLoad(q) {
   const program = document.getElementById('ab-program').value;
   const exportBtn = document.getElementById('ab-export-btn');
   const exportContactsBtn = document.getElementById('ab-export-contacts-btn');
+  const emailBtn  = document.getElementById('ab-email-btn');
   list.innerHTML = `<div style="padding:20px;text-align:center;color:#9ca3af;font-size:0.82rem;">Loading…</div>`;
   exportBtn.style.display = 'none';
   exportContactsBtn.style.display = 'none';
+  emailBtn.style.display  = 'none';
+  document.getElementById('ab-email-panel').style.display = 'none';
 
   if (!q.trim() && !program) {
     // No query — show 20 recent accounts
@@ -2891,7 +2904,11 @@ async function abLoad(q) {
     const acctCount = (data.accounts||[]).length;
     count.textContent = `${data.total} result${data.total!==1?'s':''} (${acctCount} account${acctCount!==1?'s':''}) for "${q}"${program?' · '+program:''}`;
     abRenderList();
-    if (ab.results.length) { exportBtn.style.display = 'block'; exportContactsBtn.style.display = 'block'; }
+    if (ab.results.length) {
+      exportBtn.style.display = 'block';
+      exportContactsBtn.style.display = 'block';
+      emailBtn.style.display  = 'block';
+    }
   } catch(e) {
     if (e.name !== 'AbortError') list.innerHTML = `<div style="padding:16px;color:#ef4444;font-size:0.82rem;">Search error</div>`;
   }
@@ -2911,6 +2928,33 @@ function abExportContacts() {
   let url = `/api/global-search/export-contacts?q=${encodeURIComponent(q || ' ')}`;
   if (program) url += `&program=${encodeURIComponent(program)}`;
   window.location.href = url;
+}
+
+function abToggleEmailPanel() {
+  const panel = document.getElementById('ab-email-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block') document.getElementById('ab-email-to').focus();
+}
+
+async function abSendEmail(reportType) {
+  const q          = document.getElementById('ab-search').value.trim();
+  const program    = document.getElementById('ab-program').value;
+  const recipients = document.getElementById('ab-email-to').value.trim();
+  const status     = document.getElementById('ab-email-status');
+  if (!recipients) { status.textContent = 'Enter at least one recipient.'; status.style.color='#ef4444'; return; }
+  status.textContent = 'Sending…'; status.style.color = '#6b7280';
+  try {
+    let url = `/api/global-search/email?recipients=${encodeURIComponent(recipients)}&q=${encodeURIComponent(q || ' ')}&report_type=${reportType}`;
+    if (program) url += `&program=${encodeURIComponent(program)}`;
+    const res  = await fetch(url, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    status.textContent = `✓ Sent to ${data.to.join(', ')}`;
+    status.style.color = '#059669';
+  } catch(e) {
+    status.textContent = `Error: ${e.message}`;
+    status.style.color = '#ef4444';
+  }
 }
 
 function abRenderList() {
