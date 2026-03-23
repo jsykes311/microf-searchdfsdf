@@ -28,7 +28,6 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import uuid as _uuid
-import anthropic as _anthropic
 
 load_dotenv()
 
@@ -4933,6 +4932,7 @@ async def smart_query_endpoint(q: str, user=Depends(require_auth)):
     system = _SMART_SYSTEM.format(today=today)
 
     try:
+        import anthropic as _anthropic
         client = _anthropic.AsyncAnthropic(api_key=_ANTHROPIC_KEY)
         msg = await client.messages.create(
             model="claude-3-5-haiku-20241022",
