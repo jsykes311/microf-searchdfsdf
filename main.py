@@ -3056,7 +3056,7 @@ async def global_search_email(
 async def get_me(request: _Request):
     email = _get_session_email(request)
     is_admin = (not _AZ_CLIENT_ID) or (email and email.lower() in _ADMIN_EMAILS)
-    return {"email": email or "anonymous", "is_admin": bool(is_admin)}
+    return {"email": email or "anonymous", "is_admin": bool(is_admin), "anthropic_key_set": bool(_ANTHROPIC_KEY)}
 
 
 @app.get("/api/admin/schedules")
