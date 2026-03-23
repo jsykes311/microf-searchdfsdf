@@ -43,6 +43,7 @@ body {
 
 /* ── App Shell ── */
 .app-shell { display: flex; height: 100vh; overflow: hidden; }
+.app-shell.accounts-mode .app-nav { display: none; }
 
 .app-nav {
   width: 220px; min-width: 220px;
@@ -633,6 +634,39 @@ select, input { font-family: inherit; }
 .ab-result-badge.account { background: var(--ms-blue-light); color: var(--ms-blue); }
 .ab-result-badge.slp     { background: #dff6dd; color: var(--ms-green); }
 .ab-result-badge.contact { background: #fff4ce; color: #7a4f0b; }
+
+/* ── Admin Hub ── */
+.admin-hub { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
+.admin-hub h2 { font-size: 1.25rem; font-weight: 700; color: var(--ms-g130); margin-bottom: 6px; }
+.admin-hub .admin-subtitle { font-size: 0.82rem; color: var(--ms-g90); margin-bottom: 32px; }
+.admin-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.admin-card {
+  background: var(--ms-white); border: 1px solid var(--ms-g30); border-radius: 8px;
+  padding: 24px 20px; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s;
+  text-align: left; font-family: inherit;
+}
+.admin-card:hover { box-shadow: var(--ms-sh8); border-color: var(--ms-blue); }
+.admin-card .ac-icon { font-size: 1.8rem; margin-bottom: 12px; }
+.admin-card .ac-title { font-size: 0.95rem; font-weight: 700; color: var(--ms-g130); margin-bottom: 4px; }
+.admin-card .ac-desc  { font-size: 0.78rem; color: var(--ms-g90); line-height: 1.45; }
+
+/* Admin button in cmdbar */
+.admin-nav-btn {
+  display: none; align-items: center; gap: 5px;
+  background: none; border: 1px solid var(--ms-g40); border-radius: 4px;
+  color: var(--ms-g90); font-size: 0.78rem; font-weight: 600; font-family: inherit;
+  padding: 5px 12px; cursor: pointer; transition: all 0.1s; margin-left: 12px;
+}
+.admin-nav-btn:hover { background: var(--ms-g20); color: var(--ms-g130); }
+.accounts-mode .admin-nav-btn { display: flex; }
+
+/* Back-to-admin link shown on tool tabs */
+.back-to-admin {
+  display: none; align-items: center; gap: 4px;
+  background: none; border: none; color: var(--ms-blue); font-size: 0.78rem;
+  font-family: inherit; cursor: pointer; padding: 0; margin-bottom: 16px;
+}
+.back-to-admin:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -680,7 +714,9 @@ select, input { font-family: inherit; }
            onkeydown="if(event.key==='Enter')openGlobalSearch(this.value)"
            autocomplete="off"/>
   </div>
-  <div class="ms-cmdbar-actions" style="flex-shrink:0;"></div>
+  <div class="ms-cmdbar-actions" style="flex-shrink:0;">
+    <button class="admin-nav-btn" onclick="showTab('admin', null)">⚙ Admin</button>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
@@ -740,6 +776,48 @@ select, input { font-family: inherit; }
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- ADMIN HUB TAB                                             -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="tab-admin" class="tab-panel">
+  <div class="admin-hub">
+    <h2>Admin &amp; Tools</h2>
+    <p class="admin-subtitle">Reports, search tools, and scheduler settings.</p>
+    <div class="admin-card-grid">
+      <button class="admin-card" onclick="showTab('prebuilt', null)">
+        <div class="ac-icon">📋</div>
+        <div class="ac-title">Pre-Built Reports</div>
+        <div class="ac-desc">Run saved reports for activations, ARS, BDR summaries, and more.</div>
+      </button>
+      <button class="admin-card" onclick="showTab('builder', null)">
+        <div class="ac-icon">⚙</div>
+        <div class="ac-title">Report Builder</div>
+        <div class="ac-desc">Build custom reports by filtering any AC object and field.</div>
+      </button>
+      <button class="admin-card" onclick="showTab('profile', null)">
+        <div class="ac-icon">🔎</div>
+        <div class="ac-title">Dealer Profile</div>
+        <div class="ac-desc">Look up a dealer by ID to see full account and SLP details.</div>
+      </button>
+      <button class="admin-card" onclick="showTab('analytics', null)">
+        <div class="ac-icon">📊</div>
+        <div class="ac-title">Analytics</div>
+        <div class="ac-desc">Activation trends, BDR performance, and program breakdowns.</div>
+      </button>
+      <button class="admin-card" onclick="showTab('smartquery', null)">
+        <div class="ac-icon">💡</div>
+        <div class="ac-title">Smart Search</div>
+        <div class="ac-desc">Natural-language search across accounts, SLPs, and contacts.</div>
+      </button>
+      <button class="admin-card" id="admin-card-scheduler" style="display:none;" onclick="showTab('scheduler', null)">
+        <div class="ac-icon">🕐</div>
+        <div class="ac-title">Scheduler</div>
+        <div class="ac-desc">Schedule automated email reports for your team.</div>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- TOOLS TABS (Report Builder, Pre-Built, etc.)              -->
 <!-- ══════════════════════════════════════════════════════════ -->
 <div id="tools-container" class="container">
@@ -1667,7 +1745,7 @@ select, input { font-family: inherit; }
 </div>
 
 <script>
-// v2026032301
+// v2026032302
 // ── State ──────────────────────────────────────────────────────
 const state = {
   object: null,
@@ -1682,7 +1760,7 @@ const state = {
 
 // ── Tab Nav ────────────────────────────────────────────────────
 const _TAB_NAMES = {
-  accounts: 'Accounts', builder: 'Report Builder', prebuilt: 'Pre-Built Reports',
+  accounts: 'Accounts', admin: 'Admin', builder: 'Report Builder', prebuilt: 'Pre-Built Reports',
   profile: 'Dealer Profile', analytics: 'Analytics', smartquery: 'Smart Search',
   scheduler: 'Scheduler', globalsearch: 'Global Search',
 };
@@ -1702,6 +1780,8 @@ function showTab(id, btn, pushHistory = true) {
     const navBtn = document.querySelector(`.app-nav nav button[data-tab="${id}"]`);
     if (navBtn) navBtn.classList.add('active');
   }
+  // Toggle accounts-mode (hides the left nav, shows Admin button)
+  document.querySelector('.app-shell').classList.toggle('accounts-mode', id === 'accounts');
   // Update URL hash without triggering hashchange listener
   if (pushHistory && window.location.hash !== '#' + id) {
     history.pushState(null, '', '#' + id);
@@ -2480,6 +2560,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (d.is_admin) {
       document.getElementById('scheduler-nav-btn').style.display = '';
       document.getElementById('scheduler-nav-divider').style.display = '';
+      const sc = document.getElementById('admin-card-scheduler');
+      if (sc) sc.style.display = '';
     }
   }).catch(()=>{});
   populateBdrDropdowns();
