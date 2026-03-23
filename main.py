@@ -86,7 +86,7 @@ _SMTP_FROM  = os.getenv("SMTP_FROM_NAME", "Microf Reports")
 _RECIPIENTS = [r.strip() for r in os.getenv("REPORT_RECIPIENTS", "").split(",") if r.strip()]
 
 # ── Admin / Scheduler ─────────────────────────────────────────────────────
-_ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL", "jsykes@microf.com")
+_ADMIN_EMAILS   = {e.strip().lower() for e in os.getenv("ADMIN_EMAIL", "jsykes@microf.com,bsanders@microf.com").split(",") if e.strip()}
 _SCHEDULES_FILE = os.getenv("SCHEDULES_FILE", os.path.join(os.path.dirname(__file__), "schedules.json"))
 _scheduler      = AsyncIOScheduler()
 _schedules: dict = {}   # job_id → schedule dict
@@ -153,7 +153,7 @@ def _require_admin(request: _Request):
     email = _get_session_email(request)
     if not _AZ_CLIENT_ID:          # no Azure → local dev, allow all
         return "local"
-    if not email or email.lower() != _ADMIN_EMAIL.lower():
+    if not email or email.lower() not in _ADMIN_EMAILS:
         raise HTTPException(status_code=403, detail="Admin only")
     return email
 
@@ -3055,7 +3055,7 @@ async def global_search_email(
 @app.get("/api/me")
 async def get_me(request: _Request):
     email = _get_session_email(request)
-    is_admin = (not _AZ_CLIENT_ID) or (email and email.lower() == _ADMIN_EMAIL.lower())
+    is_admin = (not _AZ_CLIENT_ID) or (email and email.lower() in _ADMIN_EMAILS)
     return {"email": email or "anonymous", "is_admin": bool(is_admin)}
 
 
