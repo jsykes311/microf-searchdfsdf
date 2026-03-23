@@ -2595,7 +2595,7 @@ async def create_account_note(account_id: str, note: _NoteIn, request: _Request,
     """Create an Account Activity (note) record linked to an account."""
     from datetime import timezone
     performed_by = _get_session_email(request) or user or "Microf Reports"
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     payload = {
         "record": {
