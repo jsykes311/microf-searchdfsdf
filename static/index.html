@@ -406,6 +406,21 @@ select, input { font-family: inherit; }
 }
 .gs-empty { color: var(--ms-g50); font-size: 0.8rem; font-style: italic; }
 
+/* ── Top Search Bar ── */
+.top-search-bar {
+  flex: 1; max-width: 480px; margin: 0 auto;
+  position: relative;
+}
+.top-search-bar input {
+  width: 100%; padding: 7px 14px 7px 34px;
+  border: 1px solid var(--ms-g40); border-radius: 4px;
+  font-size: 0.82rem; outline: none; font-family: inherit;
+  background: var(--ms-g10) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center;
+  color: var(--ms-g130); transition: border-color 0.15s, background 0.15s;
+}
+.top-search-bar input:focus { border-color: var(--ms-blue); background: var(--ms-white); }
+.top-search-bar input::placeholder { color: var(--ms-g50); }
+
 /* ── Account Browser ── */
 .ab-layout {
   display: grid; grid-template-columns: 280px 1fr;
@@ -435,6 +450,18 @@ select, input { font-family: inherit; }
 .ab-detail { overflow-y: auto; background: var(--ms-g10); }
 .ab-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--ms-g50); gap: 10px; font-size: 0.88rem; }
 .ab-empty-state .big { font-size: 3rem; }
+
+/* Full-width account detail mode */
+.ab-layout.detail-mode .ab-sidebar { display: none; }
+.ab-layout.detail-mode { grid-template-columns: 1fr; }
+.ab-back-btn {
+  display: none; align-items: center; gap: 6px;
+  background: none; border: none; color: var(--ms-blue);
+  font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  padding: 10px 16px 0; font-family: inherit;
+}
+.ab-back-btn:hover { text-decoration: underline; }
+.detail-mode .ab-back-btn { display: flex; }
 
 /* AC-style header */
 .acui-header {
@@ -635,7 +662,6 @@ select, input { font-family: inherit; }
     <div class="nav-divider" id="scheduler-nav-divider" style="display:none;"></div>
     <button id="scheduler-nav-btn" onclick="showTab('scheduler', this)" style="display:none;"><i class="nav-icon">🕐</i> Scheduler</button>
   </nav>
-  <button class="nav-search-btn" onclick="openGlobalSearch()">⌕ &nbsp;Global Search</button>
 </div>
 
 <!-- Main content area -->
@@ -643,14 +669,18 @@ select, input { font-family: inherit; }
 
 <!-- Command bar -->
 <div class="ms-cmdbar">
-  <div class="ms-cmdbar-breadcrumb">
+  <div class="ms-cmdbar-breadcrumb" style="flex-shrink:0;">
     <strong>AC Reports</strong>
     <span class="sep">›</span>
     <span id="ms-page-name">Accounts</span>
   </div>
-  <div class="ms-cmdbar-actions">
-    <button class="ms-cmdbar-btn" onclick="openGlobalSearch()" title="Global Search (/)">⌕</button>
+  <div class="top-search-bar">
+    <input id="top-search-input" placeholder="Search accounts, SLPs, contacts…"
+           oninput="topSearchInput(this.value)"
+           onkeydown="if(event.key==='Enter')openGlobalSearch(this.value)"
+           autocomplete="off"/>
   </div>
+  <div class="ms-cmdbar-actions" style="flex-shrink:0;"></div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
@@ -699,6 +729,7 @@ select, input { font-family: inherit; }
 
     <!-- Right: detail -->
     <div class="ab-detail" id="ab-detail">
+      <button class="ab-back-btn" onclick="abBack()">← Back to Accounts</button>
       <div class="ab-empty-state">
         <div class="big">🏢</div>
         <div>Select an account to view details</div>
@@ -2914,9 +2945,13 @@ async function runGlobalSearch() {
 let gsOverlayTimer = null;
 let _gsController = null;
 
-function openGlobalSearch() {
+function openGlobalSearch(prefill) {
   document.getElementById('gs-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('gs-overlay-input').focus(), 50);
+  const inp = document.getElementById('gs-overlay-input');
+  setTimeout(() => {
+    inp.focus();
+    if (prefill) { inp.value = prefill; inp.dispatchEvent(new Event('input')); }
+  }, 50);
 }
 
 function closeGlobalSearch() {
@@ -3133,11 +3168,23 @@ function abSearch(q) {
   ab.searchTimer = setTimeout(() => abLoad(q), 300);
 }
 
+function abBack() {
+  document.querySelector('.ab-layout').classList.remove('detail-mode');
+  ab.activeId = null;
+  abRenderList();
+}
+
+function topSearchInput(val) {
+  if (val.length >= 2) openGlobalSearch(val);
+}
+
 async function abSelect(accountId) {
   ab.activeId = accountId;
   abRenderList();
+  // Switch to full-width detail mode
+  document.querySelector('.ab-layout').classList.add('detail-mode');
   const detail = document.getElementById('ab-detail');
-  detail.innerHTML = `<div class="ab-empty-state"><span class="spinner" style="border-color:rgba(53,106,230,0.3);border-top-color:#356ae6;width:28px;height:28px;"></span><div>Loading…</div></div>`;
+  detail.innerHTML = `<button class="ab-back-btn" onclick="abBack()">← Back to Accounts</button><div class="ab-empty-state"><span class="spinner" style="border-color:rgba(53,106,230,0.3);border-top-color:#356ae6;width:28px;height:28px;"></span><div>Loading…</div></div>`;
   try {
     const res  = await fetch(`/api/accounts/${accountId}/detail`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -3278,7 +3325,8 @@ function abRenderDetail(d) {
   const sidebar = `<div class="acui-sidebar">${dealerProgramsPanel}${contactsPanel}${altContactsPanel}</div>`;
   const body    = `<div class="acui-body">${aboutCard}${sidebar}</div>`;
 
-  document.getElementById('ab-detail').innerHTML = header + body;
+  document.getElementById('ab-detail').innerHTML =
+    `<button class="ab-back-btn" onclick="abBack()">← Back to Accounts</button>` + header + body;
 }
 
 function abToggleSection(btn) {
