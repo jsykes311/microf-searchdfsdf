@@ -649,18 +649,18 @@ select, input { font-family: inherit; }
   </div>
   <nav>
     <div class="nav-section-label">Views</div>
-    <button class="active" onclick="showTab('accounts', this)"><i class="nav-icon">🏢</i> Accounts</button>
+    <button class="active" data-tab="accounts" onclick="showTab('accounts', this)"><i class="nav-icon">🏢</i> Accounts</button>
     <div class="nav-divider"></div>
     <div class="nav-section-label">Reports</div>
-    <button onclick="showTab('builder', this)"><i class="nav-icon">⚙</i> Report Builder</button>
-    <button onclick="showTab('prebuilt', this)"><i class="nav-icon">📋</i> Pre-Built Reports</button>
+    <button data-tab="builder" onclick="showTab('builder', this)"><i class="nav-icon">⚙</i> Report Builder</button>
+    <button data-tab="prebuilt" onclick="showTab('prebuilt', this)"><i class="nav-icon">📋</i> Pre-Built Reports</button>
     <div class="nav-divider"></div>
     <div class="nav-section-label">Tools</div>
-    <button onclick="showTab('profile', this)"><i class="nav-icon">🔎</i> Dealer Profile</button>
-    <button onclick="showTab('analytics', this)"><i class="nav-icon">📊</i> Analytics</button>
-    <button onclick="showTab('smartquery', this)"><i class="nav-icon">💡</i> Smart Search</button>
+    <button data-tab="profile" onclick="showTab('profile', this)"><i class="nav-icon">🔎</i> Dealer Profile</button>
+    <button data-tab="analytics" onclick="showTab('analytics', this)"><i class="nav-icon">📊</i> Analytics</button>
+    <button data-tab="smartquery" onclick="showTab('smartquery', this)"><i class="nav-icon">💡</i> Smart Search</button>
     <div class="nav-divider" id="scheduler-nav-divider" style="display:none;"></div>
-    <button id="scheduler-nav-btn" onclick="showTab('scheduler', this)" style="display:none;"><i class="nav-icon">🕐</i> Scheduler</button>
+    <button id="scheduler-nav-btn" data-tab="scheduler" onclick="showTab('scheduler', this)" style="display:none;"><i class="nav-icon">🕐</i> Scheduler</button>
   </nav>
 </div>
 
@@ -1667,7 +1667,7 @@ select, input { font-family: inherit; }
 </div>
 
 <script>
-// v2026031902
+// v2026032301
 // ── State ──────────────────────────────────────────────────────
 const state = {
   object: null,
@@ -1681,20 +1681,35 @@ const state = {
 };
 
 // ── Tab Nav ────────────────────────────────────────────────────
-function showTab(id, btn) {
+const _TAB_NAMES = {
+  accounts: 'Accounts', builder: 'Report Builder', prebuilt: 'Pre-Built Reports',
+  profile: 'Dealer Profile', analytics: 'Analytics', smartquery: 'Smart Search',
+  scheduler: 'Scheduler', globalsearch: 'Global Search',
+};
+const _VALID_TABS = new Set(Object.keys(_TAB_NAMES));
+
+function showTab(id, btn, pushHistory = true) {
+  if (!_VALID_TABS.has(id)) id = 'accounts';
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.app-nav nav button').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
-  btn.classList.add('active');
+  const panel = document.getElementById('tab-' + id);
+  if (!panel) return;
+  panel.classList.add('active');
+  // Highlight the matching nav button (btn may be null when called from routing)
+  if (btn) {
+    btn.classList.add('active');
+  } else {
+    const navBtn = document.querySelector(`.app-nav nav button[data-tab="${id}"]`);
+    if (navBtn) navBtn.classList.add('active');
+  }
+  // Update URL hash without triggering hashchange listener
+  if (pushHistory && window.location.hash !== '#' + id) {
+    history.pushState(null, '', '#' + id);
+  }
   // Update command bar breadcrumb
   if (id === 'scheduler') schLoad();
-  const pageNames = {
-    accounts: 'Accounts', builder: 'Report Builder', prebuilt: 'Pre-Built Reports',
-    profile: 'Dealer Profile', analytics: 'Analytics', smartquery: 'Smart Search',
-    scheduler: 'Scheduler', globalsearch: 'Global Search',
-  };
   const bc = document.getElementById('ms-page-name');
-  if (bc) bc.textContent = pageNames[id] || id;
+  if (bc) bc.textContent = _TAB_NAMES[id] || id;
   // Accounts fills app-main; tools use scrollable container
   const tools = document.getElementById('tools-container');
   if (id === 'accounts') {
@@ -1705,10 +1720,19 @@ function showTab(id, btn) {
   }
 }
 
+// Navigate to a tab by hash (no btn reference needed)
+function _navToHash(hash) {
+  const id = (hash || '').replace(/^#/, '') || 'accounts';
+  showTab(id, null, false);
+}
+
+// Browser back/forward
+window.addEventListener('hashchange', () => _navToHash(window.location.hash));
+
 // ── Boot ───────────────────────────────────────────────────────
 async function init() {
-  // Accounts is default tab — load it immediately
-  abInit();
+  // Route to the tab indicated by the URL hash (or default to accounts)
+  _navToHash(window.location.hash || '#accounts');
 
   // Lazy-load tool data in background
   fetch('/api/objects').then(r => r.json()).then(data => {
@@ -3022,8 +3046,7 @@ async function gsOverlaySearch(q) {
 function gsOverlaySelect(accountId) {
   closeGlobalSearch();
   // Switch to accounts tab via showTab
-  const btn = document.querySelector('.app-nav nav button:first-child');
-  showTab('accounts', btn);
+  showTab('accounts', null);
   if (ab.initialized) {
     abSelect(accountId);
   } else {
