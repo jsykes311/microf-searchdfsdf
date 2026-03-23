@@ -1057,6 +1057,74 @@ select, input { font-family: inherit; }
       <div id="act-lw-result" style="margin-top:12px;"></div>
     </div>
 
+    <!-- Last App Date -->
+    <div class="report-card">
+      <span class="badge-icon">📋</span>
+      <h3>Last App Date</h3>
+      <p>Accounts where the last application date (CF140) falls within the selected period. Defaults to the last 18 months.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_week','lad-from','lad-to',this)">Last Week</button>
+        <button class="period-btn" onclick="applyPeriod('last_month','lad-from','lad-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','lad-from','lad-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','lad-from','lad-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('this_quarter','lad-from','lad-to',this)">This Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','lad-from','lad-to',this)">YTD</button>
+        <button class="period-btn" onclick="applyPeriod('last_year','lad-from','lad-to',this)">Last Year</button>
+        <button class="period-btn" onclick="applyPeriod('this_year','lad-from','lad-to',this)">This Year</button>
+        <button class="period-btn active" onclick="applyPeriod('last_18_months','lad-from','lad-to',this)">Last 18 Mo</button>
+        <button class="period-btn" onclick="applyPeriod('all','lad-from','lad-to',this)">All Time</button>
+      </div>
+      <div class="form-row">
+        <label>From Date</label>
+        <input type="date" id="lad-from"/>
+      </div>
+      <div class="form-row">
+        <label>To Date</label>
+        <input type="date" id="lad-to"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runPrebuilt('last-app-date')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('last-app-date')">⬇ CSV</button>
+        <button class="btn btn-email btn-sm" onclick="sendEmailReport('last-app-date','lad-from','lad-to','lad-result')">✉ Email</button>
+      </div>
+      <div id="lad-result" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Last RPA Date -->
+    <div class="report-card">
+      <span class="badge-icon">🔄</span>
+      <h3>Last RPA Date</h3>
+      <p>Accounts where the last RPA date (CF38) falls within the selected period. Defaults to the last 18 months.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('last_week','rpa-from','rpa-to',this)">Last Week</button>
+        <button class="period-btn" onclick="applyPeriod('last_month','rpa-from','rpa-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','rpa-from','rpa-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','rpa-from','rpa-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('this_quarter','rpa-from','rpa-to',this)">This Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','rpa-from','rpa-to',this)">YTD</button>
+        <button class="period-btn" onclick="applyPeriod('last_year','rpa-from','rpa-to',this)">Last Year</button>
+        <button class="period-btn" onclick="applyPeriod('this_year','rpa-from','rpa-to',this)">This Year</button>
+        <button class="period-btn active" onclick="applyPeriod('last_18_months','rpa-from','rpa-to',this)">Last 18 Mo</button>
+        <button class="period-btn" onclick="applyPeriod('all','rpa-from','rpa-to',this)">All Time</button>
+      </div>
+      <div class="form-row">
+        <label>From Date</label>
+        <input type="date" id="rpa-from"/>
+      </div>
+      <div class="form-row">
+        <label>To Date</label>
+        <input type="date" id="rpa-to"/>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runPrebuilt('last-rpa-date')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('last-rpa-date')">⬇ CSV</button>
+        <button class="btn btn-email btn-sm" onclick="sendEmailReport('last-rpa-date','rpa-from','rpa-to','rpa-result')">✉ Email</button>
+      </div>
+      <div id="rpa-result" style="margin-top:12px;"></div>
+    </div>
+
     <!-- BDR Summary -->
     <div class="report-card">
       <span class="badge-icon">👥</span>
@@ -2263,6 +2331,8 @@ function computeDateRange(period) {
     case 'ytd':       return { from:`${now.getFullYear()}-01-01`, to:today };
     case 'this_year': return { from:`${now.getFullYear()}-01-01`, to:`${now.getFullYear()}-12-31` };
     case 'last_year': { const y=now.getFullYear()-1; return { from:`${y}-01-01`, to:`${y}-12-31` }; }
+    case 'last_18_months': { const d=new Date(now); d.setMonth(d.getMonth()-18); return { from:fmt(d), to:today }; }
+    case 'all':       return { from:'2000-01-01', to:today };
     default:          return { from:'', to:'' };
   }
 }
@@ -2321,6 +2391,20 @@ function prebuiltParams(type) {
     if (from) p.set('from_date', from);
     if (to)   p.set('to_date', to);
     return { endpoint: 'activations', params: p };
+  }
+  if (type === 'last-app-date') {
+    const from = document.getElementById('lad-from').value;
+    const to   = document.getElementById('lad-to').value;
+    if (from) p.set('from_date', from);
+    if (to)   p.set('to_date', to);
+    return { endpoint: 'last-app-date', params: p };
+  }
+  if (type === 'last-rpa-date') {
+    const from = document.getElementById('rpa-from').value;
+    const to   = document.getElementById('rpa-to').value;
+    if (from) p.set('from_date', from);
+    if (to)   p.set('to_date', to);
+    return { endpoint: 'last-rpa-date', params: p };
   }
   if (type === 'bdr') {
     const from = document.getElementById('bdr-from').value;
@@ -2424,6 +2508,7 @@ async function runPrebuilt(type) {
     activations: 'act-result', license: 'lic-result', bdr: 'bdr-result',
     'license-this-month': 'lic-tm-result', 'license-last-month': 'lic-lm-result',
     'activations-last-week': 'act-lw-result',
+    'last-app-date': 'lad-result', 'last-rpa-date': 'rpa-result',
     training: 'trn-result', acta: 'acta-result', team: 'team-result',
     'training-activity': 'ta-result', 'stale-untrained': 'su-result',
     'account-status': 'as-result', 'platform-breakdown': 'pb-result',
@@ -3633,7 +3718,7 @@ function abRenderDetail(d) {
         <div style="display:flex;gap:6px;align-items:center;">
           <button onclick="acuiSubmitNote('${a.id}')"
             style="padding:5px 14px;font-size:0.78rem;font-weight:600;background:var(--ms-blue);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;">
-            + Add Note
+            Submit
           </button>
           <span id="acui-note-status" style="font-size:0.76rem;color:#6b7280;"></span>
         </div>

@@ -3772,6 +3772,28 @@ def _resolve_date_range(
             first_this = today.replace(day=1)
             last_prev  = first_this - timedelta(days=1)
             return last_prev.replace(day=1), last_prev
+        if p == "this_quarter":
+            q = (today.month - 1) // 3
+            return today.replace(month=q*3+1, day=1), today
+        if p == "last_quarter":
+            q = (today.month - 1) // 3
+            if q == 0:
+                qs, qy = 3, today.year - 1
+            else:
+                qs, qy = q - 1, today.year
+            from calendar import monthrange as _mr
+            qe_month = qs * 3 + 3
+            qe_day   = _mr(qy, qe_month)[1]
+            return date(qy, qs*3+1, 1), date(qy, qe_month, qe_day)
+        if p in ("this_year", "ytd"):
+            return today.replace(month=1, day=1), today
+        if p == "last_year":
+            y = today.year - 1
+            return date(y, 1, 1), date(y, 12, 31)
+        if p in ("last_18_months", "last_18mo", "last_18"):
+            return today - timedelta(days=548), today
+        if p in ("all", "all_time"):
+            return date(2000, 1, 1), today
     return (start or default_start), (end or default_end)
 
 
@@ -4671,6 +4693,226 @@ async def _job_team_activity(start_date=None, end_date=None, preset=None, recipi
     )
 
 
+# ── Last App Date Report ────────────────────────────────────────────────────
+
+@app.get("/api/report/last-app-date")
+async def report_last_app_date(
+    from_date: Optional[date] = Query(None),
+    to_date:   Optional[date] = Query(None),
+    preset:    Optional[str]  = Query(None),
+    format:    str            = Query("json"),
+    _: None    = Depends(require_auth),
+):
+    """Accounts where CF140 (Last App Date) falls within the given window (default: last 18 months)."""
+    today    = date.today()
+    _start, _end = _resolve_date_range(from_date, to_date, preset,
+                                       default_start=today - timedelta(days=548),
+                                       default_end=today)
+    if _start is None: _start = today - timedelta(days=548)
+    if _end   is None: _end   = today
+    date_label = f"{_start} to {_end}"
+
+    cf_map       = await _fetch_acct_cf_map({"140", "18", "23", "76"})
+    all_accounts = await ac_get_all("accounts", "accounts", {})
+    acct_by_id   = {str(a.get("id", "")): a for a in all_accounts}
+
+    records = []
+    for aid, cfs in cf_map.items():
+        val = cfs.get("140", "")
+        if not val:
+            continue
+        date_str = str(val)[:10]
+        try:
+            d = date.fromisoformat(date_str)
+            if d < _start or d > _end:
+                continue
+        except Exception:
+            continue
+        a = acct_by_id.get(aid, {})
+        records.append({
+            "Account":       a.get("name", ""),
+            "Dealer ID":     cfs.get("18", "") or _account_to_dealer.get(aid, ""),
+            "Region":        cfs.get("23", ""),
+            "Account Type":  cfs.get("76", ""),
+            "Last App Date": date_str,
+        })
+    records.sort(key=lambda x: x["Last App Date"], reverse=True)
+
+    if format == "csv":
+        out = io.StringIO()
+        if records:
+            w = csv.DictWriter(out, fieldnames=records[0].keys())
+            w.writeheader(); w.writerows(records)
+        fn = f"last_app_date_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
+                                 headers={"Content-Disposition": f"attachment; filename={fn}"})
+    return {"count": len(records), "date_range": date_label, "records": records}
+
+
+async def _job_last_app_date(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                              preset: Optional[str] = None, recipients: list = None):
+    today    = date.today()
+    _start, _end = _resolve_date_range(start_date, end_date, preset,
+                                       default_start=today - timedelta(days=548),
+                                       default_end=today)
+    if _start is None: _start = today - timedelta(days=548)
+    if _end   is None: _end   = today
+    date_label = f"{_start} to {_end}"
+    print(f"[reports] Last App Date {date_label}")
+
+    cf_map       = await _fetch_acct_cf_map({"140", "18", "23", "76"})
+    all_accounts = await ac_get_all("accounts", "accounts", {})
+    acct_by_id   = {str(a.get("id", "")): a for a in all_accounts}
+
+    records = []
+    for aid, cfs in cf_map.items():
+        val = cfs.get("140", "")
+        if not val:
+            continue
+        date_str = str(val)[:10]
+        try:
+            d = date.fromisoformat(date_str)
+            if d < _start or d > _end:
+                continue
+        except Exception:
+            continue
+        a = acct_by_id.get(aid, {})
+        records.append({
+            "Account":       a.get("name", ""),
+            "Dealer ID":     cfs.get("18", "") or _account_to_dealer.get(aid, ""),
+            "Region":        cfs.get("23", ""),
+            "Account Type":  cfs.get("76", ""),
+            "Last App Date": date_str,
+        })
+    records.sort(key=lambda x: x["Last App Date"], reverse=True)
+
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Region","Region"),
+            ("Account Type","Account Type"), ("Last App Date","Last App Date")]
+    html = _HTML_WRAPPER.format(
+        title=f"Last App Date — {date_label}",
+        subtitle=f"{len(records)} account{'s' if len(records) != 1 else ''}",
+        table=_html_table(records, cols),
+        timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
+    )
+    await _send_email(
+        subject=f"Last App Date — {date_label} ({len(records)} records)",
+        html=html,
+        csv_data=_csv_bytes(records),
+        csv_name=f"last_app_date_{_start}_{_end}.csv",
+        recipients=recipients,
+    )
+
+
+# ── Last RPA Date Report ─────────────────────────────────────────────────────
+
+@app.get("/api/report/last-rpa-date")
+async def report_last_rpa_date(
+    from_date: Optional[date] = Query(None),
+    to_date:   Optional[date] = Query(None),
+    preset:    Optional[str]  = Query(None),
+    format:    str            = Query("json"),
+    _: None    = Depends(require_auth),
+):
+    """Accounts where CF38 (Last RPA Date) falls within the given window (default: last 18 months)."""
+    today    = date.today()
+    _start, _end = _resolve_date_range(from_date, to_date, preset,
+                                       default_start=today - timedelta(days=548),
+                                       default_end=today)
+    if _start is None: _start = today - timedelta(days=548)
+    if _end   is None: _end   = today
+    date_label = f"{_start} to {_end}"
+
+    cf_map       = await _fetch_acct_cf_map({"38", "18", "23", "76"})
+    all_accounts = await ac_get_all("accounts", "accounts", {})
+    acct_by_id   = {str(a.get("id", "")): a for a in all_accounts}
+
+    records = []
+    for aid, cfs in cf_map.items():
+        val = cfs.get("38", "")
+        if not val:
+            continue
+        date_str = str(val)[:10]
+        try:
+            d = date.fromisoformat(date_str)
+            if d < _start or d > _end:
+                continue
+        except Exception:
+            continue
+        a = acct_by_id.get(aid, {})
+        records.append({
+            "Account":       a.get("name", ""),
+            "Dealer ID":     cfs.get("18", "") or _account_to_dealer.get(aid, ""),
+            "Region":        cfs.get("23", ""),
+            "Account Type":  cfs.get("76", ""),
+            "Last RPA Date": date_str,
+        })
+    records.sort(key=lambda x: x["Last RPA Date"], reverse=True)
+
+    if format == "csv":
+        out = io.StringIO()
+        if records:
+            w = csv.DictWriter(out, fieldnames=records[0].keys())
+            w.writeheader(); w.writerows(records)
+        fn = f"last_rpa_date_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
+                                 headers={"Content-Disposition": f"attachment; filename={fn}"})
+    return {"count": len(records), "date_range": date_label, "records": records}
+
+
+async def _job_last_rpa_date(start_date: Optional[date] = None, end_date: Optional[date] = None,
+                              preset: Optional[str] = None, recipients: list = None):
+    today    = date.today()
+    _start, _end = _resolve_date_range(start_date, end_date, preset,
+                                       default_start=today - timedelta(days=548),
+                                       default_end=today)
+    if _start is None: _start = today - timedelta(days=548)
+    if _end   is None: _end   = today
+    date_label = f"{_start} to {_end}"
+    print(f"[reports] Last RPA Date {date_label}")
+
+    cf_map       = await _fetch_acct_cf_map({"38", "18", "23", "76"})
+    all_accounts = await ac_get_all("accounts", "accounts", {})
+    acct_by_id   = {str(a.get("id", "")): a for a in all_accounts}
+
+    records = []
+    for aid, cfs in cf_map.items():
+        val = cfs.get("38", "")
+        if not val:
+            continue
+        date_str = str(val)[:10]
+        try:
+            d = date.fromisoformat(date_str)
+            if d < _start or d > _end:
+                continue
+        except Exception:
+            continue
+        a = acct_by_id.get(aid, {})
+        records.append({
+            "Account":       a.get("name", ""),
+            "Dealer ID":     cfs.get("18", "") or _account_to_dealer.get(aid, ""),
+            "Region":        cfs.get("23", ""),
+            "Account Type":  cfs.get("76", ""),
+            "Last RPA Date": date_str,
+        })
+    records.sort(key=lambda x: x["Last RPA Date"], reverse=True)
+
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Region","Region"),
+            ("Account Type","Account Type"), ("Last RPA Date","Last RPA Date")]
+    html = _HTML_WRAPPER.format(
+        title=f"Last RPA Date — {date_label}",
+        subtitle=f"{len(records)} account{'s' if len(records) != 1 else ''}",
+        table=_html_table(records, cols),
+        timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
+    )
+    await _send_email(
+        subject=f"Last RPA Date — {date_label} ({len(records)} records)",
+        html=html,
+        csv_data=_csv_bytes(records),
+        csv_name=f"last_rpa_date_{_start}_{_end}.csv",
+        recipients=recipients,
+    )
+
+
 # ── Manual / GitHub Actions trigger ──────────────────────────────────────
 
 _REPORT_JOBS = {
@@ -4685,6 +4927,8 @@ _REPORT_JOBS = {
     "oracle-missing":       _job_oracle_missing,
     "account-activity":     _job_account_activity,
     "team-activity":        _job_team_activity,
+    "last-app-date":        _job_last_app_date,
+    "last-rpa-date":        _job_last_rpa_date,
 }
 
 @app.get("/api/send-report/{report_type}")
