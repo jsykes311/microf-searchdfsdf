@@ -1745,7 +1745,7 @@ select, input { font-family: inherit; }
 </div>
 
 <script>
-// v2026032304
+// v2026032305
 // ── State ──────────────────────────────────────────────────────
 const state = {
   object: null,
@@ -2858,112 +2858,135 @@ function parseQuery(query) {
   return { intent, period, platform, bdr, coldAccounts };
 }
 
+// ── Map Claude's report_type → API endpoint ──────────────────
+function _sqBuildUrl(parsed) {
+  const p = new URLSearchParams();
+  if (parsed.from_date) p.set('from_date', parsed.from_date);
+  if (parsed.to_date)   p.set('to_date',   parsed.to_date);
+  switch (parsed.report_type) {
+    case 'activations':
+      if (parsed.platform) p.set('platform', parsed.platform);
+      if (parsed.bdr)      p.set('bdr', parsed.bdr);
+      return { url: `/api/report/activations?${p}`, title: parsed.explanation || 'Activations' };
+    case 'training-summary':
+      return { url: `/api/report/training-summary?${p}`, title: parsed.explanation || 'Training Summary' };
+    case 'license-expiration':
+      if (parsed.days_ahead)      p.set('days_ahead', parsed.days_ahead);
+      if (parsed.include_expired) p.set('include_expired', 'true');
+      return { url: `/api/report/license-expiration?${p}`, title: parsed.explanation || 'License Expiration' };
+    case 'bdr-summary':
+      if (parsed.platform) p.set('platform', parsed.platform);
+      return { url: `/api/report/bdr-summary?${p}`, title: parsed.explanation || 'BDR Summary' };
+    case 'team-activity':
+      return { url: `/api/report/team-activity?${p}`, title: parsed.explanation || 'Team Activity' };
+    case 'account-activity':
+      if (parsed.cold_accounts) p.set('has_activity', 'false');
+      return { url: `/api/report/account-activity?${p}`, title: parsed.explanation || 'Account Activity' };
+    default: return null;
+  }
+}
+
+// ── Regex fallback (maps old intent names → new report_type) ──
+function _sqFallbackParse(query) {
+  const { intent, period, platform, bdr, coldAccounts } = parseQuery(query);
+  const dates = period ? computeDateRange(period) : { from: '', to: '' };
+  const intentMap = {
+    activations: 'activations', training: 'training-summary', license: 'license-expiration',
+    bdr: 'bdr-summary', team: 'team-activity', account_activity: 'account-activity',
+    notes_analytics: null, dealer_profile: 'dealer-profile',
+  };
+  if (!intent) return null;
+  return {
+    report_type: intentMap[intent] || null,
+    from_date: dates.from || null, to_date: dates.to || null,
+    platform: platform || null, bdr: bdr || null, dealer_id: null,
+    cold_accounts: coldAccounts, days_ahead: intent === 'license' ? 90 : null,
+    include_expired: intent === 'license', explanation: null, error: null, _fallback: true,
+  };
+}
+
 async function runSmartQuery() {
   const query = document.getElementById('sq-input').value.trim();
   if (!query) return;
 
-  const { intent, period, platform, bdr, coldAccounts } = parseQuery(query);
-  const dates = period ? computeDateRange(period) : { from: '', to: '' };
+  const intentDiv = document.getElementById('sq-intent');
+  const resultDiv = document.getElementById('sq-result');
 
-  const intentDiv  = document.getElementById('sq-intent');
-  const resultDiv  = document.getElementById('sq-result');
+  intentDiv.innerHTML = '';
+  resultDiv.innerHTML = `<div class="card" style="max-width:800px; color:#6b7280; padding:24px; text-align:center;">
+    <span class="spinner" style="border-color:rgba(53,106,230,0.3); border-top-color:#356ae6; width:24px; height:24px;"></span>
+    <div style="margin-top:10px; font-size:0.85rem;">Interpreting your query…</div>
+  </div>`;
 
-  // Show interpretation chips
+  // ── Step 1: parse via Claude API, fallback to regex ──
+  let parsed = null;
+  try {
+    const r = await fetch(`/api/smart-query?q=${encodeURIComponent(query)}`);
+    const d = await r.json();
+    parsed = d.fallback ? _sqFallbackParse(query) : d;
+  } catch { parsed = _sqFallbackParse(query); }
+
+  // ── Step 2: show what was understood ──
   const chips = [];
-  const intentLabels = {
-    activations: 'Activations', training: 'Training', license: 'License Expiration',
-    bdr: 'BDR Summary', team: 'Team Activity', account_activity: 'Account Activity',
-    notes_analytics: 'Notes Analytics', dealer_profile: 'Dealer Profile',
+  const rtLabels = {
+    'activations':'Activations','training-summary':'Training','license-expiration':'License Expiration',
+    'bdr-summary':'BDR Summary','team-activity':'Team Activity','account-activity':'Account Activity',
+    'dealer-profile':'Dealer Profile',
   };
-  if (intent) chips.push({ label: '📊 ' + (intentLabels[intent] || intent.replace(/_/g,' ')), ok: true });
-  else        chips.push({ label: '⚠ Unknown report type', ok: false });
-  if (period)   chips.push({ label: '📅 ' + period.replace(/_/g,' '), ok: true });
-  if (platform) chips.push({ label: '🏷 ' + platform, ok: true });
-  if (bdr)      chips.push({ label: '👤 BDR: ' + bdr, ok: true });
-  if (coldAccounts && intent === 'account_activity') chips.push({ label: '❄ Active accounts only excluded', ok: true });
+  if (parsed?.report_type) chips.push({ label: '📊 ' + (rtLabels[parsed.report_type] || parsed.report_type), ok: true });
+  else chips.push({ label: '⚠ Unknown report type', ok: false });
+  if (parsed?.from_date || parsed?.to_date) {
+    chips.push({ label: '📅 ' + [parsed.from_date, parsed.to_date].filter(Boolean).join(' → '), ok: true });
+  }
+  if (parsed?.platform)    chips.push({ label: '🏷 ' + parsed.platform, ok: true });
+  if (parsed?.bdr)         chips.push({ label: '👤 ' + parsed.bdr, ok: true });
+  if (parsed?.cold_accounts) chips.push({ label: '❄ Cold accounts', ok: true });
+  if (parsed?._fallback)   chips.push({ label: '⚡ regex mode', ok: true });
 
-  intentDiv.innerHTML = chips.length
-    ? `<div class="sq-understood">${chips.map(c => `<span class="sq-tag ${c.ok?'':'warn'}">${esc(c.label)}</span>`).join('')}</div>`
-    : '';
+  const chipHtml = `<div class="sq-understood">${chips.map(c=>`<span class="sq-tag ${c.ok?'':'warn'}">${esc(c.label)}</span>`).join('')}</div>`;
+  intentDiv.innerHTML = parsed?.explanation
+    ? `<div class="card" style="max-width:800px;margin-bottom:8px;padding:10px 16px;font-size:0.83rem;color:#374151;">
+        <strong>Understood:</strong> ${esc(parsed.explanation)}${chipHtml}</div>`
+    : chipHtml;
 
-  if (!intent) {
+  if (!parsed?.report_type || parsed?.error) {
     resultDiv.innerHTML = `<div class="card" style="max-width:800px;"><div class="alert alert-error">
-      ⚠ Couldn't identify a report type. Try phrases like:<br>
-      <em>"activations for Optimus last month"</em>, <em>"training this quarter"</em>, <em>"team performance YTD"</em>, <em>"license expiring soon"</em>
+      ⚠ ${esc(parsed?.error || 'Could not identify a report type.')}<br><br>
+      <strong>Try:</strong> <em>"activations for Optimus last month"</em>, <em>"license expiring in 60 days"</em>,
+      <em>"BDR performance this year"</em>, <em>"which BDR signed up the most 360 Finance partners"</em>
     </div></div>`;
+    return;
+  }
+
+  // ── Step 3: dealer profile → redirect ──
+  if (parsed.report_type === 'dealer-profile') {
+    showTab('profile', null);
+    if (parsed.dealer_id) {
+      const inp = document.getElementById('dealer-id-input');
+      if (inp) inp.value = parsed.dealer_id;
+      const btn = document.getElementById('dealer-search-btn');
+      if (btn) btn.click();
+    }
+    resultDiv.innerHTML = '';
     return;
   }
 
   resultDiv.innerHTML = `<div class="card" style="max-width:800px; color:#6b7280; padding:24px; text-align:center;">
     <span class="spinner" style="border-color:rgba(53,106,230,0.3); border-top-color:#356ae6; width:24px; height:24px;"></span>
-    <div style="margin-top:10px; font-size:0.85rem;">Loading…</div>
+    <div style="margin-top:10px; font-size:0.85rem;">Loading report…</div>
   </div>`;
 
+  // ── Step 4: fetch report ──
+  const mapped = _sqBuildUrl(parsed);
+  if (!mapped) {
+    resultDiv.innerHTML = `<div class="card" style="max-width:800px;"><div class="alert alert-error">Could not map to a report endpoint.</div></div>`;
+    return;
+  }
+
   try {
-    const p = new URLSearchParams();
-    if (dates.from) p.set('from_date', dates.from);
-    if (dates.to)   p.set('to_date',   dates.to);
-
-    let url = '';
-    let displayTitle = '';
-
-    switch (intent) {
-      case 'activations':
-        if (platform) p.set('platform', platform);
-        if (bdr)      p.set('bdr', bdr);
-        url = `/api/report/activations?${p}`;
-        displayTitle = `Partner Activations${platform ? ' — ' + platform : ''}${period ? ' (' + period.replace(/_/g,' ') + ')' : ''}`;
-        break;
-      case 'training':
-        url = `/api/report/training-summary?${p}`;
-        displayTitle = `Training Summary${period ? ' (' + period.replace(/_/g,' ') + ')' : ''}`;
-        break;
-      case 'license':
-        p.set('days_ahead', '90');
-        p.set('include_expired', 'true');
-        url = `/api/report/license-expiration?${p}`;
-        displayTitle = 'License Expiration (next 90 days + expired)';
-        break;
-      case 'bdr':
-        url = `/api/report/bdr-summary?${p}`;
-        displayTitle = `BDR Performance Summary${period ? ' (' + period.replace(/_/g,' ') + ')' : ''}`;
-        break;
-      case 'team':
-        url = `/api/report/team-activity?${p}`;
-        displayTitle = `Team Activity${period ? ' (' + period.replace(/_/g,' ') + ')' : ''}`;
-        break;
-      case 'account_activity':
-        if (coldAccounts) p.set('has_activity', 'false');
-        url = `/api/report/account-activity?${p}`;
-        displayTitle = `Account Activity${period ? ' (' + period.replace(/_/g,' ') + ')' : ''}`;
-        break;
-      case 'notes_analytics':
-        url = `/api/summary?object_type=notes&group_by=cdate`;
-        displayTitle = `Notes Overview`;
-        break;
-      case 'dealer_profile':
-        // Switch to Dealer Profile tab and pre-fill if a dealer ID is in the query
-        showTab('profile', null);
-        {
-          const dm = query.match(/\b\d{4,6}\b/);
-          if (dm) {
-            const inp = document.getElementById('dealer-id-input');
-            if (inp) { inp.value = dm[0]; }
-            const btn = document.getElementById('dealer-search-btn');
-            if (btn) btn.click();
-          }
-        }
-        return;
-      default:
-        resultDiv.innerHTML = `<div class="card" style="max-width:800px;"><div class="alert alert-error">Could not map to a report endpoint.</div></div>`;
-        return;
-    }
-
-    const res  = await fetch(url);
+    const res  = await fetch(mapped.url);
     if (!res.ok) throw new Error(`Server returned ${res.status}`);
     const data = await res.json();
-
-    // Normalize records
     let records = data.records || data.by_user || [];
 
     if (!records.length) {
@@ -2971,27 +2994,24 @@ async function runSmartQuery() {
       return;
     }
 
-    // Render results table
     const keys = Object.keys(records[0]);
-    const tableHtml = `
+    resultDiv.innerHTML = `
       <div class="card" style="margin-top:12px;">
         <div class="results-bar">
-          <span class="results-count"><strong>${records.length}</strong> records · <em style="color:#374151; font-weight:600;">${esc(displayTitle)}</em></span>
-          <button class="btn btn-success btn-sm" onclick="sqDownloadCSV('${url}')">⬇ CSV</button>
+          <span class="results-count"><strong>${records.length}</strong> records · <em style="color:#374151;font-weight:600;">${esc(mapped.title)}</em></span>
+          <button class="btn btn-success btn-sm" onclick="sqDownloadCSV('${mapped.url}')">⬇ CSV</button>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr>${keys.map(k => `<th>${esc(k)}</th>`).join('')}</tr></thead>
-            <tbody>${records.slice(0,300).map(r =>
-              '<tr>' + keys.map(k => `<td title="${esc(String(r[k]||''))}">${esc(String(r[k]||''))}</td>`).join('') + '</tr>'
+            <thead><tr>${keys.map(k=>`<th>${esc(k)}</th>`).join('')}</tr></thead>
+            <tbody>${records.slice(0,300).map(r=>
+              '<tr>'+keys.map(k=>`<td title="${esc(String(r[k]||''))}">${esc(String(r[k]||''))}</td>`).join('')+'</tr>'
             ).join('')}
-            ${records.length > 300 ? `<tr><td colspan="${keys.length}" style="text-align:center;color:#6b7280;font-style:italic;padding:10px;">Showing 300 of ${records.length} — download CSV for all rows</td></tr>` : ''}
+            ${records.length>300?`<tr><td colspan="${keys.length}" style="text-align:center;color:#6b7280;font-style:italic;padding:10px;">Showing 300 of ${records.length} — download CSV for all</td></tr>`:''}
             </tbody>
           </table>
         </div>
       </div>`;
-
-    resultDiv.innerHTML = tableHtml;
 
   } catch(e) {
     resultDiv.innerHTML = `<div class="card" style="max-width:800px;"><div class="alert alert-error">✕ ${esc(e.message)}</div></div>`;

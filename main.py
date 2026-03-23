@@ -28,6 +28,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import uuid as _uuid
+import anthropic as _anthropic
 
 load_dotenv()
 
@@ -76,6 +77,8 @@ _SYNC_TOKEN = os.getenv("SYNC_TOKEN", "")
 # ── Scheduled email reports ───────────────────────────────────────────────
 # Set these env vars on Render to enable report delivery.
 # SMTP_USER + REPORT_RECIPIENTS are required; everything else has defaults.
+_ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+
 _SMTP_HOST  = os.getenv("SMTP_HOST",      "smtp.gmail.com")
 _SMTP_PORT  = int(os.getenv("SMTP_PORT",  "587"))
 _SMTP_USER  = os.getenv("SMTP_USER",      "")
@@ -4865,6 +4868,90 @@ async def report_ars_360(
     if format == "csv":
         return _csv_response(results, f"ars_360_{datetime.now().strftime('%Y%m%d')}.csv")
     return {"count": len(results), "records": results}
+
+
+# ── Smart Query — Claude-powered NL → report intent ──────────────────────────
+
+_SMART_SYSTEM = """You are a report-routing assistant for Microf, a financing platform.
+Your job: parse a natural-language query and return a JSON object describing which report to run.
+
+Available report types (use exactly these values for "report_type"):
+  activations       — new contractor/dealer activations
+  training-summary  — training records and completions
+  license-expiration — licenses expiring soon or already expired
+  bdr-summary       — BDR (Business Development Rep) performance summary
+  team-activity     — internal team activity / notes
+  account-activity  — account engagement / cold accounts with no activity
+  dealer-profile    — look up a specific dealer by ID
+
+Available platforms (use exactly as shown, or null):
+  "360 Finance", "OPTIMUS", "LTO", "Microf", "SpectrumAC",
+  "ACIMA", "FlexShopper", "Snap", "Kornerstone", "GreenSky", "UOWn", "Wells"
+
+Today's date: {today}
+
+Return ONLY valid JSON, no prose. Schema:
+{{
+  "report_type": "<one of the above, or null if truly ambiguous>",
+  "from_date": "<YYYY-MM-DD or null>",
+  "to_date": "<YYYY-MM-DD or null>",
+  "platform": "<platform name or null>",
+  "bdr": "<BDR name/username or null>",
+  "dealer_id": "<numeric dealer ID or null>",
+  "cold_accounts": <true if user wants accounts with no activity, else false>,
+  "days_ahead": <integer if asking about upcoming license expiration, else null>,
+  "include_expired": <true if asking about already-expired licenses, else false>,
+  "explanation": "<one short sentence describing what you understood, shown to the user>",
+  "error": "<only if truly cannot map to a report; leave null otherwise>"
+}}
+
+Examples:
+  "activations for Optimus last month"
+  → {{"report_type":"activations","from_date":"<first of last month>","to_date":"<last of last month>","platform":"OPTIMUS","bdr":null,"dealer_id":null,"cold_accounts":false,"days_ahead":null,"include_expired":false,"explanation":"Activations for OPTIMUS platform last month","error":null}}
+
+  "which BDR signed up the most 360 Finance partners this quarter"
+  → {{"report_type":"bdr-summary","from_date":"<Q start>","to_date":"<today>","platform":"360 Finance","bdr":null,"dealer_id":null,"cold_accounts":false,"days_ahead":null,"include_expired":false,"explanation":"BDR summary for 360 Finance this quarter","error":null}}
+
+  "show me licenses expiring in the next 60 days"
+  → {{"report_type":"license-expiration","from_date":null,"to_date":null,"platform":null,"bdr":null,"dealer_id":null,"cold_accounts":false,"days_ahead":60,"include_expired":false,"explanation":"Licenses expiring in the next 60 days","error":null}}
+
+  "dealers who haven't had any activity in 6 months"
+  → {{"report_type":"account-activity","from_date":"<6 months ago>","to_date":"<today>","platform":null,"bdr":null,"dealer_id":null,"cold_accounts":true,"days_ahead":null,"include_expired":false,"explanation":"Cold accounts with no activity in the last 6 months","error":null}}
+"""
+
+
+@app.get("/api/smart-query")
+async def smart_query_endpoint(q: str, user=Depends(require_auth)):
+    """Parse a natural-language query with Claude and return structured report intent."""
+    if not q.strip():
+        raise HTTPException(400, "Query required")
+
+    if not _ANTHROPIC_KEY:
+        return {"error": "ANTHROPIC_API_KEY not configured", "fallback": True}
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    system = _SMART_SYSTEM.format(today=today)
+
+    try:
+        client = _anthropic.AsyncAnthropic(api_key=_ANTHROPIC_KEY)
+        msg = await client.messages.create(
+            model="claude-3-5-haiku-20241022",
+            max_tokens=512,
+            system=system,
+            messages=[{"role": "user", "content": q}],
+        )
+        raw = msg.content[0].text.strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        import json as _json
+        parsed = _json.loads(raw)
+        return parsed
+    except Exception as e:
+        print(f"[smart-query] Claude parse error: {e}")
+        return {"error": str(e), "fallback": True}
 
 
 if __name__ == "__main__":
