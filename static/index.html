@@ -1819,7 +1819,7 @@ select, input { font-family: inherit; }
 </div>
 
 <script>
-// v2026032307
+// v2026032308
 // ── State ──────────────────────────────────────────────────────
 const state = {
   object: null,
@@ -3611,11 +3611,97 @@ function abRenderDetail(d) {
       </div>
     </div>` : '';
 
-  const sidebar = `<div class="acui-sidebar">${dealerProgramsPanel}${contactsPanel}${altContactsPanel}</div>`;
+  const notesPanel = `
+    <div class="acui-panel" id="acui-notes-panel">
+      <div class="acui-panel-header">
+        <h4>Activity Notes</h4>
+      </div>
+      <div class="acui-panel-body" id="acui-notes-list">
+        <div style="color:#94a3b8;font-size:0.78rem;">Loading…</div>
+      </div>
+      <div style="padding:10px 12px;border-top:1px solid var(--ms-g30);">
+        <select id="acui-note-type" style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid var(--ms-g40);border-radius:4px;font-family:inherit;margin-bottom:6px;">
+          <option value="Internal Note">Internal Note</option>
+          <option value="Call">Call</option>
+          <option value="Email">Email</option>
+          <option value="Text">Text</option>
+        </select>
+        <input id="acui-note-subject" type="text" placeholder="Subject"
+          style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid var(--ms-g40);border-radius:4px;font-family:inherit;margin-bottom:6px;"/>
+        <textarea id="acui-note-body" rows="3" placeholder="Write a note…"
+          style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid var(--ms-g40);border-radius:4px;font-family:inherit;resize:vertical;margin-bottom:6px;"></textarea>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button onclick="acuiSubmitNote('${a.id}')"
+            style="padding:5px 14px;font-size:0.78rem;font-weight:600;background:var(--ms-blue);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;">
+            + Add Note
+          </button>
+          <span id="acui-note-status" style="font-size:0.76rem;color:#6b7280;"></span>
+        </div>
+      </div>
+    </div>`;
+
+  const sidebar = `<div class="acui-sidebar">${dealerProgramsPanel}${contactsPanel}${altContactsPanel}${notesPanel}</div>`;
   const body    = `<div class="acui-body">${aboutCard}${sidebar}</div>`;
 
   document.getElementById('ab-detail').innerHTML =
     `<button class="ab-back-btn" onclick="abBack()">← Back to Accounts</button>` + header + body;
+
+  // Load notes async after render
+  acuiLoadNotes(a.id);
+}
+
+// ── Account Notes ──────────────────────────────────────────────
+async function acuiLoadNotes(accountId) {
+  const list = document.getElementById('acui-notes-list');
+  if (!list) return;
+  try {
+    const r = await fetch(`/api/accounts/${accountId}/notes`);
+    const d = await r.json();
+    const notes = d.notes || [];
+    if (!notes.length) {
+      list.innerHTML = '<div style="color:#94a3b8;font-size:0.78rem;">No notes yet.</div>';
+      return;
+    }
+    list.innerHTML = notes.map(n => `
+      <div style="padding:8px 0;border-bottom:1px solid var(--ms-g30);font-size:0.78rem;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+          <span style="font-weight:600;color:var(--ms-g130);">${esc(n.subject||'(no subject)')}</span>
+          <span style="font-size:0.7rem;color:var(--ms-g90);white-space:nowrap;margin-left:8px;">${esc((n.activity_date||'').slice(0,10))}</span>
+        </div>
+        <div style="color:var(--ms-g90);margin-bottom:3px;">${esc(n.body||'')}</div>
+        <div style="font-size:0.7rem;color:var(--ms-g50);">${esc(n.activity_type||'')} · ${esc(n.performed_by||'')}</div>
+      </div>`).join('');
+  } catch(e) {
+    if (list) list.innerHTML = `<div style="color:#ef4444;font-size:0.78rem;">✕ ${esc(e.message)}</div>`;
+  }
+}
+
+async function acuiSubmitNote(accountId) {
+  const subject = document.getElementById('acui-note-subject').value.trim();
+  const body    = document.getElementById('acui-note-body').value.trim();
+  const type    = document.getElementById('acui-note-type').value;
+  const status  = document.getElementById('acui-note-status');
+
+  if (!body) { status.textContent = 'Body is required.'; status.style.color = '#ef4444'; return; }
+
+  status.textContent = 'Saving…'; status.style.color = '#6b7280';
+  try {
+    const r = await fetch(`/api/accounts/${accountId}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject, body, activity_type: type }),
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    status.textContent = '✓ Saved';
+    status.style.color = '#059669';
+    document.getElementById('acui-note-subject').value = '';
+    document.getElementById('acui-note-body').value    = '';
+    setTimeout(() => { status.textContent = ''; }, 2500);
+    await acuiLoadNotes(accountId);
+  } catch(e) {
+    status.textContent = '✕ ' + e.message;
+    status.style.color = '#ef4444';
+  }
 }
 
 function abToggleSection(btn) {

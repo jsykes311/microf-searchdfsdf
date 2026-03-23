@@ -2581,6 +2581,70 @@ async def account_detail(account_id: str):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# ACCOUNT NOTES  (Account Activity custom object)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class _NoteIn(BaseModel := __import__('pydantic').BaseModel):
+    subject:       str
+    body:          str
+    activity_type: str = "Internal Note"   # Internal Note | Call | Email | Text
+
+@app.post("/api/accounts/{account_id}/notes")
+async def create_account_note(account_id: str, note: _NoteIn, request: _Request,
+                               user=Depends(require_auth)):
+    """Create an Account Activity (note) record linked to an account."""
+    from datetime import timezone
+    performed_by = _get_session_email(request) or user or "Microf Reports"
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
+    payload = {
+        "record": {
+            "fields": [
+                {"id": "activity-type",  "value": note.activity_type},
+                {"id": "subject",        "value": note.subject},
+                {"id": "body",           "value": note.body},
+                {"id": "activity-date",  "value": now_iso},
+                {"id": "performed-by",   "value": performed_by},
+                {"id": "source",         "value": "Microf Reports"},
+            ],
+            "relationships": {"account": [int(account_id)]},
+        }
+    }
+    status, data = await ac_post(
+        f"customObjects/records/{ACCT_ACTIVITY_SCHEMA_ID}", payload
+    )
+    if status >= 400:
+        raise HTTPException(status_code=status,
+                            detail=data.get("message", "AC API error"))
+    return {"ok": True, "record": data.get("record", {})}
+
+
+@app.get("/api/accounts/{account_id}/notes")
+async def get_account_notes(account_id: str, user=Depends(require_auth)):
+    """Fetch Account Activity records linked to an account."""
+    all_records = await ac_get_all(
+        f"customObjects/records/{ACCT_ACTIVITY_SCHEMA_ID}", "records",
+        {}
+    )
+    results = []
+    for r in all_records:
+        rels = r.get("relationships", {}).get("account", [])
+        if str(account_id) not in [str(x) for x in rels]:
+            continue
+        fields = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
+        results.append({
+            "id":            r.get("id"),
+            "activity_type": fields.get("activity-type", ""),
+            "subject":       fields.get("subject", ""),
+            "body":          fields.get("body", ""),
+            "activity_date": fields.get("activity-date", ""),
+            "performed_by":  fields.get("performed-by", ""),
+        })
+    results.sort(key=lambda x: x.get("activity_date", ""), reverse=True)
+    return {"notes": results}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # GLOBAL SEARCH
 # ═══════════════════════════════════════════════════════════════════════════
 
