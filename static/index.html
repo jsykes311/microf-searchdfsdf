@@ -715,7 +715,7 @@ select, input { font-family: inherit; }
            autocomplete="off"/>
   </div>
   <div class="ms-cmdbar-actions" style="flex-shrink:0;">
-    <button class="admin-nav-btn" onclick="showTab('admin', null)">⚙ Admin</button>
+    <button class="admin-nav-btn" id="admin-nav-btn" style="display:none;" onclick="showTab('admin', null)">⚙ Admin</button>
   </div>
 </div>
 
@@ -1745,7 +1745,7 @@ select, input { font-family: inherit; }
 </div>
 
 <script>
-// v2026032302
+// v2026032303
 // ── State ──────────────────────────────────────────────────────
 const state = {
   object: null,
@@ -1766,8 +1766,12 @@ const _TAB_NAMES = {
 };
 const _VALID_TABS = new Set(Object.keys(_TAB_NAMES));
 
+let _isAdmin = false;   // set after /api/me resolves
+
 function showTab(id, btn, pushHistory = true) {
   if (!_VALID_TABS.has(id)) id = 'accounts';
+  // Guard admin tab — non-admins land on accounts instead
+  if (id === 'admin' && !_isAdmin) id = 'accounts';
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.app-nav nav button').forEach(b => b.classList.remove('active'));
   const panel = document.getElementById('tab-' + id);
@@ -2558,10 +2562,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Show scheduler nav only for admin
   fetch('/api/me').then(r=>r.json()).then(d => {
     if (d.is_admin) {
+      _isAdmin = true;
       document.getElementById('scheduler-nav-btn').style.display = '';
       document.getElementById('scheduler-nav-divider').style.display = '';
       const sc = document.getElementById('admin-card-scheduler');
       if (sc) sc.style.display = '';
+      const ab = document.getElementById('admin-nav-btn');
+      if (ab) ab.style.display = '';
+      // If the page loaded directly on #admin, re-trigger routing now that we know they're admin
+      if (window.location.hash === '#admin') _navToHash('#admin');
     }
   }).catch(()=>{});
   populateBdrDropdowns();
