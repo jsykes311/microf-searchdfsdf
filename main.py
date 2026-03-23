@@ -127,6 +127,7 @@ def _register_schedule(s: dict, persist: bool = True):
 
     report_type = s["report_type"]
     recipients  = s["recipients"]
+    period      = s.get("period") or None
 
     async def _run():
         job = _REPORT_JOBS.get(report_type)
@@ -134,7 +135,10 @@ def _register_schedule(s: dict, persist: bool = True):
             print(f"[scheduler] Unknown report type: {report_type}")
             return
         try:
-            await job(recipients=recipients)
+            kwargs = {"recipients": recipients}
+            if period:
+                kwargs["preset"] = period
+            await job(**kwargs)
             print(f"[scheduler] Sent '{report_type}' → {recipients}")
         except Exception as exc:
             print(f"[scheduler] Job '{report_type}' failed: {exc}")
@@ -1818,16 +1822,28 @@ async def activations_report(
 
 @app.get("/api/report/license-expiration")
 async def license_expiration_report(
-    days_ahead:      int  = Query(90),
-    include_expired: bool = Query(True),
-    format:          str  = Query("json"),
+    days_ahead:      int            = Query(90),
+    include_expired: bool           = Query(True),
+    from_date:       Optional[date] = Query(None, description="Filter by expiration date ≥ this date"),
+    to_date:         Optional[date] = Query(None, description="Filter by expiration date ≤ this date"),
+    preset:          Optional[str]  = Query(None, description="Date preset: this_month | last_month | last_week | etc."),
+    format:          str            = Query("json"),
 ):
-    """License records expiring within N days, joined to accounts."""
+    """License records filtered by expiration date. Supports days_ahead (future window) or
+    explicit from_date/to_date or a named preset (this_month, last_month, etc.)."""
     from datetime import timezone
     print("\nLicense expiration report...")
     lic_records = await ac_get_all(f"customObjects/records/{LICENSE_SCHEMA_ID}", "records", {})
-    now    = datetime.now(timezone.utc)
-    cutoff = now + timedelta(days=days_ahead)
+    now = datetime.now(timezone.utc)
+
+    # Resolve date-range mode vs days-ahead mode
+    use_range = bool(preset or from_date or to_date)
+    range_start: Optional[date] = None
+    range_end:   Optional[date] = None
+    if use_range:
+        range_start, range_end = _resolve_date_range(from_date, to_date, preset)
+    else:
+        cutoff = now + timedelta(days=days_ahead)
 
     account_ids: set = set()
     candidates  = []
@@ -1845,10 +1861,18 @@ async def license_expiration_report(
             continue
 
         is_expired = exp_dt < now
-        if is_expired and not include_expired:
-            continue
-        if not is_expired and exp_dt > cutoff:
-            continue
+        if use_range:
+            # Filter by whether the expiration date falls in the range
+            exp_date_only = exp_dt.date()
+            if range_start and exp_date_only < range_start:
+                continue
+            if range_end and exp_date_only > range_end:
+                continue
+        else:
+            if is_expired and not include_expired:
+                continue
+            if not is_expired and exp_dt > cutoff:
+                continue
 
         rel    = r.get("relationships", {}).get("account", [])
         acc_id = str(rel[0]) if rel else None
@@ -2989,6 +3013,7 @@ async def create_schedule(
     day_of_month: Optional[int]= Query(None, description="1-28 for monthly"),
     recipients:   str          = Query(..., description="Comma-separated emails"),
     label:        Optional[str]= Query(None),
+    period:       Optional[str]= Query(None, description="Date preset applied at run time: yesterday | last_week | this_month | last_month | last_quarter | ytd"),
     admin=Depends(_require_admin),
 ):
     if report_type not in _REPORT_JOBS:
@@ -3007,6 +3032,7 @@ async def create_schedule(
         "day_of_month": day_of_month or 1,
         "recipients":   [r.strip() for r in recipients.split(",") if r.strip()],
         "label":        label or report_type,
+        "period":       period or "",
         "created_at":   datetime.now().isoformat(),
     }
     _register_schedule(s)

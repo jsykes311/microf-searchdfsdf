@@ -977,9 +977,27 @@ select, input { font-family: inherit; }
     <div class="report-card">
       <span class="badge-icon">📜</span>
       <h3>License Expiration</h3>
-      <p>Contractor license records expiring within N days. Optionally include already-expired licenses.</p>
+      <p>Contractor license records filtered by expiration date. Use period shortcuts or set a custom date range.</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('this_month','lic-from','lic-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_month','lic-from','lic-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','lic-from','lic-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('this_quarter','lic-from','lic-to',this)">This Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','lic-from','lic-to',this)">YTD</button>
+        <button class="period-btn" onclick="applyPeriod('this_year','lic-from','lic-to',this)">This Year</button>
+        <button class="period-btn" onclick="licClearDates(this)">Next N Days ↓</button>
+      </div>
       <div class="form-row">
-        <label>Expiring within (days)</label>
+        <label>Expiration From</label>
+        <input type="date" id="lic-from"/>
+      </div>
+      <div class="form-row">
+        <label>Expiration To</label>
+        <input type="date" id="lic-to"/>
+      </div>
+      <div id="lic-days-wrap" class="form-row">
+        <label>— OR — Expiring within (days)</label>
         <input type="number" id="lic-days" value="90" min="1"/>
       </div>
       <div class="form-row">
@@ -992,9 +1010,48 @@ select, input { font-family: inherit; }
       <div class="btn-row">
         <button class="btn btn-primary" onclick="runPrebuilt('license')">▶ Run</button>
         <button class="btn btn-success" onclick="downloadPrebuilt('license')">⬇ CSV</button>
-        <button class="btn btn-email btn-sm" onclick="sendEmailReport('license-expiration',null,null,'lic-result')">✉ Email</button>
+        <button class="btn btn-email btn-sm" onclick="sendEmailReport('license-expiration','lic-from','lic-to','lic-result')">✉ Email</button>
       </div>
       <div id="lic-result" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Licenses Expiring This Month -->
+    <div class="report-card">
+      <span class="badge-icon">📅</span>
+      <h3>Licenses Expiring This Month</h3>
+      <p>Contractor licenses whose expiration date falls within the current calendar month.</p>
+      <div class="btn-row" style="margin-top:auto;">
+        <button class="btn btn-primary" onclick="runPrebuilt('license-this-month')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('license-this-month')">⬇ CSV</button>
+        <button class="btn btn-email btn-sm" onclick="sendEmailReportPreset('license-expiration','this_month','lic-tm-result')">✉ Email</button>
+      </div>
+      <div id="lic-tm-result" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Licenses Expiring Last Month -->
+    <div class="report-card">
+      <span class="badge-icon">📆</span>
+      <h3>Licenses Expired Last Month</h3>
+      <p>Contractor licenses whose expiration date fell within the previous calendar month.</p>
+      <div class="btn-row" style="margin-top:auto;">
+        <button class="btn btn-primary" onclick="runPrebuilt('license-last-month')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('license-last-month')">⬇ CSV</button>
+        <button class="btn btn-email btn-sm" onclick="sendEmailReportPreset('license-expiration','last_month','lic-lm-result')">✉ Email</button>
+      </div>
+      <div id="lic-lm-result" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Dealer Activations Last Week -->
+    <div class="report-card">
+      <span class="badge-icon">⚡</span>
+      <h3>Dealer Activations Last Week</h3>
+      <p>All SLP records with "Contractor Activated" status whose activation date falls within last week (Mon–Sun).</p>
+      <div class="btn-row" style="margin-top:auto;">
+        <button class="btn btn-primary" onclick="runPrebuilt('activations-last-week')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('activations-last-week')">⬇ CSV</button>
+        <button class="btn btn-email btn-sm" onclick="sendEmailReportPreset('activations','last_week','act-lw-result')">✉ Email</button>
+      </div>
+      <div id="act-lw-result" style="margin-top:12px;"></div>
     </div>
 
     <!-- BDR Summary -->
@@ -1677,6 +1734,20 @@ select, input { font-family: inherit; }
         </select>
       </div>
       <div>
+        <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Date Period</label>
+        <select id="sch-period" style="width:100%;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          <option value="">— report default —</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="last_week">Last Week</option>
+          <option value="this_month">This Month</option>
+          <option value="last_month">Last Month</option>
+          <option value="last_quarter">Last Quarter</option>
+          <option value="ytd">Year to Date</option>
+          <option value="last_30_days">Last 30 Days</option>
+          <option value="last_90_days">Last 90 Days</option>
+        </select>
+      </div>
+      <div>
         <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Frequency</label>
         <select id="sch-freq" onchange="schUpdateFreqFields()" style="width:100%;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
           <option value="daily">Daily</option>
@@ -1745,7 +1816,7 @@ select, input { font-family: inherit; }
 </div>
 
 <script>
-// v2026032305
+// v2026032306
 // ── State ──────────────────────────────────────────────────────
 const state = {
   object: null,
@@ -2223,9 +2294,30 @@ function prebuiltParams(type) {
     return { endpoint: 'activations', params: p };
   }
   if (type === 'license') {
-    p.set('days_ahead', document.getElementById('lic-days').value || '90');
-    p.set('include_expired', document.getElementById('lic-expired').value);
+    const from = document.getElementById('lic-from').value;
+    const to   = document.getElementById('lic-to').value;
+    if (from || to) {
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+    } else {
+      p.set('days_ahead', document.getElementById('lic-days').value || '90');
+      p.set('include_expired', document.getElementById('lic-expired').value);
+    }
     return { endpoint: 'license-expiration', params: p };
+  }
+  if (type === 'license-this-month') {
+    p.set('preset', 'this_month');
+    return { endpoint: 'license-expiration', params: p };
+  }
+  if (type === 'license-last-month') {
+    p.set('preset', 'last_month');
+    return { endpoint: 'license-expiration', params: p };
+  }
+  if (type === 'activations-last-week') {
+    const { from, to } = computeDateRange('last_week');
+    if (from) p.set('from_date', from);
+    if (to)   p.set('to_date', to);
+    return { endpoint: 'activations', params: p };
   }
   if (type === 'bdr') {
     const from = document.getElementById('bdr-from').value;
@@ -2327,6 +2419,8 @@ async function runPrebuilt(type) {
   const { endpoint, params } = prebuiltParams(type);
   const resultId = {
     activations: 'act-result', license: 'lic-result', bdr: 'bdr-result',
+    'license-this-month': 'lic-tm-result', 'license-last-month': 'lic-lm-result',
+    'activations-last-week': 'act-lw-result',
     training: 'trn-result', acta: 'acta-result', team: 'team-result',
     'training-activity': 'ta-result', 'stale-untrained': 'su-result',
     'account-status': 'as-result', 'platform-breakdown': 'pb-result',
@@ -2510,7 +2604,7 @@ async function schLoad() {
       return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;margin-bottom:6px;">
         <div>
           <div style="font-size:0.82rem;font-weight:600;color:#111827;">${esc(s.label||_REPORT_LABELS[s.report_type]||s.report_type)}</div>
-          <div style="font-size:0.76rem;color:#6b7280;">${freq} at ${time} → ${esc(s.recipients.join(', '))}</div>
+          <div style="font-size:0.76rem;color:#6b7280;">${freq} at ${time}${s.period ? ' · ' + esc(s.period.replace(/_/g,' ')) : ''} → ${esc(s.recipients.join(', '))}</div>
         </div>
         <button onclick="schDelete('${s.id}')" style="padding:3px 8px;font-size:0.74rem;background:#fee2e2;color:#dc2626;border:none;border-radius:3px;cursor:pointer;">Delete</button>
       </div>`;
@@ -2522,6 +2616,7 @@ async function schLoad() {
 
 async function schCreate() {
   const status = document.getElementById('sch-create-status');
+  const period = document.getElementById('sch-period').value;
   const p = new URLSearchParams({
     report_type:  document.getElementById('sch-report').value,
     frequency:    document.getElementById('sch-freq').value,
@@ -2532,6 +2627,7 @@ async function schCreate() {
     recipients:   document.getElementById('sch-recipients').value.trim(),
     label:        document.getElementById('sch-label').value.trim(),
   });
+  if (period) p.set('period', period);
   if (!p.get('recipients')) { status.textContent = 'Enter at least one recipient.'; status.style.color='#ef4444'; return; }
   status.textContent = 'Saving…'; status.style.color = '#6b7280';
   try {
@@ -3015,6 +3111,38 @@ async function runSmartQuery() {
 
   } catch(e) {
     resultDiv.innerHTML = `<div class="card" style="max-width:800px;"><div class="alert alert-error">✕ ${esc(e.message)}</div></div>`;
+  }
+}
+
+// Clear license date fields (to switch back to days-ahead mode)
+function licClearDates(btn) {
+  document.getElementById('lic-from').value = '';
+  document.getElementById('lic-to').value   = '';
+  if (btn) {
+    btn.closest('.period-row').querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  }
+}
+
+// Email a preset-based report without needing date input fields
+async function sendEmailReportPreset(reportType, preset, resultId) {
+  const toEl = document.getElementById('email-to');
+  const recipients = toEl ? toEl.value.trim() : '';
+  if (!recipients) {
+    const r = prompt('Recipients (comma-separated emails):');
+    if (!r) return;
+    if (toEl) toEl.value = r;
+  }
+  const finalRecipients = (toEl ? toEl.value : recipients).trim();
+  if (!finalRecipients) return;
+  const url = `/api/send-report/${reportType}?recipients=${encodeURIComponent(finalRecipients)}&preset=${encodeURIComponent(preset)}`;
+  const el = document.getElementById(resultId);
+  if (el) el.innerHTML = `<div style="color:#6b7280;font-size:0.8rem;">Sending…</div>`;
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    if (el) el.innerHTML = `<div style="color:#059669;font-size:0.8rem;">✓ Queued for ${(d.recipients||[]).join(', ')}</div>`;
+  } catch(e) {
+    if (el) el.innerHTML = `<div style="color:#ef4444;font-size:0.8rem;">✕ ${e.message}</div>`;
   }
 }
 
