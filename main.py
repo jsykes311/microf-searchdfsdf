@@ -1875,16 +1875,17 @@ async def not_activated_report(
                 continue
 
         if from_dt or to_dt:
-            created_str = str(r.get("createdTimestamp", "") or "").strip()
-            if created_str:
-                try:
-                    created_dt = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
-                    if from_dt and created_dt < from_dt:
-                        continue
-                    if to_dt and created_dt > to_dt:
-                        continue
-                except Exception:
-                    pass
+            created_str = str(r.get("cdate") or r.get("createdTimestamp") or "").strip()
+            if not created_str:
+                continue
+            try:
+                created_dt = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                if from_dt and created_dt < from_dt:
+                    continue
+                if to_dt and created_dt > to_dt:
+                    continue
+            except Exception:
+                continue
 
         if acc_id:
             account_ids.add(acc_id)
