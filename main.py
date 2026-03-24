@@ -5484,32 +5484,31 @@ async def optimus_deactivate_preview(body: dict = Body(...), admin=Depends(_requ
     not_found = []
 
     for did in dealer_ids:
-        # Query SLP records directly by dealer-id field
+        # Use the pre-built dealer ID index (CF18 → account_id)
+        entry = _dealer_id_index.get(did)
+        if not entry:
+            not_found.append(did)
+            continue
+
+        acct_id   = str(entry["id"])
+        acct_name = entry.get("name", "")
+
+        # Fetch OPTIMUS SLPs for this account
         slp_data = await ac_get(f"customObjects/records/{SLP_SCHEMA}",
-                                {"filters[dealer-id]": did, "limit": 20})
+                                {"filters[relationships.account]": acct_id, "limit": 50})
         found_any = False
         for r in slp_data.get("records", []):
             fmap = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
             if (fmap.get("platform") or "").strip().upper() != "OPTIMUS":
                 continue
             found_any = True
-            # Get account name from relationship
-            acct_ids = r.get("relationships", {}).get("account", [])
-            acct_name = ""
-            acct_id = str(acct_ids[0]) if acct_ids else ""
-            if acct_id:
-                try:
-                    ad = await ac_get(f"accounts/{acct_id}")
-                    acct_name = ad.get("account", {}).get("name", "")
-                except Exception:
-                    pass
             rows.append({
-                "record_id":     r["id"],
-                "account_id":    acct_id,
-                "dealer_id":     did,
-                "account_name":  acct_name,
+                "record_id":      r["id"],
+                "account_id":     acct_id,
+                "dealer_id":      did,
+                "account_name":   acct_name,
                 "current_status": fmap.get("slp-status-detail", ""),
-                "platform":      fmap.get("platform", ""),
+                "platform":       fmap.get("platform", ""),
             })
         if not found_any:
             not_found.append(did)
