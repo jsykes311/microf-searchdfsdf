@@ -5484,36 +5484,35 @@ async def optimus_deactivate_preview(body: dict = Body(...), admin=Depends(_requ
     not_found = []
 
     for did in dealer_ids:
-        # Search AC accounts by name/keyword — fallback to CF18 scan
-        data = await ac_get("accounts", {"search": did, "limit": 20})
-        accounts = data.get("accounts", [])
-        matched_acc = None
-        for a in accounts:
-            ad = await ac_get(f"accounts/{a['id']}")
-            acc = ad.get("account", {})
-            cf_map = {f["customFieldId"]: f["fieldValue"] for f in acc.get("accountCustomFieldData", [])}
-            if cf_map.get("18") == did:
-                matched_acc = acc
-                break
-
-        if not matched_acc:
-            not_found.append(did)
-            continue
-
-        # Find OPTIMUS SLP(s) for this account
+        # Query SLP records directly by dealer-id field
         slp_data = await ac_get(f"customObjects/records/{SLP_SCHEMA}",
-                                {"filters[relationships.account]": matched_acc["id"]})
+                                {"filters[dealer-id]": did, "limit": 20})
+        found_any = False
         for r in slp_data.get("records", []):
             fmap = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
-            if (fmap.get("platform") or "").strip().upper() == "OPTIMUS":
-                rows.append({
-                    "record_id":   r["id"],
-                    "account_id":  matched_acc["id"],
-                    "dealer_id":   did,
-                    "account_name": matched_acc.get("name", ""),
-                    "current_status": fmap.get("slp-status-detail", ""),
-                    "platform":    fmap.get("platform", ""),
-                })
+            if (fmap.get("platform") or "").strip().upper() != "OPTIMUS":
+                continue
+            found_any = True
+            # Get account name from relationship
+            acct_ids = r.get("relationships", {}).get("account", [])
+            acct_name = ""
+            acct_id = str(acct_ids[0]) if acct_ids else ""
+            if acct_id:
+                try:
+                    ad = await ac_get(f"accounts/{acct_id}")
+                    acct_name = ad.get("account", {}).get("name", "")
+                except Exception:
+                    pass
+            rows.append({
+                "record_id":     r["id"],
+                "account_id":    acct_id,
+                "dealer_id":     did,
+                "account_name":  acct_name,
+                "current_status": fmap.get("slp-status-detail", ""),
+                "platform":      fmap.get("platform", ""),
+            })
+        if not found_any:
+            not_found.append(did)
 
     return {"preview": rows, "not_found": not_found, "dealer_ids_parsed": dealer_ids}
 
