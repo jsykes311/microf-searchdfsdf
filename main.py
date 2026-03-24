@@ -1823,14 +1823,18 @@ async def activations_report(
 
 @app.get("/api/report/not-activated")
 async def not_activated_report(
-    platform:  Optional[str] = Query(None),
-    bdr:       Optional[str] = Query(None),
-    status:    Optional[str] = Query(None, description="Filter to a specific non-activated status"),
-    format:    str           = Query("json"),
+    platform:          Optional[str] = Query(None),
+    bdr:               Optional[str] = Query(None),
+    status:            Optional[str] = Query(None, description="Filter to a specific non-activated status"),
+    state:             Optional[str] = Query(None, description="2-letter state abbreviation"),
+    exclude_platforms: Optional[str] = Query(None, description="Comma-separated platforms to exclude"),
+    format:            str           = Query("json"),
 ):
     """SLP records whose status is NOT 'Contractor Activated', joined to accounts."""
     from datetime import timezone
     print("\nNot-activated report...")
+    exclude_set = {p.strip() for p in exclude_platforms.split(",")} if exclude_platforms else set()
+
     slp_records = await ac_get_all(
         f"customObjects/records/{SLP_SCHEMA_ID}", "records", {}
     )
@@ -1850,6 +1854,8 @@ async def not_activated_report(
         plat_norm = _normalize_platform(plat)
         if platform and plat_norm != _normalize_platform(platform):
             continue
+        if plat_norm in exclude_set or plat in exclude_set:
+            continue
 
         rel    = r.get("relationships", {}).get("account", [])
         acc_id = str(rel[0]) if rel else None
@@ -1858,6 +1864,11 @@ async def not_activated_report(
         eff_bdr = slp_bdr or _account_to_bdr.get(acc_id or "", "")
         if bdr and eff_bdr != bdr:
             continue
+
+        if state:
+            states_val = str(fields.get("doing-business-in-states", "") or "").upper()
+            if state.upper() not in [s.strip() for s in states_val.split(",")]:
+                continue
 
         if acc_id:
             account_ids.add(acc_id)
