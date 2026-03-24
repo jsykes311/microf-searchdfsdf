@@ -1849,7 +1849,7 @@ async def not_activated_report(
     for r in slp_records:
         fields     = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
         status_val = str(fields.get("slp-status-detail", "")).strip()
-        if status_val in ("Contractor Activated", "Inactive"):
+        if status_val in ("Contractor Activated", "Inactive", "Deactivated"):
             continue
         if status and status_val != status:
             continue
@@ -5032,7 +5032,7 @@ async def _job_not_activated(start_date=None, end_date=None,
     for r in slp_records:
         fields     = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
         status_val = str(fields.get("slp-status-detail", "")).strip()
-        if status_val in ("Contractor Activated", "Inactive"):
+        if status_val in ("Contractor Activated", "Inactive", "Deactivated"):
             continue
         rel    = r.get("relationships", {}).get("account", [])
         acc_id = str(rel[0]) if rel else None
