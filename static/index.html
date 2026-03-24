@@ -817,6 +817,26 @@ select, input { font-family: inherit; }
         <div class="ac-title">Scheduler</div>
         <div class="ac-desc">Schedule automated email reports for your team.</div>
       </button>
+      <button class="admin-card" onclick="showOptimusDeactivator()">
+        <div class="ac-icon">🔴</div>
+        <div class="ac-title">OPTIMUS Deactivation</div>
+        <div class="ac-desc">Paste a GreenSky suspension email to bulk-deactivate OPTIMUS SLPs.</div>
+      </button>
+    </div>
+
+    <!-- OPTIMUS Deactivation Panel -->
+    <div id="optimus-deact-panel" style="display:none;margin-top:32px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-size:1rem;font-weight:700;color:#111827;">OPTIMUS Bulk Deactivation</div>
+        <button onclick="document.getElementById('optimus-deact-panel').style.display='none'" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:#6b7280;">✕</button>
+      </div>
+      <p style="font-size:0.82rem;color:#6b7280;margin:0 0 12px;">Paste the GreenSky deactivation email body below. The tool will extract dealer IDs, find their OPTIMUS SLPs, and show you a preview before making any changes.</p>
+      <textarea id="optimus-email-body" rows="8" placeholder="Paste GreenSky email text here..." style="width:100%;box-sizing:border-box;padding:10px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;resize:vertical;"></textarea>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+        <button onclick="optimusPreview()" style="padding:7px 18px;background:#356ae6;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem;font-family:inherit;">🔍 Preview</button>
+        <span id="optimus-status" style="font-size:0.8rem;color:#6b7280;"></span>
+      </div>
+      <div id="optimus-preview-area" style="margin-top:16px;"></div>
     </div>
   </div>
 </div>
@@ -3914,6 +3934,92 @@ function abCoTab(key, btn) {
 }
 
 init();
+
+// ── OPTIMUS Bulk Deactivation ──────────────────────────────────────────────
+function showOptimusDeactivator() {
+  const panel = document.getElementById('optimus-deact-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('optimus-preview-area').innerHTML = '';
+  document.getElementById('optimus-status').textContent = '';
+}
+
+async function optimusPreview() {
+  const text = document.getElementById('optimus-email-body').value.trim();
+  if (!text) { alert('Please paste the email body first.'); return; }
+  const status = document.getElementById('optimus-status');
+  const area   = document.getElementById('optimus-preview-area');
+  status.textContent = 'Parsing…';
+  area.innerHTML = '';
+  try {
+    const res  = await fetch('/api/admin/optimus-deactivate/preview', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({text})
+    });
+    const data = await res.json();
+    if (!res.ok) { status.textContent = '✕ ' + (data.detail || 'Error'); return; }
+
+    const { preview, not_found, dealer_ids_parsed } = data;
+    status.textContent = `Found ${dealer_ids_parsed.length} dealer ID(s) in email.`;
+
+    let html = '';
+    if (not_found.length) {
+      html += `<div style="margin-bottom:10px;padding:8px 12px;background:#fef3c7;border-radius:6px;font-size:0.8rem;color:#92400e;">
+        ⚠ Dealer IDs not found in AC: <strong>${not_found.join(', ')}</strong></div>`;
+    }
+    if (!preview.length) {
+      html += `<p style="color:#6b7280;font-size:0.82rem;">No OPTIMUS SLPs found for the parsed dealer IDs.</p>`;
+    } else {
+      html += `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:14px;">
+        <thead><tr style="background:#f3f4f6;text-align:left;">
+          <th style="padding:7px 10px;border:1px solid #e5e7eb;">Dealer ID</th>
+          <th style="padding:7px 10px;border:1px solid #e5e7eb;">Account Name</th>
+          <th style="padding:7px 10px;border:1px solid #e5e7eb;">Current Status</th>
+          <th style="padding:7px 10px;border:1px solid #e5e7eb;">SLP Record</th>
+        </tr></thead><tbody>`;
+      for (const row of preview) {
+        const statusColor = row.current_status === 'Contractor Activated' ? '#166534' : '#92400e';
+        html += `<tr>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${esc(row.dealer_id)}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;">${esc(row.account_name)}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;color:${statusColor};">${esc(row.current_status)}</td>
+          <td style="padding:7px 10px;border:1px solid #e5e7eb;font-family:monospace;font-size:0.75rem;">${esc(row.record_id)}</td>
+        </tr>`;
+      }
+      html += `</tbody></table>`;
+
+      const ids = JSON.stringify(preview.map(r => r.record_id));
+      html += `<button onclick="optimusConfirm(${ids.replace(/"/g,'&quot;')})"
+        style="padding:7px 20px;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem;font-family:inherit;">
+        🔴 Deactivate ${preview.length} SLP(s)</button>
+        <span id="optimus-confirm-status" style="margin-left:10px;font-size:0.8rem;color:#6b7280;"></span>`;
+    }
+    area.innerHTML = html;
+  } catch(e) {
+    status.textContent = '✕ ' + e.message;
+  }
+}
+
+async function optimusConfirm(recordIds) {
+  if (!confirm(`Set ${recordIds.length} OPTIMUS SLP(s) to Deactivated? This cannot be undone here.`)) return;
+  const cs = document.getElementById('optimus-confirm-status');
+  cs.textContent = 'Updating…';
+  try {
+    const res  = await fetch('/api/admin/optimus-deactivate/confirm', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({record_ids: recordIds})
+    });
+    const data = await res.json();
+    if (!res.ok) { cs.textContent = '✕ ' + (data.detail || 'Error'); return; }
+    const { updated, failed } = data;
+    cs.textContent = `✓ ${updated.length} updated${failed.length ? ` · ✕ ${failed.length} failed` : ''}`;
+    if (failed.length) console.error('Failed:', failed);
+  } catch(e) {
+    cs.textContent = '✕ ' + e.message;
+  }
+}
+
 </script>
 </body>
 </html>

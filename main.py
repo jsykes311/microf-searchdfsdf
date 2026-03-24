@@ -5459,6 +5459,104 @@ async def smart_query_endpoint(q: str, user=Depends(require_auth)):
         return {"error": str(e), "fallback": True}
 
 
+# ---------------------------------------------------------------------------
+# OPTIMUS Bulk Deactivation
+# ---------------------------------------------------------------------------
+import re as _re
+
+class _DeactivateConfirmIn(_BaseModel):
+    record_ids: list  # SLP record IDs to set Deactivated
+
+@app.post("/api/admin/optimus-deactivate/preview")
+async def optimus_deactivate_preview(body: dict = Body(...), admin=Depends(_require_admin)):
+    """
+    Parse a GreenSky deactivation email body, find each dealer's OPTIMUS SLP,
+    and return a preview list without making any changes.
+    """
+    text = body.get("text", "")
+    # Extract 4-6 digit numbers as candidate dealer IDs
+    raw_ids = _re.findall(r'\b(\d{4,6})\b', text)
+    dealer_ids = list(dict.fromkeys(raw_ids))  # dedupe, preserve order
+
+    SLP_SCHEMA = "d5ccf74f-981f-40ff-8a03-23cd0309808f"
+    rows = []
+    not_found = []
+
+    for did in dealer_ids:
+        # Search AC accounts by name/keyword — fallback to CF18 scan
+        data = await ac_get("accounts", {"search": did, "limit": 20})
+        accounts = data.get("accounts", [])
+        matched_acc = None
+        for a in accounts:
+            ad = await ac_get(f"accounts/{a['id']}")
+            acc = ad.get("account", {})
+            cf_map = {f["customFieldId"]: f["fieldValue"] for f in acc.get("accountCustomFieldData", [])}
+            if cf_map.get("18") == did:
+                matched_acc = acc
+                break
+
+        if not matched_acc:
+            not_found.append(did)
+            continue
+
+        # Find OPTIMUS SLP(s) for this account
+        slp_data = await ac_get(f"customObjects/records/{SLP_SCHEMA}",
+                                {"filters[relationships.account]": matched_acc["id"]})
+        for r in slp_data.get("records", []):
+            fmap = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
+            if (fmap.get("platform") or "").strip().upper() == "OPTIMUS":
+                rows.append({
+                    "record_id":   r["id"],
+                    "account_id":  matched_acc["id"],
+                    "dealer_id":   did,
+                    "account_name": matched_acc.get("name", ""),
+                    "current_status": fmap.get("slp-status-detail", ""),
+                    "platform":    fmap.get("platform", ""),
+                })
+
+    return {"preview": rows, "not_found": not_found, "dealer_ids_parsed": dealer_ids}
+
+
+@app.post("/api/admin/optimus-deactivate/confirm")
+async def optimus_deactivate_confirm(body: _DeactivateConfirmIn, admin=Depends(_require_admin)):
+    """
+    Set slp-status-detail = Deactivated on the given SLP record IDs.
+    Fetches each record first to avoid wiping other fields.
+    """
+    SLP_SCHEMA = "d5ccf74f-981f-40ff-8a03-23cd0309808f"
+    results = {"updated": [], "failed": []}
+
+    for rec_id in body.record_ids:
+        try:
+            # Fetch current record
+            rd = await ac_get(f"customObjects/records/{SLP_SCHEMA}/{rec_id}")
+            rec = rd.get("record", {})
+            existing = {f["id"]: f.get("value", "") for f in rec.get("fields", [])}
+            rels = rec.get("relationships", {})
+            acct_ids = [int(x) for x in (rels.get("account") or [])]
+
+            # Merge with updated status
+            existing["slp-status-detail"] = "Deactivated"
+
+            payload = {
+                "record": {
+                    "fields": [{"id": k, "value": v} for k, v in existing.items() if v != ""],
+                    "relationships": {"account": acct_ids},
+                }
+            }
+            status, data = await ac_post(
+                f"customObjects/records/{SLP_SCHEMA}/{rec_id}", payload
+            )
+            if status in (200, 201):
+                results["updated"].append(rec_id)
+            else:
+                results["failed"].append({"id": rec_id, "error": str(data)})
+        except Exception as e:
+            results["failed"].append({"id": rec_id, "error": str(e)})
+
+    return results
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
