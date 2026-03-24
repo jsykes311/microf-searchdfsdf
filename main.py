@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query, Depends, Body
+from pydantic import BaseModel as _BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse, JSONResponse
@@ -1817,6 +1818,86 @@ async def activations_report(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# PRE-BUILT REPORT: NOT ACTIVATED (SLPs without Contractor Activated status)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/report/not-activated")
+async def not_activated_report(
+    platform:  Optional[str] = Query(None),
+    bdr:       Optional[str] = Query(None),
+    format:    str           = Query("json"),
+):
+    """SLP records whose status is NOT 'Contractor Activated', joined to accounts."""
+    from datetime import timezone
+    print("\nNot-activated report...")
+    slp_records = await ac_get_all(
+        f"customObjects/records/{SLP_SCHEMA_ID}", "records", {}
+    )
+
+    account_ids: set = set()
+    candidates  = []
+
+    for r in slp_records:
+        fields   = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
+        status   = str(fields.get("slp-status-detail", "")).strip()
+        if status == "Contractor Activated":
+            continue
+
+        plat      = str(fields.get("platform", "")).strip()
+        plat_norm = _normalize_platform(plat)
+        if platform and plat_norm != _normalize_platform(platform):
+            continue
+
+        rel    = r.get("relationships", {}).get("account", [])
+        acc_id = str(rel[0]) if rel else None
+
+        slp_bdr = str(fields.get("assigned-bdr", "")).strip()
+        eff_bdr = slp_bdr or _account_to_bdr.get(acc_id or "", "")
+        if bdr and eff_bdr != bdr:
+            continue
+
+        if acc_id:
+            account_ids.add(acc_id)
+        candidates.append({"fields": fields, "account_id": acc_id, "eff_bdr": eff_bdr})
+
+    print(f"  {len(candidates)} not-activated candidates")
+
+    # Fetch account names
+    acct_cache: dict = {}
+    for aid in account_ids:
+        try:
+            d = await ac_get(f"accounts/{aid}")
+            acct_cache[aid] = d.get("account", {}).get("name", "")
+        except Exception:
+            acct_cache[aid] = ""
+
+    results = []
+    for c in candidates:
+        aid = c["account_id"]
+        f   = c["fields"]
+        results.append({
+            "account_name":  acct_cache.get(aid, ""),
+            "account_id":    aid or "",
+            "platform":      f.get("platform", ""),
+            "dealer_id":     f.get("dealer-id", ""),
+            "slp_status":    f.get("slp-status-detail", "Not Started"),
+            "assigned_bdr":  c["eff_bdr"],
+        })
+
+    results.sort(key=lambda x: (x.get("slp_status", ""), x.get("account_name", "")))
+
+    if format == "csv":
+        out = io.StringIO()
+        if results:
+            w = csv.DictWriter(out, fieldnames=results[0].keys())
+            w.writeheader(); w.writerows(results)
+        fn = f"not_activated_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
+                                 headers={"Content-Disposition": f"attachment; filename={fn}"})
+    return {"count": len(results), "records": results}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # PRE-BUILT REPORT: LICENSE EXPIRATION
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -2584,9 +2665,9 @@ async def account_detail(account_id: str):
 # ACCOUNT NOTES  (Account Activity custom object)
 # ═══════════════════════════════════════════════════════════════════════════
 
-class _NoteIn(BaseModel := __import__('pydantic').BaseModel):
+class _NoteIn(_BaseModel):
     subject:       str
-    body:          str
+    note_body:     str
     activity_type: str = "Internal Note"   # Internal Note | Call | Email | Text
 
 @app.post("/api/accounts/{account_id}/notes")
@@ -2602,7 +2683,7 @@ async def create_account_note(account_id: str, note: _NoteIn, request: _Request,
             "fields": [
                 {"id": "activity-type",  "value": note.activity_type},
                 {"id": "subject",        "value": note.subject},
-                {"id": "body",           "value": note.body},
+                {"id": "body",           "value": note.note_body},
                 {"id": "activity-date",  "value": now_iso},
                 {"id": "performed-by",   "value": performed_by},
                 {"id": "source",         "value": "Microf Reports"},
@@ -2619,15 +2700,13 @@ async def create_account_note(account_id: str, note: _NoteIn, request: _Request,
 @app.get("/api/accounts/{account_id}/notes")
 async def get_account_notes(account_id: str, user=Depends(require_auth)):
     """Fetch Account Activity records linked to an account."""
-    all_records = await ac_get_all(
-        f"customObjects/records/{ACCT_ACTIVITY_SCHEMA_ID}", "records",
-        {}
+    data = await ac_get(
+        f"customObjects/records/{ACCT_ACTIVITY_SCHEMA_ID}",
+        {"filters[relationships.account]": account_id, "limit": 50},
     )
+    all_records = data.get("records", []) if isinstance(data, dict) else []
     results = []
     for r in all_records:
-        rels = r.get("relationships", {}).get("account", [])
-        if str(account_id) not in [str(x) for x in rels]:
-            continue
         fields = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
         results.append({
             "id":            r.get("id"),

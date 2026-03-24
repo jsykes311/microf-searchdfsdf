@@ -1057,6 +1057,18 @@ select, input { font-family: inherit; }
       <div id="act-lw-result" style="margin-top:12px;"></div>
     </div>
 
+    <!-- Not Activated -->
+    <div class="report-card">
+      <span class="badge-icon">🔴</span>
+      <h3>Not Activated</h3>
+      <p>All SLP records whose status is NOT "Contractor Activated" (Not Started, Inactive, etc.).</p>
+      <div class="btn-row" style="margin-top:auto;">
+        <button class="btn btn-primary" onclick="runPrebuilt('not-activated')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('not-activated')">⬇ CSV</button>
+      </div>
+      <div id="na-result" style="margin-top:12px;"></div>
+    </div>
+
     <!-- Last App Date -->
     <div class="report-card">
       <span class="badge-icon">📋</span>
@@ -2386,6 +2398,9 @@ function prebuiltParams(type) {
     p.set('preset', 'last_month');
     return { endpoint: 'license-expiration', params: p };
   }
+  if (type === 'not-activated') {
+    return { endpoint: 'not-activated', params: p };
+  }
   if (type === 'activations-last-week') {
     const { from, to } = computeDateRange('last_week');
     if (from) p.set('from_date', from);
@@ -2507,7 +2522,7 @@ async function runPrebuilt(type) {
   const resultId = {
     activations: 'act-result', license: 'lic-result', bdr: 'bdr-result',
     'license-this-month': 'lic-tm-result', 'license-last-month': 'lic-lm-result',
-    'activations-last-week': 'act-lw-result',
+    'activations-last-week': 'act-lw-result', 'not-activated': 'na-result',
     'last-app-date': 'lad-result', 'last-rpa-date': 'rpa-result',
     training: 'trn-result', acta: 'acta-result', team: 'team-result',
     'training-activity': 'ta-result', 'stale-untrained': 'su-result',
@@ -3774,7 +3789,7 @@ async function acuiSubmitNote(accountId) {
     const r = await fetch(`/api/accounts/${accountId}/notes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject, body, activity_type: type }),
+      body: JSON.stringify({ subject, note_body: body, activity_type: type }),
     });
     if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
     status.textContent = '✓ Saved';
