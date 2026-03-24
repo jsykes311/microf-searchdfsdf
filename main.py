@@ -1823,6 +1823,8 @@ async def activations_report(
 
 @app.get("/api/report/not-activated")
 async def not_activated_report(
+    from_date:         Optional[str] = Query(None, description="YYYY-MM-DD — filter by SLP created date"),
+    to_date:           Optional[str] = Query(None, description="YYYY-MM-DD"),
     platform:          Optional[str] = Query(None),
     bdr:               Optional[str] = Query(None),
     status:            Optional[str] = Query(None, description="Filter to a specific non-activated status"),
@@ -1834,6 +1836,8 @@ async def not_activated_report(
     from datetime import timezone
     print("\nNot-activated report...")
     exclude_set = {p.strip() for p in exclude_platforms.split(",")} if exclude_platforms else set()
+    from_dt = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc) if from_date else None
+    to_dt   = datetime.strptime(to_date,   "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc) if to_date else None
 
     slp_records = await ac_get_all(
         f"customObjects/records/{SLP_SCHEMA_ID}", "records", {}
@@ -1869,6 +1873,18 @@ async def not_activated_report(
             states_val = str(fields.get("doing-business-in-states", "") or "").upper()
             if state.upper() not in [s.strip() for s in states_val.split(",")]:
                 continue
+
+        if from_dt or to_dt:
+            created_str = str(r.get("createdTimestamp", "") or "").strip()
+            if created_str:
+                try:
+                    created_dt = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                    if from_dt and created_dt < from_dt:
+                        continue
+                    if to_dt and created_dt > to_dt:
+                        continue
+                except Exception:
+                    pass
 
         if acc_id:
             account_ids.add(acc_id)

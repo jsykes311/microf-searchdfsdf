@@ -1062,6 +1062,27 @@ select, input { font-family: inherit; }
       <span class="badge-icon">🔴</span>
       <h3>Not Activated</h3>
       <p>All SLP records whose status is NOT "Contractor Activated" (Not Started, Inactive, etc.).</p>
+      <div class="period-row">
+        <span class="period-label">Period</span>
+        <button class="period-btn" onclick="applyPeriod('yesterday','na-from','na-to',this)">Yesterday</button>
+        <button class="period-btn" onclick="applyPeriod('last_week','na-from','na-to',this)">Last Week</button>
+        <button class="period-btn" onclick="applyPeriod('last_month','na-from','na-to',this)">Last Month</button>
+        <button class="period-btn" onclick="applyPeriod('this_month','na-from','na-to',this)">This Month</button>
+        <button class="period-btn" onclick="applyPeriod('last_quarter','na-from','na-to',this)">Last Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('this_quarter','na-from','na-to',this)">This Qtr</button>
+        <button class="period-btn" onclick="applyPeriod('ytd','na-from','na-to',this)">YTD</button>
+        <button class="period-btn" onclick="applyPeriod('this_year','na-from','na-to',this)">This Year</button>
+        <button class="period-btn" onclick="applyPeriod('last_year','na-from','na-to',this)">Last Year</button>
+        <button class="period-btn" onclick="applyPeriod('all','na-from','na-to',this)">All Time</button>
+      </div>
+      <div class="form-row">
+        <label>From Date</label>
+        <input type="date" id="na-from"/>
+      </div>
+      <div class="form-row">
+        <label>To Date</label>
+        <input type="date" id="na-to"/>
+      </div>
       <div class="form-row">
         <label>Platform (optional)</label>
         <select id="na-platform">
@@ -2452,11 +2473,15 @@ function prebuiltParams(type) {
     return { endpoint: 'license-expiration', params: p };
   }
   if (type === 'not-activated') {
+    const from   = document.getElementById('na-from')?.value     || '';
+    const to     = document.getElementById('na-to')?.value       || '';
     const plat   = document.getElementById('na-platform')?.value || '';
     const status = document.getElementById('na-status')?.value   || '';
     const bdr    = document.getElementById('na-bdr')?.value      || '';
     const state  = document.getElementById('na-state')?.value    || '';
     const excl   = (document.getElementById('na-exclude')?.value || '').trim();
+    if (from)   p.set('from_date', from);
+    if (to)     p.set('to_date', to);
     if (plat)   p.set('platform', plat);
     if (status) p.set('status', status);
     if (bdr)    p.set('bdr', bdr);
