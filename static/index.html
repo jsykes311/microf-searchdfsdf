@@ -1879,6 +1879,7 @@ select, input { font-family: inherit; }
         <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Report</label>
         <select id="sch-report" style="width:100%;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
           <option value="activations">Activations</option>
+          <option value="not-activated">Not Activated</option>
           <option value="license-expiration">License Expiration</option>
           <option value="bdr-summary">BDR Summary</option>
           <option value="training-activity">Training Activity</option>
@@ -1888,6 +1889,9 @@ select, input { font-family: inherit; }
           <option value="partner-activation">Partner Activation</option>
           <option value="oracle-missing">Oracle Missing</option>
           <option value="stale-untrained">Stale Untrained</option>
+          <option value="last-app-date">Last App Date</option>
+          <option value="last-rpa-date">Last RPA Date</option>
+          <option value="account-activity">Account Activity</option>
         </select>
       </div>
       <div>
@@ -1899,9 +1903,14 @@ select, input { font-family: inherit; }
           <option value="this_month">This Month</option>
           <option value="last_month">Last Month</option>
           <option value="last_quarter">Last Quarter</option>
+          <option value="this_quarter">This Quarter</option>
           <option value="ytd">Year to Date</option>
+          <option value="this_year">This Year</option>
+          <option value="last_year">Last Year</option>
           <option value="last_30_days">Last 30 Days</option>
           <option value="last_90_days">Last 90 Days</option>
+          <option value="last_18_months">Last 18 Months</option>
+          <option value="all">All Time</option>
         </select>
       </div>
       <div>
