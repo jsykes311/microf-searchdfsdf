@@ -825,6 +825,73 @@ select, input { font-family: inherit; }
         <div class="ac-title">OPTIMUS Deactivation</div>
         <div class="ac-desc">Paste a GreenSky suspension email to bulk-deactivate OPTIMUS SLPs.</div>
       </button>
+      <button class="admin-card" onclick="showMoveRecords()">
+        <div class="ac-icon">🔀</div>
+        <div class="ac-title">Move Records</div>
+        <div class="ac-desc">Move a Deal, Contact, or SLP to a different account.</div>
+      </button>
+    </div>
+
+    <!-- Move Records Panel -->
+    <div id="move-records-panel" style="display:none;margin-top:32px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+        <div style="font-size:1rem;font-weight:700;color:#111827;">Move Records</div>
+        <button onclick="document.getElementById('move-records-panel').style.display='none'" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:#6b7280;">✕</button>
+      </div>
+      <!-- Tabs -->
+      <div style="display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid #e5e7eb;">
+        <button id="mv-tab-deal" onclick="mvShowTab('deal')" style="padding:6px 16px;font-size:0.82rem;border:none;border-bottom:2px solid #356ae6;background:none;cursor:pointer;font-weight:600;color:#356ae6;font-family:inherit;">Deal</button>
+        <button id="mv-tab-contact" onclick="mvShowTab('contact')" style="padding:6px 16px;font-size:0.82rem;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:#6b7280;font-family:inherit;">Contact</button>
+        <button id="mv-tab-slp" onclick="mvShowTab('slp')" style="padding:6px 16px;font-size:0.82rem;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:#6b7280;font-family:inherit;">SLP</button>
+      </div>
+      <!-- Deal pane -->
+      <div id="mv-pane-deal">
+        <p style="font-size:0.82rem;color:#6b7280;margin:0 0 12px;">Enter the Deal ID and the destination Account ID.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Deal ID</label>
+            <input id="mv-deal-id" type="text" placeholder="e.g. 9076" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          </div>
+          <div>
+            <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">New Account ID</label>
+            <input id="mv-deal-acct" type="text" placeholder="e.g. 15912" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          </div>
+        </div>
+        <button onclick="mvMove('deal')" style="padding:7px 18px;background:#356ae6;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem;font-family:inherit;">Move Deal</button>
+        <span id="mv-deal-status" style="margin-left:10px;font-size:0.8rem;color:#6b7280;"></span>
+      </div>
+      <!-- Contact pane -->
+      <div id="mv-pane-contact" style="display:none;">
+        <p style="font-size:0.82rem;color:#6b7280;margin:0 0 12px;">Enter the Contact ID and the destination Account ID. The contact's existing account association will be removed and replaced.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Contact ID</label>
+            <input id="mv-contact-id" type="text" placeholder="e.g. 96872" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          </div>
+          <div>
+            <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">New Account ID</label>
+            <input id="mv-contact-acct" type="text" placeholder="e.g. 15912" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          </div>
+        </div>
+        <button onclick="mvMove('contact')" style="padding:7px 18px;background:#356ae6;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem;font-family:inherit;">Move Contact</button>
+        <span id="mv-contact-status" style="margin-left:10px;font-size:0.8rem;color:#6b7280;"></span>
+      </div>
+      <!-- SLP pane -->
+      <div id="mv-pane-slp" style="display:none;">
+        <p style="font-size:0.82rem;color:#6b7280;margin:0 0 12px;">Enter the SLP Record ID and the destination Account ID. All field data is preserved; only the account relationship changes.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">SLP Record ID</label>
+            <input id="mv-slp-id" type="text" placeholder="e.g. 82f88a6e-952b-..." style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          </div>
+          <div>
+            <label style="font-size:0.78rem;font-weight:600;color:#374151;display:block;margin-bottom:4px;">New Account ID</label>
+            <input id="mv-slp-acct" type="text" placeholder="e.g. 15912" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:0.82rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;">
+          </div>
+        </div>
+        <button onclick="mvMove('slp')" style="padding:7px 18px;background:#356ae6;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.82rem;font-family:inherit;">Move SLP</button>
+        <span id="mv-slp-status" style="margin-left:10px;font-size:0.8rem;color:#6b7280;"></span>
+      </div>
     </div>
 
     <!-- OPTIMUS Deactivation Panel -->
@@ -3940,6 +4007,51 @@ function abCoTab(key, btn) {
 }
 
 init();
+
+// ── Move Records ───────────────────────────────────────────────────────────
+function showMoveRecords() {
+  const panel = document.getElementById('move-records-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block') mvShowTab('deal');
+}
+function mvShowTab(tab) {
+  ['deal','contact','slp'].forEach(t => {
+    document.getElementById('mv-pane-' + t).style.display = t === tab ? 'block' : 'none';
+    const btn = document.getElementById('mv-tab-' + t);
+    btn.style.borderBottomColor = t === tab ? '#356ae6' : 'transparent';
+    btn.style.color = t === tab ? '#356ae6' : '#6b7280';
+    btn.style.fontWeight = t === tab ? '600' : '400';
+  });
+}
+async function mvMove(type) {
+  const idEl    = document.getElementById(`mv-${type}-id`);
+  const acctEl  = document.getElementById(`mv-${type}-acct`);
+  const statusEl = document.getElementById(`mv-${type}-status`);
+  const rid  = (idEl.value || '').trim();
+  const acct = (acctEl.value || '').trim();
+  if (!rid || !acct) { statusEl.textContent = '⚠ Fill in both fields'; return; }
+  statusEl.textContent = 'Moving…';
+  try {
+    const endpoint = type === 'deal' ? 'move-deal' : type === 'contact' ? 'move-contact' : 'move-slp';
+    const res = await fetch(`/api/admin/${endpoint}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({record_id: rid, new_account_id: acct})
+    });
+    const d = await res.json();
+    if (d.ok) {
+      statusEl.style.color = '#16a34a';
+      statusEl.textContent = `✓ Moved successfully`;
+      idEl.value = ''; acctEl.value = '';
+    } else {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = `✕ ${d.error || 'Unknown error'}`;
+    }
+  } catch(e) {
+    statusEl.style.color = '#ef4444';
+    statusEl.textContent = `✕ ${e.message}`;
+  }
+}
 
 // ── OPTIMUS Bulk Deactivation ──────────────────────────────────────────────
 function showOptimusDeactivator() {

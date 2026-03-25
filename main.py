@@ -609,6 +609,11 @@ async def ac_put(path: str, body: dict):
             raise Exception(f"HTTP {r.status_code} {r.text[:300]}")
         return r.json()
 
+async def ac_delete(path: str) -> int:
+    async with httpx.AsyncClient(timeout=60) as client:
+        r = await client.delete(ac_url(path), headers=HEADERS)
+        return r.status_code
+
 async def ac_get_all(path: str, key: str, params: dict = None) -> list:
     """Paginate through all records, deduplicating by id.
 
@@ -5674,6 +5679,64 @@ async def optimus_deactivate_confirm(
             results["failed"].append({"id": rec_id, "error": str(e)})
 
     return results
+
+
+# ── Move Records (Deal / Contact / SLP) ───────────────────────────────────────
+
+class _MoveIn(BaseModel):
+    record_id: str
+    new_account_id: str
+
+@app.post("/api/admin/move-deal")
+async def move_deal(body: _MoveIn, admin=Depends(_require_admin)):
+    """Reassign a deal to a different account."""
+    try:
+        data = await ac_put(f"deals/{body.record_id}", {"deal": {"account": body.new_account_id}})
+        return {"ok": True, "deal_id": body.record_id, "new_account_id": body.new_account_id, "deal": data.get("deal", {})}
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(e)})
+
+@app.post("/api/admin/move-contact")
+async def move_contact(body: _MoveIn, admin=Depends(_require_admin)):
+    """Move a contact's account association to a different account."""
+    try:
+        ac_data = await ac_get("accountContacts", {"contact": body.record_id, "limit": 50})
+        associations = ac_data.get("accountContacts", [])
+
+        deleted = []
+        for assoc in associations:
+            if str(assoc.get("account", "")) != str(body.new_account_id):
+                ds = await ac_delete(f"accountContacts/{assoc['id']}")
+                if ds in (200, 204):
+                    deleted.append(assoc["id"])
+
+        data = await ac_post("accountContacts", {
+            "accountContact": {"contact": body.record_id, "account": body.new_account_id}
+        })
+        return {"ok": True, "contact_id": body.record_id, "new_account_id": body.new_account_id, "removed_associations": deleted}
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(e)})
+
+@app.post("/api/admin/move-slp")
+async def move_slp(body: _MoveIn, admin=Depends(_require_admin)):
+    """Move an SLP record to a different account by updating its relationship."""
+    SLP_SCHEMA = "d5ccf74f-981f-40ff-8a03-23cd0309808f"
+    try:
+        rec_data = await ac_get(f"customObjects/records/{SLP_SCHEMA}/{body.record_id}")
+        record = rec_data.get("record", {})
+        if not record:
+            return JSONResponse(status_code=404, content={"ok": False, "error": "SLP record not found"})
+        fields = record.get("fields", [])
+        payload = {
+            "record": {
+                "fields": fields,
+                "relationships": {"account": [int(body.new_account_id)]}
+            }
+        }
+        data = await ac_post(f"customObjects/records/{SLP_SCHEMA}/{body.record_id}", payload)
+        return {"ok": True, "slp_id": body.record_id, "new_account_id": body.new_account_id}
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(e)})
 
 
 if __name__ == "__main__":
