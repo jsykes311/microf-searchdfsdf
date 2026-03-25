@@ -5683,7 +5683,7 @@ async def optimus_deactivate_confirm(
 
 # ── Move Records (Deal / Contact / SLP) ───────────────────────────────────────
 
-class _MoveIn(BaseModel):
+class _MoveIn(_BaseModel):
     record_id: str
     new_account_id: str
 
