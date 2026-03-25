@@ -698,8 +698,6 @@ select, input { font-family: inherit; }
     <button data-tab="prebuilt" onclick="showTab('prebuilt', this)"><i class="nav-icon">📋</i> Pre-Built Reports</button>
     <div class="nav-divider"></div>
     <div class="nav-section-label">Tools</div>
-    <button data-tab="profile" onclick="showTab('profile', this)"><i class="nav-icon">🔎</i> Dealer Profile</button>
-    <button data-tab="analytics" onclick="showTab('analytics', this)"><i class="nav-icon">📊</i> Analytics</button>
     <button data-tab="smartquery" onclick="showTab('smartquery', this)"><i class="nav-icon">💡</i> Smart Search</button>
     <div class="nav-divider" id="scheduler-nav-divider" style="display:none;"></div>
     <button id="scheduler-nav-btn" data-tab="scheduler" onclick="showTab('scheduler', this)" style="display:none;"><i class="nav-icon">🕐</i> Scheduler</button>
@@ -802,16 +800,7 @@ select, input { font-family: inherit; }
         <div class="ac-title">Report Builder</div>
         <div class="ac-desc">Build custom reports by filtering any AC object and field.</div>
       </button>
-      <button class="admin-card" onclick="showTab('profile', null)">
-        <div class="ac-icon">🔎</div>
-        <div class="ac-title">Dealer Profile</div>
-        <div class="ac-desc">Look up a dealer by ID to see full account and SLP details.</div>
-      </button>
-      <button class="admin-card" onclick="showTab('analytics', null)">
-        <div class="ac-icon">📊</div>
-        <div class="ac-title">Analytics</div>
-        <div class="ac-desc">Activation trends, BDR performance, and program breakdowns.</div>
-      </button>
+
       <button class="admin-card" onclick="showTab('smartquery', null)">
         <div class="ac-icon">💡</div>
         <div class="ac-title">Smart Search</div>
@@ -1762,160 +1751,6 @@ select, input { font-family: inherit; }
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
-<!-- DEALER PROFILE TAB                                         -->
-<!-- ══════════════════════════════════════════════════════════ -->
-<div id="tab-profile" class="tab-panel">
-  <div class="card">
-    <div class="card-title">Search Dealer</div>
-    <div class="profile-search">
-      <input type="text" id="profile-input" placeholder="Dealer ID or Account ID…" onkeydown="if(event.key==='Enter') lookupProfile()"/>
-      <select id="profile-search-type">
-        <option value="dealer_id">Dealer ID</option>
-        <option value="account_id">Account ID</option>
-      </select>
-      <button class="btn btn-primary" onclick="lookupProfile()">🔍 Look Up</button>
-    </div>
-  </div>
-
-  <div id="profile-result" style="display:none;">
-    <div class="card">
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-        <div style="font-size:2rem;">🏢</div>
-        <div>
-          <div style="font-size:1.2rem; font-weight:700; color:#111827;" id="profile-name"></div>
-          <div style="font-size:0.82rem; color:#6b7280;" id="profile-id-display"></div>
-        </div>
-      </div>
-      <div class="summary-pills" id="profile-pills"></div>
-      <div class="profile-grid">
-        <div class="profile-section">
-          <h4>Account Fields</h4>
-          <ul class="kv-list" id="profile-account-fields"></ul>
-        </div>
-        <div>
-          <div class="profile-section" style="margin-bottom:18px;">
-            <h4>Contacts (<span id="profile-contact-count">0</span>)</h4>
-            <ul class="kv-list" id="profile-contacts"></ul>
-          </div>
-          <div class="profile-section">
-            <h4>Deals (<span id="profile-deal-count">0</span>)</h4>
-            <ul class="kv-list" id="profile-deals"></ul>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="two-col">
-      <div class="card">
-        <div class="card-title">SLP Records (<span id="profile-slp-count">0</span>)</div>
-        <div class="table-wrap">
-          <table>
-            <thead id="profile-slp-head"></thead>
-            <tbody id="profile-slp-body"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title">Training Records (<span id="profile-trn-count">0</span>)</div>
-        <div class="table-wrap">
-          <table>
-            <thead id="profile-trn-head"></thead>
-            <tbody id="profile-trn-body"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- ANALYTICS TAB                                              -->
-<!-- ══════════════════════════════════════════════════════════ -->
-<div id="tab-analytics" class="tab-panel">
-  <div class="card" style="max-width:700px;">
-    <div class="card-title">Group-By Analytics</div>
-    <div class="two-col">
-      <div class="form-row">
-        <label>Object</label>
-        <select id="an-object" onchange="loadAnalyticsFields()">
-          <option value="slp">Strategic Lending Partners</option>
-          <option value="accounts">Accounts</option>
-          <option value="contacts">Contacts</option>
-          <option value="deals">Deals</option>
-          <option value="trainings">Trainings</option>
-          <option value="license_details">License Details</option>
-          <option value="notes">Notes</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label>Group By Field</label>
-        <select id="an-groupby"><option>— select object first —</option></select>
-      </div>
-    </div>
-    <div class="form-row">
-      <label>Count Distinct Values of (optional)</label>
-      <select id="an-countfield"><option value="">— none —</option></select>
-    </div>
-
-    <!-- Date Filter -->
-    <div style="border-top:1px solid #f3f4f6; padding-top:12px; margin-top:4px;">
-      <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#9ca3af; margin-bottom:8px;">Date Filter (optional)</div>
-      <div class="period-row" id="an-period-row">
-        <span class="period-label">Period</span>
-        <button class="period-btn" onclick="applyPeriod('last_month','an-from','an-to',this)">Last Month</button>
-        <button class="period-btn" onclick="applyPeriod('this_month','an-from','an-to',this)">This Month</button>
-        <button class="period-btn" onclick="applyPeriod('last_quarter','an-from','an-to',this)">Last Qtr</button>
-        <button class="period-btn" onclick="applyPeriod('this_quarter','an-from','an-to',this)">This Qtr</button>
-        <button class="period-btn" onclick="applyPeriod('ytd','an-from','an-to',this)">YTD</button>
-        <button class="period-btn" onclick="applyPeriod('this_year','an-from','an-to',this)">This Year</button>
-        <button class="period-btn" onclick="applyPeriod('last_year','an-from','an-to',this)">Last Year</button>
-        <button class="period-btn" onclick="applyPeriod('all','an-from','an-to',this)">All Time</button>
-      </div>
-      <div class="two-col" style="gap:8px;">
-        <div class="form-row" style="margin-bottom:0;">
-          <label>Date Field to Filter</label>
-          <select id="an-date-field">
-            <option value="">— no date filter —</option>
-          </select>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <div class="form-row" style="margin-bottom:0; flex:1;">
-            <label>From</label>
-            <input type="date" id="an-from"/>
-          </div>
-          <div class="form-row" style="margin-bottom:0; flex:1;">
-            <label>To</label>
-            <input type="date" id="an-to"/>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-top:14px;">
-      <button class="btn btn-primary" onclick="runAnalytics()">▶ Run</button>
-    </div>
-  </div>
-
-  <div class="two-col" id="analytics-result" style="display:none; margin-top:18px;">
-    <div class="card">
-      <div class="card-title" id="an-chart-title">Chart</div>
-      <div class="bar-chart" id="an-chart"></div>
-    </div>
-    <div class="card">
-      <div class="results-bar">
-        <span class="results-count"><strong id="an-count">0</strong> groups · <strong id="an-total">0</strong> records</span>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead id="an-table-head"></thead>
-          <tbody id="an-table-body"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════ -->
 <!-- SMART QUERY TAB                                            -->
 <!-- ══════════════════════════════════════════════════════════ -->
 <div id="tab-smartquery" class="tab-panel">
@@ -2119,8 +1954,7 @@ const state = {
 // ── Tab Nav ────────────────────────────────────────────────────
 const _TAB_NAMES = {
   accounts: 'Accounts', admin: 'Apps', builder: 'Report Builder', prebuilt: 'Pre-Built Reports',
-  profile: 'Dealer Profile', analytics: 'Analytics', smartquery: 'Smart Search',
-  scheduler: 'Scheduler', globalsearch: 'Global Search',
+  smartquery: 'Smart Search', scheduler: 'Scheduler', globalsearch: 'Global Search',
 };
 const _VALID_TABS = new Set(Object.keys(_TAB_NAMES));
 
@@ -2154,7 +1988,7 @@ function showTab(id, btn, pushHistory = true) {
   const bc = document.getElementById('ms-page-name');
   if (bc) bc.textContent = _TAB_NAMES[id] || id;
   // Accounts fills app-main; builder/prebuilt use scrollable tools container; others are standalone
-  const _TOOLS_TABS = new Set(['builder','prebuilt','profile','analytics','smartquery','globalsearch']);
+  const _TOOLS_TABS = new Set(['builder','prebuilt','smartquery','globalsearch']);
   const tools = document.getElementById('tools-container');
   if (id === 'accounts') {
     tools.classList.remove('active');
@@ -2191,7 +2025,6 @@ async function init() {
       grid.appendChild(btn);
     });
   });
-  loadAnalyticsFields();
 }
 
 // ── Object Selection ───────────────────────────────────────────
