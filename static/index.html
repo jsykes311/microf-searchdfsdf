@@ -2055,7 +2055,7 @@ function showTab(id, btn, pushHistory = true) {
   const bc = document.getElementById('ms-page-name');
   if (bc) bc.textContent = _TAB_NAMES[id] || id;
   // Accounts fills app-main; builder/prebuilt use scrollable tools container; others are standalone
-  const _TOOLS_TABS = new Set(['builder','prebuilt','globalsearch']);
+  const _TOOLS_TABS = new Set(['builder','prebuilt','profile','analytics','smartquery','globalsearch']);
   const tools = document.getElementById('tools-container');
   if (id === 'accounts') {
     tools.classList.remove('active');
