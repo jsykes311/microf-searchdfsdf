@@ -2775,6 +2775,63 @@ async def get_account_notes(account_id: str, user=Depends(require_auth)):
     return {"notes": results}
 
 
+# ── Training Records ────────────────────────────────────────────────────────
+
+TRAINING_SCHEMA_ID = "9368fee4-ccef-407b-a0d3-4b72c346b2af"
+
+class _TrainingIn(_BaseModel):
+    training_type:   str = ""
+    trained_by:      str = ""
+    date_of_training: str = ""
+    training_agenda: str = ""
+    dealer_id:       str = ""
+    training_notes:  str = ""
+    name:            str = ""
+
+@app.post("/api/accounts/{account_id}/training")
+async def create_training_record(account_id: str, rec: _TrainingIn,
+                                  user=Depends(require_auth)):
+    payload = {
+        "record": {
+            "fields": [
+                {"id": "name",              "value": rec.name},
+                {"id": "training-type",     "value": rec.training_type},
+                {"id": "trained-by",        "value": rec.trained_by},
+                {"id": "date-of-training",  "value": rec.date_of_training},
+                {"id": "training-agenda",   "value": rec.training_agenda},
+                {"id": "dealer-id",         "value": rec.dealer_id},
+                {"id": "training-notes",    "value": rec.training_notes},
+            ],
+            "relationships": {"account": [int(account_id)]},
+        }
+    }
+    data = await ac_post(f"customObjects/records/{TRAINING_SCHEMA_ID}", payload)
+    return {"ok": True, "record": data.get("record", {})}
+
+
+@app.get("/api/accounts/{account_id}/training")
+async def get_training_records(account_id: str, user=Depends(require_auth)):
+    data = await ac_get(
+        f"customObjects/records/{TRAINING_SCHEMA_ID}",
+        {"filters[relationships.account]": account_id, "limit": 50},
+    )
+    results = []
+    for r in (data.get("records", []) if isinstance(data, dict) else []):
+        fields = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
+        results.append({
+            "id":               r.get("id"),
+            "name":             fields.get("name", ""),
+            "training_type":    fields.get("training-type", ""),
+            "trained_by":       fields.get("trained-by", ""),
+            "date_of_training": fields.get("date-of-training", ""),
+            "training_agenda":  fields.get("training-agenda", ""),
+            "dealer_id":        fields.get("dealer-id", ""),
+            "training_notes":   fields.get("training-notes", ""),
+        })
+    results.sort(key=lambda x: x.get("date_of_training", ""), reverse=True)
+    return {"training": results}
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # GLOBAL SEARCH
 # ═══════════════════════════════════════════════════════════════════════════

@@ -3970,14 +3970,57 @@ function abRenderDetail(d) {
       </div>
     </div>`;
 
-  const sidebar = `<div class="acui-sidebar">${dealerProgramsPanel}${contactsPanel}${altContactsPanel}${notesPanel}</div>`;
+  const dealerId = cf['18'] || '';
+  const acctName = a.name || '';
+  const trainingPanel = `
+    <div class="acui-panel" id="acui-training-panel">
+      <div class="acui-panel-header"><h4>Training Records</h4></div>
+      <div class="acui-panel-body" id="acui-training-list">
+        <div style="color:#94a3b8;font-size:0.78rem;">Loading…</div>
+      </div>
+      <div style="padding:10px 12px;border-top:1px solid var(--ms-g30);">
+        <select id="acui-tr-type" style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid var(--ms-g40);border-radius:4px;font-family:inherit;margin-bottom:6px;">
+          <option value="Webinar">Webinar</option>
+          <option value="Video Link">Video Link</option>
+          <option value="In Person">In Person</option>
+        </select>
+        <select id="acui-tr-agenda" style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid var(--ms-g40);border-radius:4px;font-family:inherit;margin-bottom:6px;">
+          <option value="Enrollment Training">Enrollment Training</option>
+          <option value="Refresh Training">Refresh Training</option>
+        </select>
+        <select id="acui-tr-trainer" style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid var(--ms-g40);border-radius:4px;font-family:inherit;margin-bottom:6px;">
+          <option value="">— Trained By —</option>
+          <option>Barb Yeskey</option>
+          <option>Blake Sanders</option>
+          <option>Amanda Jones</option>
+          <option>Chip Harden</option>
+          <option>Jeanine Tiplady</option>
+          <option>Warren Neely</option>
+          <option>Roman Olbrys</option>
+        </select>
+        <input id="acui-tr-date" type="date" style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid var(--ms-g40);border-radius:4px;font-family:inherit;margin-bottom:6px;"
+          value="${new Date().toISOString().slice(0,10)}">
+        <textarea id="acui-tr-notes" rows="2" placeholder="Training notes (optional)…"
+          style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid var(--ms-g40);border-radius:4px;font-family:inherit;resize:vertical;margin-bottom:6px;"></textarea>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button onclick="acuiSubmitTraining('${a.id}','${esc(acctName)}','${esc(dealerId)}')"
+            style="padding:5px 14px;font-size:0.78rem;font-weight:600;background:var(--ms-blue);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit;">
+            Submit
+          </button>
+          <span id="acui-tr-status" style="font-size:0.76rem;color:#6b7280;"></span>
+        </div>
+      </div>
+    </div>`;
+
+  const sidebar = `<div class="acui-sidebar">${dealerProgramsPanel}${contactsPanel}${altContactsPanel}${notesPanel}${trainingPanel}</div>`;
   const body    = `<div class="acui-body">${aboutCard}${sidebar}</div>`;
 
   document.getElementById('ab-detail').innerHTML =
     `<button class="ab-back-btn" onclick="abBack()">← Back to Accounts</button>` + header + body;
 
-  // Load notes async after render
+  // Load notes + training async after render
   acuiLoadNotes(a.id);
+  acuiLoadTraining(a.id);
 }
 
 // ── Account Notes ──────────────────────────────────────────────
@@ -4031,6 +4074,61 @@ async function acuiSubmitNote(accountId) {
   } catch(e) {
     status.textContent = '✕ ' + e.message;
     status.style.color = '#ef4444';
+  }
+}
+
+// ── Training Records ───────────────────────────────────────────
+async function acuiLoadTraining(accountId) {
+  const list = document.getElementById('acui-training-list');
+  if (!list) return;
+  try {
+    const r = await fetch(`/api/accounts/${accountId}/training`);
+    const d = await r.json();
+    const recs = d.training || [];
+    if (!recs.length) {
+      list.innerHTML = '<div style="color:#94a3b8;font-size:0.78rem;">No training records yet.</div>';
+      return;
+    }
+    list.innerHTML = recs.map(t => `
+      <div style="padding:8px 0;border-bottom:1px solid var(--ms-g30);font-size:0.78rem;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+          <span style="font-weight:600;color:var(--ms-g130);">${esc(t.training_agenda||t.training_type||'Training')}</span>
+          <span style="font-size:0.7rem;color:var(--ms-g90);white-space:nowrap;margin-left:8px;">${esc((t.date_of_training||'').slice(0,10))}</span>
+        </div>
+        <div style="color:var(--ms-g90);margin-bottom:2px;">${esc(t.training_type||'')}${t.trained_by ? ' · ' + esc(t.trained_by) : ''}</div>
+        ${t.training_notes ? `<div style="color:var(--ms-g50);font-size:0.7rem;">${esc(t.training_notes)}</div>` : ''}
+      </div>`).join('');
+  } catch(e) {
+    if (list) list.innerHTML = `<div style="color:#ef4444;font-size:0.78rem;">✕ ${esc(e.message)}</div>`;
+  }
+}
+
+async function acuiSubmitTraining(accountId, acctName, dealerId) {
+  const status = document.getElementById('acui-tr-status');
+  const payload = {
+    name:             acctName,
+    training_type:    document.getElementById('acui-tr-type').value,
+    training_agenda:  document.getElementById('acui-tr-agenda').value,
+    trained_by:       document.getElementById('acui-tr-trainer').value,
+    date_of_training: document.getElementById('acui-tr-date').value,
+    training_notes:   document.getElementById('acui-tr-notes').value.trim(),
+    dealer_id:        dealerId,
+  };
+  if (!payload.trained_by) { status.textContent = 'Select a trainer.'; status.style.color='#ef4444'; return; }
+  status.textContent = 'Saving…'; status.style.color = '#6b7280';
+  try {
+    const r = await fetch(`/api/accounts/${accountId}/training`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || r.status); }
+    status.textContent = '✓ Saved'; status.style.color = '#059669';
+    document.getElementById('acui-tr-notes').value = '';
+    setTimeout(() => { status.textContent = ''; }, 2500);
+    await acuiLoadTraining(accountId);
+  } catch(e) {
+    status.textContent = '✕ ' + e.message; status.style.color = '#ef4444';
   }
 }
 
