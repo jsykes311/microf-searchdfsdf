@@ -2071,7 +2071,10 @@ select, input { font-family: inherit; }
     <span id="sch-create-status" style="margin-left:10px;font-size:0.8rem;color:#6b7280;"></span>
 
     <div style="margin-top:24px;">
-      <div style="font-size:0.78rem;font-weight:600;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">Active Schedules</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:0.78rem;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.04em;">Active Schedules</div>
+        <button onclick="schCopyEnvVar()" title="Copy schedule config to clipboard for SCHEDULES_JSON env var on Render" style="padding:4px 10px;font-size:0.75rem;background:#f3f4f6;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;color:#374151;font-family:inherit;">📋 Copy to Env Var</button>
+      </div>
       <div id="sch-list"><span style="font-size:0.82rem;color:#9ca3af;">Loading…</span></div>
     </div>
   </div>
@@ -2906,6 +2909,17 @@ function schUpdateFreqFields() {
   const freq = document.getElementById('sch-freq').value;
   document.getElementById('sch-dow-wrap').style.display  = freq === 'weekly'  ? '' : 'none';
   document.getElementById('sch-dom-wrap').style.display  = freq === 'monthly' ? '' : 'none';
+}
+
+async function schCopyEnvVar() {
+  try {
+    const res = await fetch('/api/admin/schedules/export-json');
+    const d = await res.json();
+    await navigator.clipboard.writeText(d.json);
+    alert(`✓ Copied ${d.count} schedule(s) to clipboard.\n\nPaste this as the SCHEDULES_JSON environment variable in your Render service settings to persist schedules across deploys.`);
+  } catch(e) {
+    alert('Failed to copy: ' + e.message);
+  }
 }
 
 async function schLoad() {

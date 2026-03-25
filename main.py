@@ -94,23 +94,40 @@ _schedules: dict = {}   # job_id → schedule dict
 
 
 def _load_schedules_from_disk():
-    if not os.path.exists(_SCHEDULES_FILE):
-        return
-    try:
-        with open(_SCHEDULES_FILE) as f:
-            saved = json.load(f)
+    """Load schedules from file, falling back to SCHEDULES_JSON env var (for Render deploys)."""
+    saved = None
+    if os.path.exists(_SCHEDULES_FILE):
+        try:
+            with open(_SCHEDULES_FILE) as f:
+                saved = json.load(f)
+            print(f"[scheduler] Loaded {len(saved)} schedule(s) from disk")
+        except Exception as e:
+            print(f"[scheduler] Failed to load from disk: {e}")
+    if saved is None:
+        env_json = os.getenv("SCHEDULES_JSON", "").strip()
+        if env_json:
+            try:
+                saved = json.loads(env_json)
+                print(f"[scheduler] Loaded {len(saved)} schedule(s) from SCHEDULES_JSON env var")
+                # Write to disk so future in-process saves work normally
+                _save_schedules_to_disk_raw(saved)
+            except Exception as e:
+                print(f"[scheduler] Failed to parse SCHEDULES_JSON env var: {e}")
+    if saved:
         for s in saved:
             _register_schedule(s, persist=False)
-    except Exception as e:
-        print(f"[scheduler] Failed to load schedules: {e}")
 
 
-def _save_schedules_to_disk():
+def _save_schedules_to_disk_raw(data: list):
+    """Write a schedule list to disk (used by both save paths)."""
     try:
         with open(_SCHEDULES_FILE, "w") as f:
-            json.dump(list(_schedules.values()), f, indent=2)
+            json.dump(data, f, indent=2)
     except Exception as e:
-        print(f"[scheduler] Failed to save schedules: {e}")
+        print(f"[scheduler] Failed to write schedules to disk: {e}")
+
+def _save_schedules_to_disk():
+    _save_schedules_to_disk_raw(list(_schedules.values()))
 
 
 def _register_schedule(s: dict, persist: bool = True):
@@ -3228,6 +3245,13 @@ async def delete_schedule(job_id: str, admin=Depends(_require_admin)):
     del _schedules[job_id]
     _save_schedules_to_disk()
     return {"ok": True}
+
+
+@app.get("/api/admin/schedules/export-json")
+async def export_schedules_json(admin=Depends(_require_admin)):
+    """Return current schedules as a JSON string suitable for pasting into SCHEDULES_JSON env var."""
+    data = list(_schedules.values())
+    return {"json": json.dumps(data), "count": len(data)}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
