@@ -3970,7 +3970,7 @@ function abRenderDetail(d) {
       </div>
     </div>`;
 
-  const dealerId = cf['18'] || '';
+  const dealerId = (cfs['18'] || cfs['dealer_id'] || '').toString();
   const acctName = a.name || '';
   const trainingPanel = `
     <div class="acui-panel" id="acui-training-panel">
