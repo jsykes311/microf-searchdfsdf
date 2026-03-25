@@ -5486,8 +5486,9 @@ async def optimus_deactivate_preview(body: dict = Body(...), admin=Depends(_requ
     # Determine which dealer IDs are missing from the CF18 index
     missing_dids = {did for did in dealer_ids if did not in _dealer_id_index}
 
-    # For missing IDs: scan all SLP records once and build a dealer-id → account_id map
-    slp_did_to_acct: dict = {}
+    # For missing IDs: scan all SLP records once; store account_id AND the matching SLP record
+    slp_did_to_acct: dict = {}   # did → account_id
+    slp_did_to_rec:  dict = {}   # did → SLP record (so we don't need to re-filter by platform)
     if missing_dids:
         offset = 0
         while True:
@@ -5505,6 +5506,7 @@ async def optimus_deactivate_preview(body: dict = Body(...), admin=Depends(_requ
                     if accts:
                         aid = str(accts[0]) if isinstance(accts[0], int) else str(accts[0].get("id", ""))
                         slp_did_to_acct[slp_did] = aid
+                        slp_did_to_rec[slp_did]  = (r, fmap)
             total = int(page.get("meta", {}).get("total", 0))
             offset += len(records)
             if offset >= total or len(slp_did_to_acct) >= len(missing_dids):
@@ -5527,33 +5529,48 @@ async def optimus_deactivate_preview(body: dict = Body(...), admin=Depends(_requ
         acct_name = entry.get("name", "") if entry else ""
 
         # Phase 2: fall back to SLP dealer-id scan
+        via_slp_scan = False
         if not acct_id and did in slp_did_to_acct:
-            acct_id   = slp_did_to_acct[did]
-            acct_name = acct_names.get(acct_id, "")
+            acct_id      = slp_did_to_acct[did]
+            acct_name    = acct_names.get(acct_id, "")
+            via_slp_scan = True
 
         if not acct_id:
             not_found.append(did)
             continue
 
-        # Fetch OPTIMUS SLPs for this account
-        slp_data = await ac_get(f"customObjects/records/{SLP_SCHEMA}",
-                                {"filters[relationships.account]": acct_id, "limit": 50})
-        found_any = False
-        for r in slp_data.get("records", []):
-            fmap = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
-            if "optimus" not in (fmap.get("platform") or "").lower():
-                continue
-            found_any = True
+        if via_slp_scan:
+            # Use the SLP record we already found — skip platform filter since
+            # platform may be unset on these records
+            r, fmap = slp_did_to_rec[did]
             rows.append({
                 "record_id":      r["id"],
                 "account_id":     acct_id,
                 "dealer_id":      did,
                 "account_name":   acct_name,
                 "current_status": fmap.get("slp-status-detail", ""),
-                "platform":       fmap.get("platform", ""),
+                "platform":       fmap.get("platform", "Optimus"),
             })
-        if not found_any:
-            not_found.append(did)
+        else:
+            # Fetch OPTIMUS SLPs for this account (CF18-indexed path)
+            slp_data = await ac_get(f"customObjects/records/{SLP_SCHEMA}",
+                                    {"filters[relationships.account]": acct_id, "limit": 50})
+            found_any = False
+            for r in slp_data.get("records", []):
+                fmap = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
+                if "optimus" not in (fmap.get("platform") or "").lower():
+                    continue
+                found_any = True
+                rows.append({
+                    "record_id":      r["id"],
+                    "account_id":     acct_id,
+                    "dealer_id":      did,
+                    "account_name":   acct_name,
+                    "current_status": fmap.get("slp-status-detail", ""),
+                    "platform":       fmap.get("platform", ""),
+                })
+            if not found_any:
+                not_found.append(did)
 
     return {"preview": rows, "not_found": not_found, "dealer_ids_parsed": dealer_ids}
 
