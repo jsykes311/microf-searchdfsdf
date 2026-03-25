@@ -5483,28 +5483,53 @@ async def optimus_deactivate_preview(body: dict = Body(...), admin=Depends(_requ
     rows = []
     not_found = []
 
+    # Determine which dealer IDs are missing from the CF18 index
+    missing_dids = {did for did in dealer_ids if did not in _dealer_id_index}
+
+    # For missing IDs: scan all SLP records once and build a dealer-id → account_id map
+    slp_did_to_acct: dict = {}
+    if missing_dids:
+        offset = 0
+        while True:
+            page = await ac_get(f"customObjects/records/{SLP_SCHEMA}",
+                                {"limit": 100, "offset": offset})
+            records = page.get("records", [])
+            if not records:
+                break
+            for r in records:
+                fmap = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
+                slp_did = str(fmap.get("dealer-id") or "").strip()
+                if slp_did in missing_dids and slp_did not in slp_did_to_acct:
+                    rels  = r.get("relationships", {})
+                    accts = rels.get("account", [])
+                    if accts:
+                        aid = str(accts[0]) if isinstance(accts[0], int) else str(accts[0].get("id", ""))
+                        slp_did_to_acct[slp_did] = aid
+            total = int(page.get("meta", {}).get("total", 0))
+            offset += len(records)
+            if offset >= total or len(slp_did_to_acct) >= len(missing_dids):
+                break
+
+        # Fetch names for newly found accounts
+        new_acct_ids = list(set(slp_did_to_acct.values()))
+        acct_names: dict = {}
+        for aid in new_acct_ids:
+            try:
+                ad = await ac_get(f"accounts/{aid}")
+                acct_names[aid] = ad.get("account", {}).get("name", "")
+            except Exception:
+                acct_names[aid] = ""
+
     for did in dealer_ids:
         # Phase 1: try CF18 index
         entry     = _dealer_id_index.get(did)
-        acct_id   = str(entry["id"])   if entry else None
+        acct_id   = str(entry["id"])    if entry else None
         acct_name = entry.get("name", "") if entry else ""
 
-        # Phase 2: if not in index, search SLP records by dealer-id field directly
-        if not acct_id:
-            slp_fallback = await ac_get(f"customObjects/records/{SLP_SCHEMA}",
-                                        {"filters[dealer-id]": did, "limit": 10})
-            for r in slp_fallback.get("records", []):
-                rels = r.get("relationships", {})
-                accts = rels.get("account", [])
-                if accts:
-                    acct_id = str(accts[0]) if isinstance(accts[0], int) else str(accts[0].get("id", ""))
-                    # fetch account name
-                    try:
-                        ad = await ac_get(f"accounts/{acct_id}")
-                        acct_name = ad.get("account", {}).get("name", "")
-                    except Exception:
-                        acct_name = ""
-                    break
+        # Phase 2: fall back to SLP dealer-id scan
+        if not acct_id and did in slp_did_to_acct:
+            acct_id   = slp_did_to_acct[did]
+            acct_name = acct_names.get(acct_id, "")
 
         if not acct_id:
             not_found.append(did)
