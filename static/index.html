@@ -3872,11 +3872,12 @@ function abRenderDetail(d) {
 
   // ── SLPs table ────────────────────────────────────────────────
   const slpCols = ['dealer-id','name','platform','slp-status-detail','contractor-activated-date'];
+  const slpColLabels = {'dealer-id':'dealer id','name':'name','platform':'dealer program','slp-status-detail':'status','contractor-activated-date':'activation date'};
   function coTable(rows, cols) {
     const useCols = cols.filter(c => rows.some(r => r[c]));
     if (!rows.length) return `<div class="acui-co-empty">No SLP records</div>`;
     return `<table class="acui-co-table">
-      <thead><tr>${useCols.map(c=>`<th>${esc(c.replace(/-/g,' '))}</th>`).join('')}</tr></thead>
+      <thead><tr>${useCols.map(c=>`<th>${esc(slpColLabels[c]||c.replace(/-/g,' '))}</th>`).join('')}</tr></thead>
       <tbody>${rows.map(r=>'<tr>'+useCols.map(c=>`<td>${esc(String(r[c]||''))}</td>`).join('')+'</tr>').join('')}</tbody>
     </table>`;
   }
