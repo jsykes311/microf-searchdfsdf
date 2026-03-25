@@ -1966,8 +1966,6 @@ let _isAppsUser = false;  // apps-only users see Apps tab but not left nav
 
 function showTab(id, btn, pushHistory = true) {
   if (!_VALID_TABS.has(id)) id = 'accounts';
-  // Guard admin tab — non-admins land on accounts instead
-  if (id === 'admin' && !_isAppsUser) id = 'accounts';
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.app-nav nav button').forEach(b => b.classList.remove('active'));
   const panel = document.getElementById('tab-' + id);
