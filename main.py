@@ -3258,9 +3258,9 @@ async def get_me(request: _Request):
     elif em in _ACCT_MGMT_EMAILS:
         group = "account_management"
     else:
-        group = "viewer"
+        group = "account_management"   # default — everyone sees basic reports
     is_admin     = group == "admin"
-    is_apps_user = group != "viewer"
+    is_apps_user = True
     return {"email": email or "anonymous", "is_admin": bool(is_admin), "is_apps_user": bool(is_apps_user), "group": group}
 
 
