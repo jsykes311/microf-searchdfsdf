@@ -2745,52 +2745,68 @@ async def _build_location_index() -> dict:
         if acc_id:
             qualifying.add(acc_id)
 
-    # Try pgeocode for accounts that have a zip code; fall back to state centroid
-    zip_coords: dict = {}
+    import math as _math, random
+
+    # Build lookup tables from pgeocode's bundled US zip database:
+    #   zip_coords  — "75001"          → (lat, lon)   exact zip precision
+    #   city_coords — "HOUSTON|TX"     → (lat, lon)   city centroid (avg of all zips in that city)
+    zip_coords:  dict = {}
+    city_coords: dict = {}
     try:
         import pgeocode
         geo = pgeocode.Nominatim('us')
+        df  = geo._data.dropna(subset=['latitude', 'longitude'])
+
+        # zip-level lookup (only for zips our accounts actually have)
         zips = {(_account_to_zip.get(aid, "") or "")[:5] for aid in qualifying
                 if (_account_to_zip.get(aid, "") or "")[:5].isdigit()}
         zips.discard("")
         if zips:
             result = geo.query_postal_code(list(zips))
-            if hasattr(result, 'iterrows'):
-                for idx, row in result.iterrows():
-                    try:
-                        lat, lon = float(row['latitude']), float(row['longitude'])
-                        import math
-                        if not (math.isnan(lat) or math.isnan(lon)):
-                            zip_coords[str(idx)] = (lat, lon)
-                    except Exception:
-                        pass
-            else:
+            rows   = result if hasattr(result, 'iterrows') else result.to_frame().T
+            for idx, row in rows.iterrows():
                 try:
-                    import math
-                    lat, lon = float(result['latitude']), float(result['longitude'])
-                    if not (math.isnan(lat) or math.isnan(lon)):
-                        z = str(result.name) if hasattr(result, 'name') else ""
-                        if z:
-                            zip_coords[z] = (lat, lon)
+                    lat, lon = float(row['latitude']), float(row['longitude'])
+                    if not (_math.isnan(lat) or _math.isnan(lon)):
+                        zip_coords[str(idx)] = (lat, lon)
                 except Exception:
                     pass
-    except Exception:
-        pass
 
-    import random, math as _math
+        # city-level lookup — group every zip in the dataset by city+state, take centroid
+        df2 = df.copy()
+        df2['_key'] = df2['place_name'].str.strip().str.upper() + '|' + df2['state_code'].str.strip().str.upper()
+        grp = df2.groupby('_key')[['latitude', 'longitude']].mean()
+        for key, row in grp.iterrows():
+            try:
+                lat, lon = float(row['latitude']), float(row['longitude'])
+                if not (_math.isnan(lat) or _math.isnan(lon)):
+                    city_coords[key] = (lat, lon)
+            except Exception:
+                pass
+
+    except Exception:
+        pass  # fall through to state-centroid below
+
     index: dict = {}
     for aid in qualifying:
         z    = (_account_to_zip.get(aid, "") or "")[:5]
-        city = _account_to_city.get(aid, "")
+        city = (_account_to_city.get(aid, "") or "").strip()
         st   = (_account_to_state_prov.get(aid, "") or "").strip().upper()[:2]
 
+        city_key = f"{city.upper()}|{st}"
+
         if z in zip_coords:
-            lat, lon = zip_coords[z]
+            lat, lon  = zip_coords[z]
+            precision = "zip"
+        elif city_key in city_coords:
+            lat, lon  = city_coords[city_key]
+            precision = "city"
         elif st in _STATE_CENTROIDS:
-            # Spread pins ~1° randomly around state centroid so they don't all stack
+            # Last resort — spread pins randomly across the state
             clat, clon = _STATE_CENTROIDS[st]
             lat = clat + random.uniform(-1.0, 1.0)
             lon = clon + random.uniform(-1.5, 1.5)
+            precision  = "state"
         else:
             continue  # no location data at all
 
@@ -2802,14 +2818,21 @@ async def _build_location_index() -> dict:
             "city":      city,
             "state":     st,
             "zip":       z,
-            "approx":    z not in zip_coords,  # flag for UI
+            "approx":    precision != "zip",
         }
 
     _location_index    = index
     _location_index_ts = now
-    exact  = sum(1 for v in index.values() if not v.get("approx"))
-    approx = len(index) - exact
-    print(f"[location-index] Built with {len(index)} accounts ({exact} exact zip, {approx} state-centroid approx)")
+    by_prec = {"zip": 0, "city": 0, "state": 0}
+    for v in index.values():
+        if not v["approx"]:
+            by_prec["zip"] += 1
+        elif v.get("city"):
+            by_prec["city"] += 1
+        else:
+            by_prec["state"] += 1
+    print(f"[location-index] {len(index)} accounts — "
+          f"{by_prec['zip']} exact-zip, {by_prec['city']} city-centroid, {by_prec['state']} state-fallback")
     return index
 
 
