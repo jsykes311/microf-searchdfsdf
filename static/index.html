@@ -1947,7 +1947,7 @@ select, input { font-family: inherit; }
 <!-- Contractor Card Modal (map pin click) -->
 <div id="mf-card-overlay" class="gs-overlay" onclick="if(event.target===this)closeMfCard()" style="align-items:center;padding-top:0;">
   <div id="mf-card" style="background:var(--ms-white);border-radius:6px;width:360px;max-width:95vw;box-shadow:var(--ms-sh16);border:1px solid var(--ms-g30);overflow:hidden;">
-    <div style="background:var(--ms-blue);padding:16px 18px 14px;position:relative;">
+    <div style="background:#019139;padding:16px 18px 14px;position:relative;">
       <div id="mf-card-badge" style="display:inline-block;background:rgba(255,255,255,0.2);border-radius:3px;padding:2px 8px;font-size:0.65rem;font-weight:700;color:#fff;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;"></div>
       <div id="mf-card-name" style="font-size:1rem;font-weight:700;color:#fff;line-height:1.3;padding-right:28px;"></div>
       <div id="mf-card-id" style="font-size:0.72rem;color:rgba(255,255,255,0.75);margin-top:3px;"></div>
@@ -1958,10 +1958,10 @@ select, input { font-family: inherit; }
         <span style="color:var(--ms-g90);margin-right:6px;">📍</span><span id="mf-card-addr-text"></span>
       </div>
       <div id="mf-card-phone" style="font-size:0.82rem;display:none;">
-        <span style="color:var(--ms-g90);margin-right:6px;">📞</span><a id="mf-card-phone-link" href="#" style="color:var(--ms-blue);text-decoration:none;"></a>
+        <span style="color:var(--ms-g90);margin-right:6px;">📞</span><a id="mf-card-phone-link" href="#" style="color:#019139;text-decoration:none;"></a>
       </div>
       <div id="mf-card-web" style="font-size:0.82rem;display:none;">
-        <span style="color:var(--ms-g90);margin-right:6px;">🌐</span><a id="mf-card-web-link" href="#" target="_blank" rel="noopener" style="color:var(--ms-blue);text-decoration:none;"></a>
+        <span style="color:var(--ms-g90);margin-right:6px;">🌐</span><a id="mf-card-web-link" href="#" target="_blank" rel="noopener" style="color:#019139;text-decoration:none;"></a>
       </div>
       <div id="mf-card-dist" style="font-size:0.75rem;color:var(--ms-g90);display:none;padding-top:2px;border-top:1px solid var(--ms-g30);margin-top:2px;">
         <span id="mf-card-dist-text"></span>
@@ -3974,7 +3974,7 @@ function _mfDropPins(accounts, centerLat, centerLon) {
 
   const pinIcon = L.divIcon({
     className: '',
-    html: `<div style="width:12px;height:12px;background:#356ae6;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4);"></div>`,
+    html: `<div style="width:12px;height:12px;background:#019139;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4);"></div>`,
     iconSize: [12,12], iconAnchor: [6,6]
   });
   const searchIcon = L.divIcon({
