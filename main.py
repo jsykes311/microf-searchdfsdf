@@ -2596,7 +2596,7 @@ async def accounts_search(q: str = Query(""), limit: int = Query(20)):
 
 _slp_state_index: dict = {}       # state (str) → {account_id: dealer_id}
 _slp_state_index_ts: float = 0.0
-_SLP_STATE_TTL = 600              # rebuild at most every 10 minutes
+_SLP_STATE_TTL = 86400            # rebuild at most once per 24 hours
 
 async def _build_slp_state_index() -> dict:
     global _slp_state_index, _slp_state_index_ts
