@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Microf Dealer Locator</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f3f2f1; color: #323130; min-height: 100vh; }
+
+    /* ── Header ── */
+    header {
+      background: #019139; color: #fff; padding: 14px 24px;
+      display: flex; align-items: center; gap: 14px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.15);
+    }
+    header h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.2px; }
+    header p  { font-size: 0.78rem; opacity: 0.85; margin-top: 2px; }
+
+    /* ── Main layout ── */
+    main { max-width: 1280px; margin: 0 auto; padding: 20px 20px 40px; }
+
+    #mf-layout {
+      display: flex; gap: 16px; align-items: flex-start;
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;
+    }
+
+    /* ── Sidebar ── */
+    #mf-sidebar { width: 270px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
+    #mf-sidebar-title { font-size: 0.78rem; color: #6b7280; line-height: 1.5; }
+
+    #mf-search-row { display: flex; gap: 6px; }
+    #mf-zip-input {
+      flex: 1; min-width: 0; padding: 7px 10px;
+      border: 1px solid #d1d5db; border-radius: 4px;
+      font-size: 0.82rem; font-family: inherit; outline: none;
+    }
+    #mf-zip-input:focus { border-color: #019139; box-shadow: 0 0 0 2px rgba(1,145,57,.15); }
+    #mf-find-btn {
+      padding: 7px 13px; background: #019139; color: #fff;
+      border: none; border-radius: 4px; font-size: 0.82rem;
+      cursor: pointer; font-family: inherit; white-space: nowrap;
+    }
+    #mf-find-btn:hover { background: #017a30; }
+
+    #mf-alert {
+      padding: 8px 12px; background: #f9fafb;
+      border: 1px solid #e5e7eb; border-radius: 6px;
+      font-size: 0.82rem; line-height: 1.5; color: #374151;
+    }
+
+    #mf-accounts { max-height: 440px; overflow-y: auto; }
+    .mf-acct-row {
+      padding: 8px 10px; cursor: pointer;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .mf-acct-row:last-child { border-bottom: none; }
+    .mf-acct-row:hover { background: #f0fdf4; }
+    .mf-acct-name { font-size: 0.82rem; font-weight: 500; color: #1e3a5f; }
+    .mf-acct-sub  { font-size: 0.72rem; color: #6b7280; margin-top: 1px; }
+    .mf-acct-dist { font-size: 0.72rem; color: #6b7280; white-space: nowrap; }
+
+    /* ── Map ── */
+    #mf-map-wrap { flex: 1; min-width: 0; }
+    #mf-map { height: 560px; border-radius: 6px; border: 1px solid #e5e7eb; }
+
+    /* ── Contractor card overlay ── */
+    #mf-card-overlay {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,.4); backdrop-filter: blur(2px);
+      align-items: center; justify-content: center;
+    }
+    #mf-card-overlay.open { display: flex; }
+    #mf-card {
+      background: #fff; border-radius: 6px; width: 360px; max-width: 95vw;
+      box-shadow: 0 8px 32px rgba(0,0,0,.18); border: 1px solid #e5e7eb; overflow: hidden;
+    }
+    #mf-card-header { background: #019139; padding: 16px 18px 14px; position: relative; }
+    #mf-card-badge  {
+      display: inline-block; background: rgba(255,255,255,.2); border-radius: 3px;
+      padding: 2px 8px; font-size: 0.65rem; font-weight: 700; color: #fff;
+      letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
+    }
+    #mf-card-name { font-size: 1rem; font-weight: 700; color: #fff; line-height: 1.3; padding-right: 28px; }
+    #mf-card-id   { font-size: 0.72rem; color: rgba(255,255,255,.75); margin-top: 3px; }
+    #mf-card-close {
+      position: absolute; top: 12px; right: 12px;
+      background: rgba(255,255,255,.2); border: none; border-radius: 3px;
+      color: #fff; font-size: 0.75rem; padding: 3px 8px; cursor: pointer;
+    }
+    #mf-card-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
+    .mf-card-row  { font-size: 0.82rem; color: #323130; display: none; }
+    .mf-card-row span.icon { color: #6b7280; margin-right: 6px; }
+    .mf-card-row a { color: #019139; text-decoration: none; }
+    .mf-card-row a:hover { text-decoration: underline; }
+    #mf-card-dist {
+      font-size: 0.75rem; color: #6b7280; display: none;
+      padding-top: 6px; border-top: 1px solid #f1f5f9; margin-top: 2px;
+    }
+
+    /* ── Legend ── */
+    #mf-legend {
+      margin-top: 12px; padding: 8px 12px; background: #f9fafb;
+      border: 1px solid #e5e7eb; border-radius: 6px; font-size: 0.75rem; color: #6b7280;
+    }
+    #mf-legend span { display: inline-flex; align-items: center; gap: 5px; margin-right: 14px; }
+    .leg-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+
+    /* ── Responsive ── */
+    @media (max-width: 680px) {
+      #mf-layout { flex-direction: column; }
+      #mf-sidebar { width: 100%; }
+      #mf-map { height: 320px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🗺 Microf Dealer Locator</h1>
+    <p>Find active Microf contractors near any location</p>
+  </div>
+</header>
+
+<main>
+  <div id="mf-layout">
+
+    <!-- Left: search + results -->
+    <div id="mf-sidebar">
+      <div id="mf-sidebar-title">Search by zip code or city &amp; state to find nearby contractors, or click anywhere on the map for demand conditions.</div>
+
+      <div id="mf-search-row">
+        <input id="mf-zip-input" type="text" placeholder="Zip or city, state…"
+          onkeydown="if(event.key==='Enter') mfFindNearest()"/>
+        <button id="mf-find-btn" onclick="mfFindNearest()">🔍 Find</button>
+      </div>
+
+      <div id="mf-alert">Click the map or search above to get started.</div>
+      <div id="mf-accounts"></div>
+
+      <div id="mf-legend">
+        <span><span class="leg-dot" style="background:#019139;"></span> Microf dealer</span>
+        <span><span class="leg-dot" style="background:#dc2626;"></span> Search location</span>
+      </div>
+    </div>
+
+    <!-- Right: map -->
+    <div id="mf-map-wrap">
+      <div id="mf-map"></div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Contractor card modal -->
+<div id="mf-card-overlay" onclick="if(event.target===this)closeMfCard()">
+  <div id="mf-card">
+    <div id="mf-card-header">
+      <div id="mf-card-badge"></div>
+      <div id="mf-card-name"></div>
+      <div id="mf-card-id"></div>
+      <button id="mf-card-close" onclick="closeMfCard()">✕</button>
+    </div>
+    <div id="mf-card-body">
+      <div class="mf-card-row" id="mf-card-addr"><span class="icon">📍</span><span id="mf-card-addr-text"></span></div>
+      <div class="mf-card-row" id="mf-card-phone"><span class="icon">📞</span><a id="mf-card-phone-link" href="#"></a></div>
+      <div class="mf-card-row" id="mf-card-web"><span class="icon">🌐</span><a id="mf-card-web-link" href="#" target="_blank" rel="noopener"></a></div>
+      <div id="mf-card-dist"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+let _mfMap = null;
+let _mfPinLayer = null;
+
+// ── Contractor card ────────────────────────────────────────────────────────
+function openMfCard(a) {
+  const set  = (id, val)  => { const el = document.getElementById(id); if (el) el.textContent = val || ''; };
+  const show = (id, vis)  => { const el = document.getElementById(id); if (el) el.style.display = vis ? '' : 'none'; };
+
+  set('mf-card-badge', a.platform || 'Microf');
+  set('mf-card-name',  a.name);
+  set('mf-card-id',    a.dealer_id ? `Dealer ID: ${a.dealer_id}` : '');
+
+  const cityLine = [a.city, a.state].filter(Boolean).join(', ');
+  const addrFull = [a.address, cityLine].filter(Boolean).join(', ');
+  set('mf-card-addr-text', addrFull);
+  show('mf-card-addr', !!addrFull);
+
+  if (a.phone) {
+    const pl = document.getElementById('mf-card-phone-link');
+    pl.href = `tel:${a.phone}`; pl.textContent = a.phone;
+    show('mf-card-phone', true);
+  } else { show('mf-card-phone', false); }
+
+  if (a.website) {
+    const wl  = document.getElementById('mf-card-web-link');
+    const url = a.website.startsWith('http') ? a.website : 'https://' + a.website;
+    wl.href = url; wl.textContent = a.website.replace(/^https?:\/\//, '');
+    show('mf-card-web', true);
+  } else { show('mf-card-web', false); }
+
+  const distEl = document.getElementById('mf-card-dist');
+  if (a.distance_miles != null) {
+    distEl.textContent = `${a.distance_miles} miles away`;
+    distEl.style.display = '';
+  } else { distEl.style.display = 'none'; }
+
+  document.getElementById('mf-card-overlay').classList.add('open');
+}
+function closeMfCard() {
+  document.getElementById('mf-card-overlay').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMfCard(); });
+
+// ── Account list ───────────────────────────────────────────────────────────
+function _mfRenderAccountList(accounts, headerText) {
+  const el = document.getElementById('mf-accounts');
+  if (!accounts.length) {
+    el.innerHTML = `<div style="margin-top:10px;font-size:0.78rem;color:#9ca3af;">${esc(headerText)} — no results found.</div>`;
+    return;
+  }
+  const rows = accounts.map(a => {
+    const dist = a.distance_miles != null ? `<span class="mf-acct-dist">${a.distance_miles} mi</span>` : '';
+    const loc  = [a.city, a.state].filter(Boolean).join(', ');
+    return `<div class="mf-acct-row" onclick="openMfCard(${JSON.stringify(a).replace(/"/g,'&quot;')})">
+      <div>
+        <div class="mf-acct-name">${esc(a.name)}</div>
+        ${loc ? `<div class="mf-acct-sub">${esc(loc)}${a.dealer_id ? ' · ID ' + esc(a.dealer_id) : ''}</div>` : ''}
+      </div>
+      ${dist}
+    </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div style="margin-top:12px;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+      <div style="padding:7px 10px;background:#f8fafc;font-size:0.75rem;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">${esc(headerText)}</div>
+      <div>${rows}</div>
+    </div>`;
+}
+
+// ── Drop pins ──────────────────────────────────────────────────────────────
+function _mfDropPins(accounts, centerLat, centerLon) {
+  if (!_mfMap || !_mfPinLayer) return;
+  _mfPinLayer.clearLayers();
+
+  const pinIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:12px;height:12px;background:#019139;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4);"></div>`,
+    iconSize: [12,12], iconAnchor: [6,6]
+  });
+  const searchIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;background:#dc2626;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4);"></div>`,
+    iconSize: [14,14], iconAnchor: [7,7]
+  });
+
+  if (centerLat && centerLon)
+    L.marker([centerLat, centerLon], {icon: searchIcon}).addTo(_mfPinLayer).bindPopup('📍 Search location');
+
+  accounts.forEach(a => {
+    if (!a.lat || !a.lon) return;
+    L.marker([a.lat, a.lon], {icon: pinIcon}).addTo(_mfPinLayer).on('click', () => openMfCard(a));
+  });
+
+  if (accounts.length) {
+    const bounds = accounts.filter(a => a.lat && a.lon).map(a => [a.lat, a.lon]);
+    if (centerLat && centerLon) bounds.push([centerLat, centerLon]);
+    if (bounds.length) _mfMap.fitBounds(bounds, {padding: [40,40], maxZoom: 10});
+  }
+}
+
+// ── Nearest search ─────────────────────────────────────────────────────────
+async function mfFindNearest() {
+  const input     = document.getElementById('mf-zip-input').value.trim();
+  if (!input) return;
+  const alertEl   = document.getElementById('mf-alert');
+  const accountsEl = document.getElementById('mf-accounts');
+  alertEl.textContent = 'Searching…';
+  accountsEl.innerHTML = '';
+  if (_mfPinLayer) _mfPinLayer.clearLayers();
+
+  try {
+    const res  = await fetch(`/api/accounts/nearest?address=${encodeURIComponent(input)}&limit=10`);
+    const data = await res.json();
+    if (data.error) { alertEl.innerHTML = `<span style="color:#dc2626;">${esc(data.error)}</span>`; return; }
+    const total = data.total || 0;
+    alertEl.innerHTML = `📍 Nearest Microf contractors to <strong>${esc(data.label||input)}</strong> — ${total} active account${total!==1?'s':''} total`;
+    _mfDropPins(data.accounts, data.lat, data.lon);
+    _mfRenderAccountList(data.accounts, `Nearest ${data.accounts.length} of ${total} contractors`);
+  } catch(err) {
+    alertEl.innerHTML = `<span style="color:#dc2626;">Error: ${esc(err.message)}</span>`;
+  }
+}
+
+// ── Map init ───────────────────────────────────────────────────────────────
+(function initMicrofMap() {
+  const API_KEY = "d3c2c838262d1dd06a372a8dcbd34aec";
+
+  _mfMap = L.map('mf-map').setView([39.5, -98.35], 4);
+  _mfPinLayer = L.layerGroup().addTo(_mfMap);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(_mfMap);
+  L.tileLayer(`https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${API_KEY}`, { opacity: 0.6 }).addTo(_mfMap);
+
+  _mfMap.on('click', async function(e) {
+    const { lat, lng: lon } = e.latlng;
+    const alertEl    = document.getElementById('mf-alert');
+    const accountsEl = document.getElementById('mf-accounts');
+    alertEl.textContent = 'Loading…';
+    accountsEl.innerHTML = '';
+
+    try {
+      const [weatherRes, geoRes] = await Promise.all([
+        fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=imperial&appid=${API_KEY}`),
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`, {headers:{'Accept-Language':'en'}})
+      ]);
+
+      const data = await weatherRes.json();
+      if (!weatherRes.ok) {
+        alertEl.innerHTML = `<span style="color:#dc2626;">Weather API error ${weatherRes.status}: ${esc(data.message||'')}</span>`;
+        return;
+      }
+
+      const temp = Math.round(data.main.temp);
+      const city = data.name || 'Selected area';
+      let msg, color;
+      if      (temp >= 90) { msg = '🔥 HIGH DEMAND — target contractors'; color = '#dc2626'; }
+      else if (temp <= 40) { msg = '❄️ Heating demand opportunity';        color = '#2563eb'; }
+      else                 { msg = '✅ Normal conditions';                  color = '#059669'; }
+      alertEl.innerHTML = `<strong>${esc(city)}</strong>: ${temp}°F<br><span style="color:${color};font-weight:600;">${msg}</span>`;
+
+      const geo = await geoRes.json();
+      const stateCode = (geo.address?.['ISO3166-2-lvl4'] || '').replace(/^US-/, '').trim();
+      if (!stateCode) { accountsEl.innerHTML = ''; return; }
+
+      accountsEl.innerHTML = `<div style="margin-top:10px;font-size:0.78rem;color:#6b7280;">Loading accounts in ${esc(stateCode)}…</div>`;
+      const acctRes  = await fetch(`/api/accounts/by-state?state=${encodeURIComponent(stateCode)}&limit=10`);
+      const acctData = await acctRes.json();
+      const accounts = acctData.accounts || [];
+      const total    = acctData.total || 0;
+
+      _mfDropPins(accounts, null, null);
+      _mfRenderAccountList(accounts, `${stateCode} — ${total} active account${total!==1?'s':''} ${total>10?'(showing 10)':''}`);
+    } catch(err) {
+      alertEl.innerHTML = `<span style="color:#dc2626;">Network error: ${esc(err.message)}</span>`;
+    }
+  });
+})();
+</script>
+</body>
+</html>

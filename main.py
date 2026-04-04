@@ -206,7 +206,8 @@ def require_auth(request: _Request):
 class _MSAuthMiddleware(BaseHTTPMiddleware):
     """Block unauthenticated requests. Redirects pages → /login, 401s for APIs."""
     _PUBLIC = {"/login", "/auth/start", "/auth/callback", "/logout", "/health",
-               "/api/dealer-index/status"}
+               "/api/dealer-index/status", "/dealer-locator-beta",
+               "/api/accounts/nearest", "/api/accounts/by-state"}
 
     async def dispatch(self, request: _Request, call_next):
         path = request.url.path
@@ -317,6 +318,11 @@ async def logout():
 @app.get("/search")
 async def search_page(_: None = Depends(require_auth)):
     return FileResponse("static/search.html")
+
+@app.get("/dealer-locator-beta")
+async def dealer_locator_page():
+    """Public-facing dealer locator — no auth required."""
+    return FileResponse("static/dealer-locator.html")
 
 @app.on_event("startup")
 async def _startup():
