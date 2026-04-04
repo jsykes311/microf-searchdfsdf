@@ -408,6 +408,7 @@ _account_to_platform: dict = {} # account_id (str) → platform/Dealer Program (
 _account_to_bdr: dict = {}      # account_id (str) → Assigned BDR (customfield 119)
 _account_to_name: dict = {}     # account_id (str) → account name
 _account_to_owner: dict = {}    # account_id (str) → owner user_id (str)
+_account_to_states: dict = {}   # account_id (str) → "TX,FL,GA" (customfield 22)
 _program_to_accounts: dict = {} # lowercase(dealer_program) → set of account_ids
 _dealer_index_ts:  float = 0.0
 _dealer_index_error: str = ""   # last build error message, for /api/dealer-index/status
@@ -458,6 +459,7 @@ async def _build_dealer_id_index() -> None:
     DEALER_CF_ID   = 18    # customFieldId for "Parent Dealer ID"
     PLATFORM_CF_ID = 29    # customFieldId for "Dealer Program"
     BDR_CF_ID      = 119   # customFieldId for "Assigned BDR"
+    STATES_CF_ID   = 22    # customFieldId for "Doing Business in States"
     CF_PAGE        = 1000  # 1000 records/page → ~190 pages instead of ~1900
     CONCURRENCY    = 8     # 8 concurrent requests → index builds in ~10s instead of ~5min
 
@@ -472,6 +474,7 @@ async def _build_dealer_id_index() -> None:
         acct_to_dealer:   dict = {}
         acct_to_platform: dict = {}
         acct_to_bdr:      dict = {}
+        acct_to_states:   dict = {}
 
         def _ingest(items: list) -> None:
             for item in items:
@@ -489,6 +492,8 @@ async def _build_dealer_id_index() -> None:
                     acct_to_platform[aid] = val
                 elif cf_id == BDR_CF_ID:
                     acct_to_bdr[aid]      = val
+                elif cf_id == STATES_CF_ID:
+                    acct_to_states[aid]   = val
 
         _ingest(first_page.get("accountCustomFieldData", []))
 
@@ -528,6 +533,7 @@ async def _build_dealer_id_index() -> None:
         _account_to_bdr.clear();     _account_to_bdr.update(acct_to_bdr)
         _account_to_name.clear();    _account_to_name.update(acct_to_name)
         _account_to_owner.clear();   _account_to_owner.update(acct_to_owner)
+        _account_to_states.clear();  _account_to_states.update(acct_to_states)
 
         # Reverse index: lowercase dealer program → set of account IDs
         new_prog: dict = {}
@@ -2595,32 +2601,44 @@ async def accounts_search(q: str = Query(""), limit: int = Query(20)):
     return {"accounts": accounts, "total": len(accounts)}
 
 
-_slp_state_index: dict = {}       # state (str) → {account_id: dealer_id}
+_slp_state_index: dict = {}       # state (str) → {account_id: {name, dealer_id}}
 _slp_state_index_ts: float = 0.0
 _SLP_STATE_TTL = 86400            # rebuild at most once per 24 hours
+_MICROF_PROGRAMS = {"microf", "lto", "microf (lto only)"}
 
 async def _build_slp_state_index() -> dict:
+    """Build state → active Microf/LTO accounts index from SLP records.
+    Uses account-level CF22 (Doing Business in States) for geography.
+    Filters to SLPs with platform in Microf/LTO/Microf(LTO Only) + Contractor Activated."""
     global _slp_state_index, _slp_state_index_ts
     now = _time.time()
     if _slp_state_index and (now - _slp_state_index_ts) < _SLP_STATE_TTL:
         return _slp_state_index
 
+    # Collect account IDs with at least one qualifying active SLP
     raw = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
-    id_to_name = {v["id"]: v["name"] for v in _dealer_id_index.values() if "id" in v and "name" in v}
-
-    index: dict = {}  # state → {acc_id: {name, dealer_id}}
+    qualifying_accounts: set = set()
     for r in raw:
         fields = {f.get("field") or f.get("id"): f.get("value") for f in r.get("fields", [])}
         if str(fields.get("slp-status-detail", "")).strip() != "Contractor Activated":
             continue
+        platform = str(fields.get("platform", "")).strip().lower()
+        if platform not in _MICROF_PROGRAMS:
+            continue
         rel    = r.get("relationships", {}).get("account", [])
         a0     = rel[0] if rel else None
         acc_id = str(a0) if isinstance(a0, (int, str)) else str(a0.get("id", "")) if a0 else None
-        if not acc_id:
+        if acc_id:
+            qualifying_accounts.add(acc_id)
+
+    # Build state index from account-level CF22 (already in memory from dealer index)
+    index: dict = {}
+    for acc_id in qualifying_accounts:
+        states_val = str(_account_to_states.get(acc_id, "") or "").upper()
+        if not states_val:
             continue
-        dealer_id = str(fields.get("dealer-id", ""))
-        name      = id_to_name.get(acc_id, "")
-        states_val = str(fields.get("doing-business-in-states", "") or "").upper()
+        name      = _account_to_name.get(acc_id, "")
+        dealer_id = _account_to_dealer.get(acc_id, "")
         for s in [x.strip() for x in states_val.split(",") if x.strip()]:
             index.setdefault(s, {})[acc_id] = {"name": name, "dealer_id": dealer_id}
 
