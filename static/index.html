@@ -4090,6 +4090,10 @@ function initMicrofMap() {
         `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=imperial&appid=${API_KEY}`
       );
       const data = await res.json();
+      if (!res.ok) {
+        alert.innerHTML = `<span style="color:#dc2626;">API error ${res.status}: ${data.message || 'Unknown error'}${res.status === 401 ? ' — key may still be activating (up to 2 hrs)' : ''}</span>`;
+        return;
+      }
       const temp = Math.round(data.main.temp);
       const city = data.name || "Selected area";
       let msg, color;
@@ -4105,7 +4109,7 @@ function initMicrofMap() {
       }
       alert.innerHTML = `<strong>${city}</strong>: ${temp}°F<br><span style="color:${color};font-weight:600;">${msg}</span>`;
     } catch(err) {
-      alert.innerHTML = `<span style="color:#dc2626;">Could not fetch weather data.</span>`;
+      alert.innerHTML = `<span style="color:#dc2626;">Network error: ${err.message}</span>`;
     }
   });
 }
