@@ -578,6 +578,7 @@ CACHE: dict = {
     "deal_custom_fields":    {},
     "field_metadata":        {},
     "schemas":               {},
+    "slp_by_state":          {},
 }
 CACHE_TIMESTAMPS: dict = {
     "account_custom_fields": {},
@@ -585,6 +586,7 @@ CACHE_TIMESTAMPS: dict = {
     "deal_custom_fields":    {},
     "field_metadata":        {},
     "schemas":               {},
+    "slp_by_state":          {},
 }
 CACHE_TTL = 300  # seconds
 
@@ -2592,47 +2594,52 @@ async def accounts_search(q: str = Query(""), limit: int = Query(20)):
     return {"accounts": accounts, "total": len(accounts)}
 
 
-@app.get("/api/accounts/by-state")
-async def accounts_by_state(state: str = "", limit: int = 10, request: _Request = None):
-    """Return accounts with at least one Contractor Activated SLP in the given state (2-letter abbrev)."""
-    if not state:
-        return {"accounts": [], "state": state}
+_slp_state_index: dict = {}       # state (str) → {account_id: dealer_id}
+_slp_state_index_ts: float = 0.0
+_SLP_STATE_TTL = 600              # rebuild at most every 10 minutes
 
-    state_upper = state.upper().strip()
+async def _build_slp_state_index() -> dict:
+    global _slp_state_index, _slp_state_index_ts
+    now = _time.time()
+    if _slp_state_index and (now - _slp_state_index_ts) < _SLP_STATE_TTL:
+        return _slp_state_index
+
     raw = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
-
-    seen_accounts: dict = {}  # account_id → dealer_id
-    for r in raw:
-        fields = {f.get("field") or f.get("id"): f.get("value") for f in r.get("fields", [])}
-        status = str(fields.get("slp-status-detail", "")).strip()
-        if status != "Contractor Activated":
-            continue
-        states_val = str(fields.get("doing-business-in-states", "") or "").upper()
-        if state_upper not in [s.strip() for s in states_val.split(",")]:
-            continue
-        rel   = r.get("relationships", {}).get("account", [])
-        a0    = rel[0] if rel else None
-        acc_id = str(a0) if isinstance(a0, (int, str)) else str(a0.get("id", "")) if a0 else None
-        if acc_id and acc_id not in seen_accounts:
-            seen_accounts[acc_id] = str(fields.get("dealer-id", ""))
-
-    # Build reverse id→name from existing dealer_id index
     id_to_name = {v["id"]: v["name"] for v in _dealer_id_index.values() if "id" in v and "name" in v}
 
-    # Resolve account names — use cached index first, fall back to AC API
-    results = []
-    for acc_id, dealer_id in list(seen_accounts.items())[:limit]:
-        name = id_to_name.get(acc_id, "")
-        if not name:
-            try:
-                a = await ac_get(f"accounts/{acc_id}")
-                name = a.get("account", {}).get("name", acc_id)
-            except Exception:
-                name = acc_id
-        results.append({"id": acc_id, "name": name, "dealer_id": dealer_id})
+    index: dict = {}  # state → {acc_id: {name, dealer_id}}
+    for r in raw:
+        fields = {f.get("field") or f.get("id"): f.get("value") for f in r.get("fields", [])}
+        if str(fields.get("slp-status-detail", "")).strip() != "Contractor Activated":
+            continue
+        rel    = r.get("relationships", {}).get("account", [])
+        a0     = rel[0] if rel else None
+        acc_id = str(a0) if isinstance(a0, (int, str)) else str(a0.get("id", "")) if a0 else None
+        if not acc_id:
+            continue
+        dealer_id = str(fields.get("dealer-id", ""))
+        name      = id_to_name.get(acc_id, "")
+        states_val = str(fields.get("doing-business-in-states", "") or "").upper()
+        for s in [x.strip() for x in states_val.split(",") if x.strip()]:
+            index.setdefault(s, {})[acc_id] = {"name": name, "dealer_id": dealer_id}
 
-    results.sort(key=lambda x: x["name"])
-    return {"accounts": results, "state": state_upper, "total": len(seen_accounts)}
+    _slp_state_index    = index
+    _slp_state_index_ts = now
+    return index
+
+
+@app.get("/api/accounts/by-state")
+async def accounts_by_state(state: str = "", limit: int = 10):
+    if not state:
+        return {"accounts": [], "state": state}
+    state_upper = state.upper().strip()
+    index = await _build_slp_state_index()
+    bucket = index.get(state_upper, {})
+    results = sorted(
+        [{"id": aid, **info} for aid, info in bucket.items()],
+        key=lambda x: x["name"]
+    )
+    return {"accounts": results[:limit], "state": state_upper, "total": len(bucket)}
 
 
 @app.get("/api/accounts/{account_id}/detail")
