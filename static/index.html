@@ -3911,9 +3911,18 @@ function _mfDropPins(accounts, centerLat, centerLon) {
 
   accounts.forEach(a => {
     if (!a.lat || !a.lon) return;
-    const dist = a.distance_miles != null ? ` · ${a.distance_miles} mi` : '';
-    L.marker([a.lat, a.lon], {icon: pinIcon}).addTo(_mfPinLayer)
-      .bindPopup(`<strong>${a.name}</strong><br>${[a.city, a.state].filter(Boolean).join(', ')}${dist}`);
+    const dist    = a.distance_miles != null ? ` · ${a.distance_miles} mi` : '';
+    const cityRow = [a.city, a.state].filter(Boolean).join(', ');
+    const addrRow = a.address ? `<div style="font-size:0.8rem;color:#555;margin-top:2px;">${esc(a.address)}${cityRow ? ', ' + esc(cityRow) : ''}</div>`
+                              : (cityRow ? `<div style="font-size:0.8rem;color:#555;margin-top:2px;">${esc(cityRow)}</div>` : '');
+    const phoneRow = a.phone   ? `<div style="font-size:0.8rem;margin-top:4px;">📞 <a href="tel:${esc(a.phone)}" style="color:#1d4ed8;text-decoration:none;">${esc(a.phone)}</a></div>` : '';
+    const webRow   = a.website ? `<div style="font-size:0.8rem;margin-top:2px;">🌐 <a href="${esc(a.website.startsWith('http') ? a.website : 'https://'+a.website)}" target="_blank" rel="noopener" style="color:#1d4ed8;text-decoration:none;">${esc(a.website.replace(/^https?:\/\//,''))}</a></div>` : '';
+    const distRow  = dist ? `<div style="font-size:0.75rem;color:#6b7280;margin-top:4px;">${dist.replace(' · ','')}</div>` : '';
+    const popup = `<div style="min-width:180px;max-width:240px;font-family:inherit;">
+      <div style="font-weight:700;font-size:0.85rem;margin-bottom:2px;">${esc(a.name)}</div>
+      ${addrRow}${phoneRow}${webRow}${distRow}
+    </div>`;
+    L.marker([a.lat, a.lon], {icon: pinIcon}).addTo(_mfPinLayer).bindPopup(popup);
   });
 
   if (accounts.length) {
