@@ -300,29 +300,6 @@ tr:hover td { background: var(--ms-g10); }
 .btn-email { background: var(--ms-blue); border-color: var(--ms-blue); color: white; }
 .btn-email:hover { background: var(--ms-blue-hover); border-color: var(--ms-blue-hover); }
 
-/* ── Dealer Profile ── */
-.profile-search { display: flex; gap: 8px; margin-bottom: 16px; }
-.profile-search input { flex: 1; padding: 7px 12px; border: 1px solid var(--ms-g40); border-radius: 2px; font-size: 0.85rem; outline: none; font-family: inherit; }
-.profile-search input:focus { border-color: var(--ms-blue); }
-
-.profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.profile-section h4 { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ms-g90); margin-bottom: 8px; }
-.kv-list { list-style: none; }
-.kv-list li { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--ms-g20); font-size: 0.78rem; }
-.kv-list li:last-child { border-bottom: none; }
-.kv-list .k { color: var(--ms-g90); }
-.kv-list .v { color: var(--ms-g130); font-weight: 500; text-align: right; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.summary-pills { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
-.pill { background: var(--ms-blue-light); border: 1px solid #b3d7f2; color: var(--ms-blue); padding: 5px 12px; border-radius: 2px; font-size: 0.76rem; font-weight: 600; }
-
-/* ── Analytics ── */
-.bar-chart { margin-top: 14px; }
-.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 0.76rem; }
-.bar-label { width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ms-g130); flex-shrink: 0; text-align: right; }
-.bar-track { flex: 1; background: var(--ms-g30); border-radius: 2px; height: 18px; overflow: hidden; }
-.bar-fill { height: 100%; background: linear-gradient(90deg, var(--ms-blue), #50a0e4); border-radius: 2px; min-width: 2px; transition: width 0.4s ease; }
-.bar-count { width: 50px; text-align: right; font-weight: 600; color: var(--ms-g130); flex-shrink: 0; }
 
 /* ── Misc ── */
 .spinner {
@@ -2897,176 +2874,6 @@ async function populateBdrDropdowns() {
   } catch(e) { /* silently ignore — dropdown just stays empty */ }
 }
 
-// ── Dealer Profile ─────────────────────────────────────────────
-async function lookupProfile() {
-  const val  = document.getElementById('profile-input').value.trim();
-  const type = document.getElementById('profile-search-type').value;
-  if (!val) return;
-
-  const params = new URLSearchParams();
-  params.set(type, val);
-
-  try {
-    const res  = await fetch(`/api/report/dealer-profile?${params}`);
-    if (!res.ok) { alert('Not found'); return; }
-    const data = await res.json();
-    renderProfile(data);
-  } catch(e) {
-    alert('Error: ' + e.message);
-  }
-}
-
-function renderProfile(data) {
-  const { account, slps, contacts, deals, trainings, summary } = data;
-  const FIELD_LABELS = {
-    '15': 'DBA Name', '18': 'Dealer ID', '19': 'Account Status', '22': 'Doing Business In',
-    '23': 'Sales Region', '26': 'Partner Activation Date', '29': 'Dealer Program',
-    '34': 'Platforms', '35': 'Original Owner', '119': 'Assigned BDR', '118': 'Oracle Producer ID',
-  };
-
-  document.getElementById('profile-name').textContent    = account.name || '(no name)';
-  document.getElementById('profile-id-display').textContent = `Account ID: ${account.id}`;
-
-  document.getElementById('profile-pills').innerHTML = `
-    <span class="pill">📊 ${summary.slp_count} SLPs</span>
-    <span class="pill">👤 ${summary.contact_count} Contacts</span>
-    <span class="pill">💰 ${summary.deal_count} Deals</span>
-    <span class="pill">🎓 ${summary.training_count} Trainings</span>`;
-
-  // Account fields
-  const cfs = account.custom_fields || {};
-  document.getElementById('profile-account-fields').innerHTML =
-    Object.entries(cfs).filter(([,v]) => v).map(([k,v]) =>
-      `<li><span class="k">${FIELD_LABELS[k] || 'Field '+k}</span><span class="v" title="${esc(v)}">${esc(v)}</span></li>`
-    ).join('') || '<li style="color:#9ca3af; font-size:0.8rem;">No custom field data</li>';
-
-  // Contacts
-  document.getElementById('profile-contact-count').textContent = contacts.length;
-  document.getElementById('profile-contacts').innerHTML = contacts.slice(0,5).map(c =>
-    `<li><span class="k">${esc(c.firstName||'')} ${esc(c.lastName||'')}</span><span class="v">${esc(c.email||'')}</span></li>`
-  ).join('') || '<li style="color:#9ca3af;">None</li>';
-
-  // Deals
-  document.getElementById('profile-deal-count').textContent = deals.length;
-  document.getElementById('profile-deals').innerHTML = deals.slice(0,5).map(d =>
-    `<li><span class="k">${esc(d.title||'Deal '+d.id)}</span><span class="v">${esc(d.status||'')}</span></li>`
-  ).join('') || '<li style="color:#9ca3af;">None</li>';
-
-  // SLPs table
-  document.getElementById('profile-slp-count').textContent = slps.length;
-  if (slps.length) {
-    const keys = ['platform', 'slp-status-detail', 'dealer-id', 'contractor-activated-date', 'assigned-bdr'];
-    document.getElementById('profile-slp-head').innerHTML = '<tr>' + keys.map(k => `<th>${k}</th>`).join('') + '</tr>';
-    document.getElementById('profile-slp-body').innerHTML = slps.map(s =>
-      '<tr>' + keys.map(k => `<td>${esc(String(s[k]||''))}</td>`).join('') + '</tr>'
-    ).join('');
-  } else {
-    document.getElementById('profile-slp-body').innerHTML = '<tr><td style="color:#9ca3af;">No SLP records</td></tr>';
-  }
-
-  // Trainings table
-  document.getElementById('profile-trn-count').textContent = trainings.length;
-  if (trainings.length) {
-    const keys = ['training-type', 'training-agenda', 'date-of-training', 'trained-by'];
-    document.getElementById('profile-trn-head').innerHTML = '<tr>' + keys.map(k => `<th>${k}</th>`).join('') + '</tr>';
-    document.getElementById('profile-trn-body').innerHTML = trainings.map(t =>
-      '<tr>' + keys.map(k => `<td>${esc(String(t[k]||''))}</td>`).join('') + '</tr>'
-    ).join('');
-  } else {
-    document.getElementById('profile-trn-body').innerHTML = '<tr><td style="color:#9ca3af;">No training records</td></tr>';
-  }
-
-  document.getElementById('profile-result').style.display = 'block';
-  document.getElementById('profile-result').scrollIntoView({ behavior: 'smooth' });
-}
-
-// ── Analytics ──────────────────────────────────────────────────
-async function loadAnalyticsFields() {
-  const obj = document.getElementById('an-object').value;
-  const [gbSel, cfSel, dfSel] = [
-    document.getElementById('an-groupby'),
-    document.getElementById('an-countfield'),
-    document.getElementById('an-date-field'),
-  ];
-  gbSel.innerHTML = '<option>Loading…</option>';
-  cfSel.innerHTML = '<option value="">— none —</option>';
-  dfSel.innerHTML = '<option value="">— no date filter —</option>';
-
-  try {
-    const res  = await fetch(`/api/fields/${obj}`);
-    const data = await res.json();
-    const opts      = data.fields.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
-    const dateOpts  = data.fields.filter(f => f.dataType === 'date')
-                          .map(f => `<option value="${f.id}">${f.label}</option>`).join('');
-    gbSel.innerHTML = opts;
-    cfSel.innerHTML = '<option value="">— none —</option>' + opts;
-    dfSel.innerHTML = '<option value="">— no date filter —</option>' + dateOpts;
-  } catch(e) {
-    gbSel.innerHTML = '<option>Error loading fields</option>';
-  }
-}
-
-async function runAnalytics() {
-  const obj        = document.getElementById('an-object').value;
-  const grpBy      = document.getElementById('an-groupby').value;
-  const cf         = document.getElementById('an-countfield').value;
-  const dateField  = document.getElementById('an-date-field').value;
-  const dateFrom   = document.getElementById('an-from').value;
-  const dateTo     = document.getElementById('an-to').value;
-  if (!grpBy) return;
-
-  const params = new URLSearchParams({ object_type: obj, group_by: grpBy });
-  if (cf) params.set('count_field', cf);
-
-  // Build a date filter and pass as JSON in `filters`
-  if (dateField && (dateFrom || dateTo)) {
-    const filter = { field: dateField, type: 'date', dateRange: 'custom',
-                     fromDate: dateFrom, toDate: dateTo };
-    params.set('filters', JSON.stringify([filter]));
-  }
-
-  try {
-    const res  = await fetch(`/api/summary?${params}`);
-    const data = await res.json();
-    renderAnalytics(data, grpBy, cf);
-  } catch(e) {
-    alert('Error: ' + e.message);
-  }
-}
-
-function renderAnalytics(data, grpBy, cf) {
-  const records = data.records || [];
-  if (!records.length) return;
-
-  document.getElementById('an-count').textContent = data.total_groups;
-  document.getElementById('an-total').textContent = data.total_records;
-
-  const max = Math.max(...records.map(r => r.count));
-  const chart = document.getElementById('an-chart');
-  const title = document.getElementById('an-chart-title');
-
-  // Find label for group_by field
-  title.textContent = `${grpBy} distribution`;
-
-  chart.innerHTML = records.slice(0, 25).map(r => `
-    <div class="bar-row">
-      <div class="bar-label" title="${esc(r.group)}">${esc(r.group)}</div>
-      <div class="bar-track">
-        <div class="bar-fill" style="width:${Math.max(4, (r.count/max)*100)}%"></div>
-      </div>
-      <div class="bar-count">${r.count}</div>
-    </div>`).join('');
-
-  // Table
-  const hasDist = records[0].distinct_count !== undefined;
-  document.getElementById('an-table-head').innerHTML = '<tr><th>Group</th><th>Count</th>' + (hasDist ? `<th>Distinct ${cf}</th>` : '') + '</tr>';
-  document.getElementById('an-table-body').innerHTML = records.map(r =>
-    `<tr><td>${esc(r.group)}</td><td><strong>${r.count}</strong></td>${hasDist ? `<td>${r.distinct_count}</td>` : ''}</tr>`
-  ).join('');
-
-  document.getElementById('analytics-result').style.display = 'grid';
-}
-
 // ── Utils ──────────────────────────────────────────────────────
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -3122,12 +2929,6 @@ function parseQuery(query) {
   // Account activity / cold accounts
   else if (/\baccount\s+(activ|notes|engag|touch)\b|\bcold\s+account\b|\bno\s+notes\b/i.test(q))
     intent = 'account_activity';
-  // Notes analytics
-  else if (/\bnotes?\b/i.test(q))
-    intent = 'notes_analytics';
-  // Dealer / account profile lookup
-  else if (/\bdealer\s+(profile|info|detail|lookup)\b|\blook\s+up\b|\bshow\s+dealer\b/i.test(q))
-    intent = 'dealer_profile';
 
   // ── Platform extraction ────────────────────────────────────
   // Exact multi-word platforms checked first, then single-word, then "for X" fallback
@@ -3195,7 +2996,6 @@ function _sqFallbackParse(query) {
   const intentMap = {
     activations: 'activations', training: 'training-summary', license: 'license-expiration',
     bdr: 'bdr-summary', team: 'team-activity', account_activity: 'account-activity',
-    notes_analytics: null, dealer_profile: 'dealer-profile',
   };
   if (!intent) return null;
   return {
@@ -3233,7 +3033,6 @@ async function runSmartQuery() {
   const rtLabels = {
     'activations':'Activations','training-summary':'Training','license-expiration':'License Expiration',
     'bdr-summary':'BDR Summary','team-activity':'Team Activity','account-activity':'Account Activity',
-    'dealer-profile':'Dealer Profile',
   };
   if (parsed?.report_type) chips.push({ label: '📊 ' + (rtLabels[parsed.report_type] || parsed.report_type), ok: true });
   else chips.push({ label: '⚠ Unknown report type', ok: false });
@@ -3257,19 +3056,6 @@ async function runSmartQuery() {
       <strong>Try:</strong> <em>"activations for Optimus last month"</em>, <em>"license expiring in 60 days"</em>,
       <em>"BDR performance this year"</em>, <em>"which BDR signed up the most 360 Finance partners"</em>
     </div></div>`;
-    return;
-  }
-
-  // ── Step 3: dealer profile → redirect ──
-  if (parsed.report_type === 'dealer-profile') {
-    showTab('profile', null);
-    if (parsed.dealer_id) {
-      const inp = document.getElementById('dealer-id-input');
-      if (inp) inp.value = parsed.dealer_id;
-      const btn = document.getElementById('dealer-search-btn');
-      if (btn) btn.click();
-    }
-    resultDiv.innerHTML = '';
     return;
   }
 
@@ -4218,8 +4004,7 @@ function initMicrofMap() {
       const accounts = acctData.accounts || [];
       const total = acctData.total || 0;
 
-      if (!accounts.length) {
-        _mfRenderAccountList(accounts, `${stateCode} — ${total} active account${total!==1?'s':''} ${total>10?'(showing 10)':''}`);
+      _mfRenderAccountList(accounts, `${stateCode} — ${total} active account${total!==1?'s':''} ${total>10?'(showing 10)':''}`);
     } catch(err) {
       alertEl.innerHTML = `<span style="color:#dc2626;">Network error: ${err.message}</span>`;
     }
