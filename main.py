@@ -2643,6 +2643,65 @@ _slp_state_index_ts: float = 0.0
 _SLP_STATE_TTL = 86400            # rebuild at most once per 24 hours
 _MICROF_PROGRAMS = {"microf", "lto", "microf (lto only)"}
 
+# ── Shared qualifying-accounts cache ─────────────────────────────────────────
+# Both the state index and the location index need "accounts with a Contractor
+# Activated Microf/LTO SLP".  Rather than each fetching all SLP records
+# independently, they share a single cached set rebuilt at most once per day.
+_qualifying_accounts_cache: set   = set()
+_qualifying_accounts_ts:    float = 0.0
+
+async def _get_qualifying_microf_accounts() -> set:
+    """Return the set of AC account IDs that have ≥1 Contractor Activated
+    Microf/LTO SLP record.  Result is cached for 24 h."""
+    global _qualifying_accounts_cache, _qualifying_accounts_ts
+    now = _time.time()
+    if _qualifying_accounts_cache and (now - _qualifying_accounts_ts) < _SLP_STATE_TTL:
+        return _qualifying_accounts_cache
+
+    raw = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    result: set = set()
+    for r in raw:
+        fields = {f.get("field") or f.get("id"): f.get("value") for f in r.get("fields", [])}
+        if str(fields.get("slp-status-detail", "")).strip() != "Contractor Activated":
+            continue
+        if str(fields.get("platform", "")).strip().lower() not in _MICROF_PROGRAMS:
+            continue
+        rel    = r.get("relationships", {}).get("account", [])
+        a0     = rel[0] if rel else None
+        acc_id = str(a0) if isinstance(a0, (int, str)) else str(a0.get("id", "")) if a0 else None
+        if acc_id:
+            result.add(acc_id)
+
+    _qualifying_accounts_cache = result
+    _qualifying_accounts_ts    = now
+    print(f"[slp-cache] {len(result)} qualifying Microf/LTO accounts cached")
+    return result
+
+# ── City-centroid lookup (built once from pgeocode's bundled dataset) ─────────
+# Keyed "CITY|ST" → (lat, lon).  Building this inside _build_location_index
+# on every 24-h rebuild wastes time — pgeocode's data never changes.
+def _build_city_coords_once() -> dict:
+    import math as _m
+    coords: dict = {}
+    try:
+        import pgeocode
+        df = pgeocode.Nominatim('us')._data.dropna(subset=['latitude', 'longitude']).copy()
+        df['_k'] = df['place_name'].str.strip().str.upper() + '|' + df['state_code'].str.strip().str.upper()
+        for key, row in df.groupby('_k')[['latitude', 'longitude']].mean().iterrows():
+            try:
+                lat, lon = float(row['latitude']), float(row['longitude'])
+                if not (_m.isnan(lat) or _m.isnan(lon)):
+                    coords[key] = (lat, lon)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    print(f"[city-coords] {len(coords)} city centroids loaded")
+    return coords
+
+_CITY_COORDS: dict = _build_city_coords_once()
+
+
 async def _build_slp_state_index() -> dict:
     """Build state → active Microf/LTO accounts index from SLP records.
     Uses account-level CF22 (Doing Business in States) for geography.
@@ -2652,21 +2711,7 @@ async def _build_slp_state_index() -> dict:
     if _slp_state_index and (now - _slp_state_index_ts) < _SLP_STATE_TTL:
         return _slp_state_index
 
-    # Collect account IDs with at least one qualifying active SLP
-    raw = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
-    qualifying_accounts: set = set()
-    for r in raw:
-        fields = {f.get("field") or f.get("id"): f.get("value") for f in r.get("fields", [])}
-        if str(fields.get("slp-status-detail", "")).strip() != "Contractor Activated":
-            continue
-        platform = str(fields.get("platform", "")).strip().lower()
-        if platform not in _MICROF_PROGRAMS:
-            continue
-        rel    = r.get("relationships", {}).get("account", [])
-        a0     = rel[0] if rel else None
-        acc_id = str(a0) if isinstance(a0, (int, str)) else str(a0.get("id", "")) if a0 else None
-        if acc_id:
-            qualifying_accounts.add(acc_id)
+    qualifying_accounts = await _get_qualifying_microf_accounts()
 
     # Build state index from account-level CF22 (already in memory from dealer index)
     index: dict = {}
@@ -2748,34 +2793,16 @@ async def _build_location_index() -> dict:
     if _location_index and (now - _location_index_ts) < _LOCATION_TTL:
         return _location_index
 
-    # Get qualifying account IDs (Microf/LTO + Contractor Activated)
-    raw = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
-    qualifying: set = set()
-    for r in raw:
-        fields = {f.get("field") or f.get("id"): f.get("value") for f in r.get("fields", [])}
-        if str(fields.get("slp-status-detail", "")).strip() != "Contractor Activated":
-            continue
-        if str(fields.get("platform", "")).strip().lower() not in _MICROF_PROGRAMS:
-            continue
-        rel    = r.get("relationships", {}).get("account", [])
-        a0     = rel[0] if rel else None
-        acc_id = str(a0) if isinstance(a0, (int, str)) else str(a0.get("id", "")) if a0 else None
-        if acc_id:
-            qualifying.add(acc_id)
+    # Reuse the shared qualifying-accounts cache (avoids a duplicate SLP fetch)
+    qualifying = await _get_qualifying_microf_accounts()
 
     import math as _math, random
 
-    # Build lookup tables from pgeocode's bundled US zip database:
-    #   zip_coords  — "75001"          → (lat, lon)   exact zip precision
-    #   city_coords — "HOUSTON|TX"     → (lat, lon)   city centroid (avg of all zips in that city)
-    zip_coords:  dict = {}
-    city_coords: dict = {}
+    # zip-level lookup for the small subset of accounts that actually have CF6
+    zip_coords: dict = {}
     try:
         import pgeocode
-        geo = pgeocode.Nominatim('us')
-        df  = geo._data.dropna(subset=['latitude', 'longitude'])
-
-        # zip-level lookup (only for zips our accounts actually have)
+        geo  = pgeocode.Nominatim('us')
         zips = {(_account_to_zip.get(aid, "") or "")[:5] for aid in qualifying
                 if (_account_to_zip.get(aid, "") or "")[:5].isdigit()}
         zips.discard("")
@@ -2789,21 +2816,8 @@ async def _build_location_index() -> dict:
                         zip_coords[str(idx)] = (lat, lon)
                 except Exception:
                     pass
-
-        # city-level lookup — group every zip in the dataset by city+state, take centroid
-        df2 = df.copy()
-        df2['_key'] = df2['place_name'].str.strip().str.upper() + '|' + df2['state_code'].str.strip().str.upper()
-        grp = df2.groupby('_key')[['latitude', 'longitude']].mean()
-        for key, row in grp.iterrows():
-            try:
-                lat, lon = float(row['latitude']), float(row['longitude'])
-                if not (_math.isnan(lat) or _math.isnan(lon)):
-                    city_coords[key] = (lat, lon)
-            except Exception:
-                pass
-
     except Exception:
-        pass  # fall through to state-centroid below
+        pass
 
     index: dict = {}
     for aid in qualifying:
@@ -2816,8 +2830,8 @@ async def _build_location_index() -> dict:
         if z in zip_coords:
             lat, lon  = zip_coords[z]
             precision = "zip"
-        elif city_key in city_coords:
-            lat, lon  = city_coords[city_key]
+        elif city_key in _CITY_COORDS:
+            lat, lon  = _CITY_COORDS[city_key]
             precision = "city"
         elif st in _STATE_CENTROIDS:
             # Last resort — spread pins randomly across the state
