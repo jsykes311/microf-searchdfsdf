@@ -947,6 +947,7 @@ select, input { font-family: inherit; }
       <div style="font-size:0.78rem;color:#6b7280;margin-bottom:10px;">Click anywhere on the map to see temperature and HVAC demand signal for that area.</div>
       <div id="mf-map"></div>
       <div id="mf-alert">Click a location on the map to see demand conditions.</div>
+      <div id="mf-accounts"></div>
     </div>
   </div>
 </div>
@@ -4083,33 +4084,66 @@ function initMicrofMap() {
   map.on('click', async function(e) {
     const lat = e.latlng.lat;
     const lon = e.latlng.lng;
-    const alert = document.getElementById('mf-alert');
-    alert.innerHTML = 'Loading…';
+    const alertEl = document.getElementById('mf-alert');
+    const accountsEl = document.getElementById('mf-accounts');
+    alertEl.innerHTML = 'Loading…';
+    accountsEl.innerHTML = '';
+
     try {
-      const res = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=imperial&appid=${API_KEY}`
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        alert.innerHTML = `<span style="color:#dc2626;">API error ${res.status}: ${data.message || 'Unknown error'}${res.status === 401 ? ' — key may still be activating (up to 2 hrs)' : ''}</span>`;
+      // Weather + reverse geocode in parallel
+      const [weatherRes, geoRes] = await Promise.all([
+        fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=imperial&appid=${API_KEY}`),
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`, {headers:{'Accept-Language':'en'}})
+      ]);
+
+      const data = await weatherRes.json();
+      if (!weatherRes.ok) {
+        alertEl.innerHTML = `<span style="color:#dc2626;">API error ${weatherRes.status}: ${data.message || 'Unknown error'}${weatherRes.status === 401 ? ' — key may still be activating (up to 2 hrs)' : ''}</span>`;
         return;
       }
+
       const temp = Math.round(data.main.temp);
       const city = data.name || "Selected area";
       let msg, color;
-      if (temp >= 90) {
-        msg = "🔥 HIGH DEMAND — target contractors";
-        color = "#dc2626";
-      } else if (temp <= 40) {
-        msg = "❄️ Heating demand opportunity";
-        color = "#2563eb";
-      } else {
-        msg = "✅ Normal conditions";
-        color = "#059669";
+      if (temp >= 90)      { msg = "🔥 HIGH DEMAND — target contractors"; color = "#dc2626"; }
+      else if (temp <= 40) { msg = "❄️ Heating demand opportunity";        color = "#2563eb"; }
+      else                 { msg = "✅ Normal conditions";                  color = "#059669"; }
+      alertEl.innerHTML = `<strong>${city}</strong>: ${temp}°F<br><span style="color:${color};font-weight:600;">${msg}</span>`;
+
+      // Extract state abbreviation from Nominatim
+      const geo = await geoRes.json();
+      const stateCode = (geo.address?.['ISO3166-2-lvl4'] || '').replace(/^US-/, '').trim();
+      if (!stateCode) { accountsEl.innerHTML = ''; return; }
+
+      // Fetch active accounts in this state
+      accountsEl.innerHTML = `<div style="margin-top:10px;font-size:0.78rem;color:#6b7280;">Loading accounts in ${stateCode}…</div>`;
+      const acctRes = await fetch(`/api/accounts/by-state?state=${encodeURIComponent(stateCode)}&limit=10`);
+      const acctData = await acctRes.json();
+      const accounts = acctData.accounts || [];
+      const total = acctData.total || 0;
+
+      if (!accounts.length) {
+        accountsEl.innerHTML = `<div style="margin-top:10px;font-size:0.78rem;color:#9ca3af;">No active accounts found in ${stateCode}.</div>`;
+        return;
       }
-      alert.innerHTML = `<strong>${city}</strong>: ${temp}°F<br><span style="color:${color};font-weight:600;">${msg}</span>`;
+
+      const rows = accounts.map(a => `
+        <div onclick="showTab('accounts',null);abSelect('${a.id}')"
+          style="padding:7px 10px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:8px;"
+          onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background=''">
+          <span style="font-size:0.82rem;font-weight:500;color:#1e3a5f;">${esc(a.name)}</span>
+          <span style="font-size:0.75rem;color:#6b7280;white-space:nowrap;">ID ${esc(a.dealer_id||'—')}</span>
+        </div>`).join('');
+
+      accountsEl.innerHTML = `
+        <div style="margin-top:12px;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+          <div style="padding:7px 10px;background:#f8fafc;font-size:0.75rem;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;">
+            ${stateCode} — ${total} active account${total!==1?'s':''} ${total>10?'(showing 10)':''}
+          </div>
+          <div style="max-height:240px;overflow-y:auto;">${rows}</div>
+        </div>`;
     } catch(err) {
-      alert.innerHTML = `<span style="color:#dc2626;">Network error: ${err.message}</span>`;
+      alertEl.innerHTML = `<span style="color:#dc2626;">Network error: ${err.message}</span>`;
     }
   });
 }
