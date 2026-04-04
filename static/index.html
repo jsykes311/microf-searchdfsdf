@@ -3991,7 +3991,7 @@ function _mfDropPins(accounts, centerLat, centerLon) {
   accounts.forEach(a => {
     if (!a.lat || !a.lon) return;
     L.marker([a.lat, a.lon], {icon: pinIcon}).addTo(_mfPinLayer)
-      .on('click', () => openMfCard(a));
+      .on('click', e => { L.DomEvent.stopPropagation(e); openMfCard(a); });
   });
 
   if (accounts.length) {
