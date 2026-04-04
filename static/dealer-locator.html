@@ -277,18 +277,27 @@ function _mfDropPins(accounts, centerLat, centerLon) {
 }
 
 // ── Nearest search ─────────────────────────────────────────────────────────
-async function mfFindNearest() {
-  const input     = document.getElementById('mf-zip-input').value.trim();
+async function mfFindNearest(retryCount = 0) {
+  const input      = document.getElementById('mf-zip-input').value.trim();
   if (!input) return;
-  const alertEl   = document.getElementById('mf-alert');
+  const alertEl    = document.getElementById('mf-alert');
   const accountsEl = document.getElementById('mf-accounts');
-  alertEl.textContent = 'Searching…';
-  accountsEl.innerHTML = '';
-  if (_mfPinLayer) _mfPinLayer.clearLayers();
+  if (retryCount === 0) {
+    alertEl.textContent = 'Searching…';
+    accountsEl.innerHTML = '';
+    if (_mfPinLayer) _mfPinLayer.clearLayers();
+  }
 
   try {
     const res  = await fetch(`/api/accounts/nearest?address=${encodeURIComponent(input)}&limit=10`);
     const data = await res.json();
+
+    if (data.warming_up) {
+      const secs = Math.min(5 + retryCount * 2, 15);
+      alertEl.innerHTML = `⏳ Server is warming up — retrying in ${secs}s…`;
+      setTimeout(() => mfFindNearest(retryCount + 1), secs * 1000);
+      return;
+    }
     if (data.error) { alertEl.innerHTML = `<span style="color:#dc2626;">${esc(data.error)}</span>`; return; }
     const total = data.total || 0;
     alertEl.innerHTML = `📍 Nearest Microf contractors to <strong>${esc(data.label||input)}</strong> — ${total} active account${total!==1?'s':''} total`;

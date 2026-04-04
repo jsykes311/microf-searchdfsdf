@@ -2791,14 +2791,16 @@ def _haversine(lat1, lon1, lat2, lon2) -> float:
 
 _location_index: dict = {}        # account_id → {lat, lon, name, dealer_id, city, state, zip}
 _location_index_ts: float = 0.0
+_location_index_building: bool = False
 _LOCATION_TTL = 86400
 
 async def _build_location_index() -> dict:
-    global _location_index, _location_index_ts
+    global _location_index, _location_index_ts, _location_index_building
     now = _time.time()
     if _location_index and (now - _location_index_ts) < _LOCATION_TTL:
         return _location_index
 
+    _location_index_building = True
     # Reuse the shared qualifying-accounts cache (avoids a duplicate SLP fetch)
     qualifying = await _get_qualifying_microf_accounts()
 
@@ -2864,8 +2866,9 @@ async def _build_location_index() -> dict:
             "approx":    precision != "zip",
         }
 
-    _location_index    = index
-    _location_index_ts = now
+    _location_index          = index
+    _location_index_ts       = now
+    _location_index_building = False
     by_prec = {"zip": 0, "city": 0, "state": 0}
     for v in index.values():
         if not v["approx"]:
@@ -2917,7 +2920,14 @@ async def accounts_nearest(address: str = "", limit: int = 10):
     if search_lat is None:
         return {"error": f"Could not geocode: {address}"}
 
-    loc_index = await _build_location_index()
+    # If the index is still warming up, kick off build in background and tell
+    # the client to retry — avoids blocking the request for 30-60 s on cold start
+    if not _location_index:
+        if not _location_index_building:
+            asyncio.create_task(_build_location_index())
+        return {"warming_up": True, "accounts": [], "total": 0,
+                "lat": search_lat, "lon": search_lon, "label": search_label}
+    loc_index = _location_index
     distances = []
     for aid, info in loc_index.items():
         d = _haversine(search_lat, search_lon, info["lat"], info["lon"])
