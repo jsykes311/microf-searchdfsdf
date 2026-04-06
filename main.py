@@ -2098,7 +2098,9 @@ async def license_expiration_report(
     if format == "csv":
         out = io.StringIO()
         if results:
-            w = csv.DictWriter(out, fieldnames=results[0].keys())
+            # Union of all keys so rows with extra fields don't crash the writer
+            all_keys: list = list(dict.fromkeys(k for row in results for k in row.keys()))
+            w = csv.DictWriter(out, fieldnames=all_keys, extrasaction="ignore")
             w.writeheader(); w.writerows(results)
         fn = f"license_expiration_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
