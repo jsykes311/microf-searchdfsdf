@@ -6340,7 +6340,9 @@ async def move_contact(body: _MoveIn, admin=Depends(_require_admin)):
 
 @app.post("/api/admin/move-slp")
 async def move_slp(body: _MoveIn, admin=Depends(_require_admin)):
-    """Move an SLP record to a different account by updating its relationship."""
+    """Move an SLP record to a different account.
+    AC does not allow changing relationships on existing records, so we
+    create a new record on the target account then delete the old one."""
     SLP_SCHEMA = "d5ccf74f-981f-40ff-8a03-23cd0309808f"
     try:
         rec_data = await ac_get(f"customObjects/records/{SLP_SCHEMA}/{body.record_id}")
@@ -6348,14 +6350,20 @@ async def move_slp(body: _MoveIn, admin=Depends(_require_admin)):
         if not record:
             return JSONResponse(status_code=404, content={"ok": False, "error": "SLP record not found"})
         fields = record.get("fields", [])
-        payload = {
+        # Create new record on target account
+        create_payload = {
             "record": {
                 "fields": fields,
                 "relationships": {"account": [int(body.new_account_id)]}
             }
         }
-        data = await ac_post(f"customObjects/records/{SLP_SCHEMA}/{body.record_id}", payload)
-        return {"ok": True, "slp_id": body.record_id, "new_account_id": body.new_account_id}
+        created = await ac_post(f"customObjects/records/{SLP_SCHEMA}", create_payload)
+        new_id = created.get("record", {}).get("id")
+        if not new_id:
+            return JSONResponse(status_code=500, content={"ok": False, "error": "Failed to create new SLP record"})
+        # Delete the old record
+        await ac_delete(f"customObjects/records/{SLP_SCHEMA}/{body.record_id}")
+        return {"ok": True, "old_slp_id": body.record_id, "new_slp_id": new_id, "new_account_id": body.new_account_id}
     except Exception as e:
         return JSONResponse(status_code=400, content={"ok": False, "error": str(e)})
 
