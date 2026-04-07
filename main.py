@@ -2803,6 +2803,12 @@ async def _build_location_index() -> dict:
         return _location_index
 
     _location_index_building = True
+
+    # Ensure the dealer index is ready — it populates _account_to_phone /
+    # _account_to_website / _account_to_address which we copy into each entry.
+    # Has its own TTL check so this is a no-op if already built.
+    await _build_dealer_id_index()
+
     # Reuse the shared qualifying-accounts cache (avoids a duplicate SLP fetch)
     qualifying = await _get_qualifying_microf_accounts()
 
