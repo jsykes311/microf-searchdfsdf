@@ -337,7 +337,7 @@ async function mfFindNearest(retryCount = 0) {
     if (data.error) { alertEl.innerHTML = `<span style="color:#dc2626;">${esc(data.error)}</span>`; return; }
     const total = data.total || 0;
     const within15 = data.within_15 ?? 0;
-    alertEl.innerHTML = `📍 Nearest Microf contractors to <strong>${esc(data.label||input)}</strong> — ${within15} active account${within15!==1?'s':''} within 15 miles · ${total} total`;
+    alertEl.innerHTML = `📍 Nearest Microf contractors to <strong>${esc(data.label||input)}</strong> — ${within15} active account${within15!==1?'s':''} within 15 miles`;
     const ranked = assignTiers(data.accounts);
     const tierOrder = {[TIERS[0].label]: 0, [TIERS[1].label]: 1, [TIERS[2].label]: 2};
     ranked.sort((a, b) => {
@@ -348,7 +348,7 @@ async function mfFindNearest(retryCount = 0) {
     });
     const top10 = ranked.slice(0, 10);
     _mfDropPins(top10, data.lat, data.lon);
-    _mfRenderAccountList(top10, `Nearest 10 of ${total} contractors`);
+    _mfRenderAccountList(top10, `Nearest 10 contractors`);
   } catch(err) {
     alertEl.innerHTML = `<span style="color:#dc2626;">Error: ${esc(err.message)}</span>`;
   }
