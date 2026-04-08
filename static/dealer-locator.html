@@ -100,8 +100,8 @@
       letter-spacing: 0.4px; padding: 2px 7px; border-radius: 10px;
       text-transform: uppercase; white-space: nowrap; }
     .mf-tier-1 { background: #dcfce7; color: #15803d; }
-    .mf-tier-2 { background: #fef9c3; color: #a16207; }
-    .mf-tier-3 { background: #f1f5f9; color: #94a3b8; }
+    .mf-tier-2 { background: #dbeafe; color: #1d4ed8; }
+    .mf-tier-3 { background: #fef9c3; color: #a16207; }
     #mf-card-dist {
       font-size: 0.75rem; color: #6b7280; display: none;
       padding-top: 6px; border-top: 1px solid #f1f5f9; margin-top: 2px;
@@ -187,11 +187,11 @@
 const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 function mfTier(last_app_date) {
-  if (!last_app_date) return {n:3, label:'Tier 3', cls:'mf-tier-3'};
+  if (!last_app_date) return {n:3, label:'3rd Choice', cls:'mf-tier-3'};
   const days = (Date.now() - new Date(last_app_date).getTime()) / 86400000;
-  if (days <= 90)  return {n:1, label:'Tier 1', cls:'mf-tier-1'};
-  if (days <= 365) return {n:2, label:'Tier 2', cls:'mf-tier-2'};
-  return {n:3, label:'Tier 3', cls:'mf-tier-3'};
+  if (days <= 90)  return {n:1, label:'1st Choice', cls:'mf-tier-1'};
+  if (days <= 365) return {n:2, label:'2nd Choice', cls:'mf-tier-2'};
+  return {n:3, label:'3rd Choice', cls:'mf-tier-3'};
 }
 
 let _mfMap = null;
