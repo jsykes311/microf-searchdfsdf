@@ -186,12 +186,24 @@
 <script>
 const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-function mfTier(last_app_date) {
-  if (!last_app_date) return {n:3, label:'3rd Choice', cls:'mf-tier-3'};
-  const days = (Date.now() - new Date(last_app_date).getTime()) / 86400000;
-  if (days <= 90)  return {n:1, label:'1st Choice', cls:'mf-tier-1'};
-  if (days <= 365) return {n:2, label:'2nd Choice', cls:'mf-tier-2'};
-  return {n:3, label:'3rd Choice', cls:'mf-tier-3'};
+const TIERS = [
+  {n:1, label:'1st Choice', cls:'mf-tier-1'},
+  {n:2, label:'2nd Choice', cls:'mf-tier-2'},
+  {n:3, label:'3rd Choice', cls:'mf-tier-3'},
+];
+
+function assignTiers(accounts) {
+  // Rank accounts by last_app_date descending (most recent = rank 1)
+  const sorted = [...accounts]
+    .filter(a => a.last_app_date)
+    .sort((a, b) => new Date(b.last_app_date) - new Date(a.last_app_date));
+  const rankMap = {};
+  sorted.forEach((a, i) => { rankMap[a.id] = i; });
+  return accounts.map(a => {
+    const rank = rankMap[a.id];
+    const tier = rank === 0 ? TIERS[0] : rank === 1 ? TIERS[1] : TIERS[2];
+    return {...a, _tier: tier};
+  });
 }
 
 let _mfMap = null;
@@ -205,7 +217,7 @@ function openMfCard(a) {
   set('mf-card-badge', a.platform || 'Microf');
   set('mf-card-name',  a.name);
   set('mf-card-id',    a.dealer_id ? `Dealer ID: ${a.dealer_id}` : '');
-  const tier = mfTier(a.last_app_date);
+  const tier = a._tier || TIERS[2];
   const tierEl = document.getElementById('mf-card-tier');
   if (tierEl) { tierEl.textContent = tier.label; tierEl.className = `mf-tier ${tier.cls}`; }
 
@@ -250,7 +262,7 @@ function _mfRenderAccountList(accounts, headerText) {
   const rows = accounts.map(a => {
     const dist = a.distance_miles != null ? `<span class="mf-acct-dist">${a.distance_miles} mi</span>` : '';
     const loc  = [a.city, a.state].filter(Boolean).join(', ');
-    const tier = mfTier(a.last_app_date);
+    const tier = a._tier || TIERS[2];
     return `<div class="mf-acct-row" onclick="openMfCard(${JSON.stringify(a).replace(/"/g,'&quot;')})">
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
@@ -325,8 +337,9 @@ async function mfFindNearest(retryCount = 0) {
     if (data.error) { alertEl.innerHTML = `<span style="color:#dc2626;">${esc(data.error)}</span>`; return; }
     const total = data.total || 0;
     alertEl.innerHTML = `📍 Nearest Microf contractors to <strong>${esc(data.label||input)}</strong> — ${total} active account${total!==1?'s':''} total`;
-    _mfDropPins(data.accounts, data.lat, data.lon);
-    _mfRenderAccountList(data.accounts, `Nearest ${data.accounts.length} of ${total} contractors`);
+    const ranked = assignTiers(data.accounts);
+    _mfDropPins(ranked, data.lat, data.lon);
+    _mfRenderAccountList(ranked, `Nearest ${ranked.length} of ${total} contractors`);
   } catch(err) {
     alertEl.innerHTML = `<span style="color:#dc2626;">Error: ${esc(err.message)}</span>`;
   }
