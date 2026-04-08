@@ -422,6 +422,7 @@ _account_to_state_prov: dict = {}  # account_id (str) → state/province (custom
 _account_to_phone: dict = {}    # account_id (str) → phone number (customfield 11)
 _account_to_website: dict = {}  # account_id (str) → website (customfield 39)
 _account_to_address: dict = {}  # account_id (str) → address 1 (customfield 2)
+_account_to_last_app: dict = {} # account_id (str) → last app date (customfield 140)
 _program_to_accounts: dict = {} # lowercase(dealer_program) → set of account_ids
 _dealer_index_ts:  float = 0.0
 _dealer_index_error: str = ""   # last build error message, for /api/dealer-index/status
@@ -479,6 +480,7 @@ async def _build_dealer_id_index() -> None:
     PHONE_CF_ID    = 11    # customFieldId for "Phone Number"
     WEBSITE_CF_ID  = 39    # customFieldId for "Website"
     ADDRESS_CF_ID  = 2     # customFieldId for "Address 1"
+    LAST_APP_CF_ID = 140   # customFieldId for "Last App Date"
     CF_PAGE        = 1000  # 1000 records/page → ~190 pages instead of ~1900
     CONCURRENCY    = 8     # 8 concurrent requests → index builds in ~10s instead of ~5min
 
@@ -500,6 +502,7 @@ async def _build_dealer_id_index() -> None:
         acct_to_phone:      dict = {}
         acct_to_website:    dict = {}
         acct_to_address:    dict = {}
+        acct_to_last_app:   dict = {}
 
         def _ingest(items: list) -> None:
             for item in items:
@@ -531,6 +534,8 @@ async def _build_dealer_id_index() -> None:
                     acct_to_website[aid]    = val
                 elif cf_id == ADDRESS_CF_ID:
                     acct_to_address[aid]    = val
+                elif cf_id == LAST_APP_CF_ID:
+                    acct_to_last_app[aid]   = val[:10] if val else ""
 
         _ingest(first_page.get("accountCustomFieldData", []))
 
@@ -577,6 +582,7 @@ async def _build_dealer_id_index() -> None:
         _account_to_phone.clear();       _account_to_phone.update(acct_to_phone)
         _account_to_website.clear();     _account_to_website.update(acct_to_website)
         _account_to_address.clear();     _account_to_address.update(acct_to_address)
+        _account_to_last_app.clear();    _account_to_last_app.update(acct_to_last_app)
 
         # Reverse index: lowercase dealer program → set of account IDs
         new_prog: dict = {}
@@ -2936,6 +2942,7 @@ async def accounts_nearest(address: str = "", limit: int = 10):
             "phone":        _account_to_phone.get(aid, ""),
             "website":      _account_to_website.get(aid, ""),
             "address":      _account_to_address.get(aid, ""),
+            "last_app_date": _account_to_last_app.get(aid, ""),
         })
 
     distances.sort(key=lambda x: x["distance_miles"])

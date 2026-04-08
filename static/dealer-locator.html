@@ -96,6 +96,12 @@
     .mf-card-row span.icon { color: #6b7280; margin-right: 6px; }
     .mf-card-row a { color: #019139; text-decoration: none; }
     .mf-card-row a:hover { text-decoration: underline; }
+    .mf-tier { display: inline-block; font-size: 0.65rem; font-weight: 700;
+      letter-spacing: 0.4px; padding: 2px 7px; border-radius: 10px;
+      text-transform: uppercase; white-space: nowrap; }
+    .mf-tier-1 { background: #dcfce7; color: #15803d; }
+    .mf-tier-2 { background: #fef9c3; color: #a16207; }
+    .mf-tier-3 { background: #f1f5f9; color: #94a3b8; }
     #mf-card-dist {
       font-size: 0.75rem; color: #6b7280; display: none;
       padding-top: 6px; border-top: 1px solid #f1f5f9; margin-top: 2px;
@@ -160,7 +166,10 @@
 <div id="mf-card-overlay" onclick="if(event.target===this)closeMfCard()">
   <div id="mf-card">
     <div id="mf-card-header">
-      <div id="mf-card-badge"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div id="mf-card-badge"></div>
+        <span id="mf-card-tier" class="mf-tier"></span>
+      </div>
       <div id="mf-card-name"></div>
       <div id="mf-card-id"></div>
       <button id="mf-card-close" onclick="closeMfCard()">✕</button>
@@ -177,6 +186,14 @@
 <script>
 const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
+function mfTier(last_app_date) {
+  if (!last_app_date) return {n:3, label:'Tier 3', cls:'mf-tier-3'};
+  const days = (Date.now() - new Date(last_app_date).getTime()) / 86400000;
+  if (days <= 90)  return {n:1, label:'Tier 1', cls:'mf-tier-1'};
+  if (days <= 365) return {n:2, label:'Tier 2', cls:'mf-tier-2'};
+  return {n:3, label:'Tier 3', cls:'mf-tier-3'};
+}
+
 let _mfMap = null;
 let _mfPinLayer = null;
 
@@ -188,6 +205,9 @@ function openMfCard(a) {
   set('mf-card-badge', a.platform || 'Microf');
   set('mf-card-name',  a.name);
   set('mf-card-id',    a.dealer_id ? `Dealer ID: ${a.dealer_id}` : '');
+  const tier = mfTier(a.last_app_date);
+  const tierEl = document.getElementById('mf-card-tier');
+  if (tierEl) { tierEl.textContent = tier.label; tierEl.className = `mf-tier ${tier.cls}`; }
 
   const cityLine = [a.city, a.state].filter(Boolean).join(', ');
   const addrFull = [a.address, cityLine].filter(Boolean).join(', ');
@@ -230,9 +250,13 @@ function _mfRenderAccountList(accounts, headerText) {
   const rows = accounts.map(a => {
     const dist = a.distance_miles != null ? `<span class="mf-acct-dist">${a.distance_miles} mi</span>` : '';
     const loc  = [a.city, a.state].filter(Boolean).join(', ');
+    const tier = mfTier(a.last_app_date);
     return `<div class="mf-acct-row" onclick="openMfCard(${JSON.stringify(a).replace(/"/g,'&quot;')})">
-      <div>
-        <div class="mf-acct-name">${esc(a.name)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <div class="mf-acct-name">${esc(a.name)}</div>
+          <span class="mf-tier ${tier.cls}">${tier.label}</span>
+        </div>
         ${loc ? `<div class="mf-acct-sub">${esc(loc)}${a.dealer_id ? ' · ID ' + esc(a.dealer_id) : ''}</div>` : ''}
       </div>
       ${dist}
