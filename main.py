@@ -2948,12 +2948,14 @@ async def accounts_nearest(address: str = "", limit: int = 10):
         })
 
     distances.sort(key=lambda x: x["distance_miles"])
+    within_15 = [d for d in distances if d["distance_miles"] <= 15]
     return {
         "accounts": distances[:limit],
         "lat": search_lat,
         "lon": search_lon,
         "label": search_label,
         "total": len(distances),
+        "within_15": len(within_15),
     }
 
 
