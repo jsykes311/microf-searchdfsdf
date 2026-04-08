@@ -480,7 +480,7 @@ async def _build_dealer_id_index() -> None:
     PHONE_CF_ID    = 11    # customFieldId for "Phone Number"
     WEBSITE_CF_ID  = 39    # customFieldId for "Website"
     ADDRESS_CF_ID  = 2     # customFieldId for "Address 1"
-    LAST_APP_CF_ID = 140   # customFieldId for "Last App Date"
+    LAST_APP_CF_ID = 37    # customFieldId for "Last Application Date" (CF140 is unpopulated)
     CF_PAGE        = 1000  # 1000 records/page → ~190 pages instead of ~1900
     CONCURRENCY    = 8     # 8 concurrent requests → index builds in ~10s instead of ~5min
 
@@ -551,6 +551,17 @@ async def _build_dealer_id_index() -> None:
             for page in pages:
                 if not isinstance(page, Exception):
                     _ingest(page.get("accountCustomFieldData", []))
+
+        # ── Phase 1b: fetch Last Application Date (CF37) via dedicated scan ─
+        # CF37 data lives at high offsets in the bulk endpoint and is missed
+        # by the parallel scan; _fetch_acct_cf_map pages reliably through all records.
+        print("[dealer-index] Fetching Last Application Date (CF37)…")
+        cf37_map = await _fetch_acct_cf_map({"37"})
+        for aid, fields in cf37_map.items():
+            val = fields.get("37", "")
+            if val:
+                acct_to_last_app[aid] = val[:10]
+        print(f"[dealer-index] {len(acct_to_last_app)} last app dates loaded")
 
         print(f"[dealer-index] {len(acct_to_dealer)} dealer IDs, "
               f"{len(acct_to_platform)} platforms, {len(acct_to_bdr)} BDRs indexed; "
