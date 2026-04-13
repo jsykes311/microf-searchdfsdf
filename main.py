@@ -6378,6 +6378,217 @@ async def move_slp(body: _MoveIn, admin=Depends(_require_admin)):
         return JSONResponse(status_code=400, content={"ok": False, "error": str(e)})
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Webhook: deal-created → append row to SharePoint Excel
+# ─────────────────────────────────────────────────────────────────────────────
+
+_GRAPH_TOKEN_CACHE: dict = {}
+
+async def _get_graph_token() -> str:
+    """Get a Microsoft Graph access token via client credentials flow, with caching."""
+    now = _time.time()
+    if _GRAPH_TOKEN_CACHE.get("token") and now < _GRAPH_TOKEN_CACHE.get("expires", 0) - 60:
+        return _GRAPH_TOKEN_CACHE["token"]
+
+    tenant = _AZ_TENANT_ID if _AZ_TENANT_ID and _AZ_TENANT_ID != "common" else os.getenv("AZURE_TENANT_ID", "")
+    url = f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(url, data={
+            "grant_type":    "client_credentials",
+            "client_id":     _AZ_CLIENT_ID,
+            "client_secret": _AZ_CLIENT_SEC,
+            "scope":         "https://graph.microsoft.com/.default",
+        })
+        resp.raise_for_status()
+        data = resp.json()
+    token = data["access_token"]
+    _GRAPH_TOKEN_CACHE["token"]   = token
+    _GRAPH_TOKEN_CACHE["expires"] = now + int(data.get("expires_in", 3600))
+    return token
+
+
+async def _graph_get(path: str) -> dict:
+    token = await _get_graph_token()
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"https://graph.microsoft.com/v1.0{path}",
+                             headers={"Authorization": f"Bearer {token}"}, timeout=30)
+        r.raise_for_status()
+        return r.json()
+
+
+async def _graph_put(path: str, data: bytes, content_type: str = "application/octet-stream") -> dict:
+    token = await _get_graph_token()
+    async with httpx.AsyncClient() as client:
+        r = await client.put(f"https://graph.microsoft.com/v1.0{path}",
+                             headers={"Authorization": f"Bearer {token}", "Content-Type": content_type},
+                             content=data, timeout=60)
+        r.raise_for_status()
+        return r.json()
+
+
+async def _graph_post(path: str, body: dict) -> dict:
+    token = await _get_graph_token()
+    async with httpx.AsyncClient() as client:
+        r = await client.post(f"https://graph.microsoft.com/v1.0{path}",
+                              headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                              json=body, timeout=30)
+        r.raise_for_status()
+        return r.json()
+
+
+_SP_SITE_ID: str = ""
+_SP_DRIVE_ID: str = ""
+_SP_FILE_ID: str = ""
+
+_DEAL_TRACKER_HEADERS = ["Date", "Deal ID", "Account Name", "Dealer ID", "Platform", "Contact Name", "Contact Email"]
+_SP_HOSTNAME  = "microfllc.sharepoint.com"
+_SP_SITE_PATH = "/DRR"
+_SP_FOLDER    = "2024 Marketing Management"
+_SP_FILENAME  = "Deal Tracker.xlsx"
+
+
+async def _ensure_sp_ids():
+    """Resolve and cache SharePoint site ID, drive ID, and file ID."""
+    global _SP_SITE_ID, _SP_DRIVE_ID, _SP_FILE_ID
+
+    if not _SP_SITE_ID:
+        site = await _graph_get(f"/sites/{_SP_HOSTNAME}:{_SP_SITE_PATH}")
+        _SP_SITE_ID = site["id"]
+
+    if not _SP_DRIVE_ID:
+        drives = await _graph_get(f"/sites/{_SP_SITE_ID}/drives")
+        # The DRR document library has the same name
+        for d in drives.get("value", []):
+            if d.get("name", "").upper() == "DRR":
+                _SP_DRIVE_ID = d["id"]
+                break
+        if not _SP_DRIVE_ID:
+            # Fallback: use default drive
+            drive = await _graph_get(f"/sites/{_SP_SITE_ID}/drive")
+            _SP_DRIVE_ID = drive["id"]
+
+    if not _SP_FILE_ID:
+        try:
+            item = await _graph_get(
+                f"/drives/{_SP_DRIVE_ID}/root:/{_SP_FOLDER}/{_SP_FILENAME}"
+            )
+            _SP_FILE_ID = item["id"]
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                _SP_FILE_ID = ""   # will create below
+            else:
+                raise
+
+
+async def _ensure_workbook() -> str:
+    """Ensure Deal Tracker.xlsx exists. Returns file ID."""
+    global _SP_FILE_ID
+    await _ensure_sp_ids()
+
+    if not _SP_FILE_ID:
+        # Create a minimal XLSX with headers using openpyxl
+        try:
+            import openpyxl
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Deals"
+            ws.append(_DEAL_TRACKER_HEADERS)
+            buf = io.BytesIO()
+            wb.save(buf)
+            content = buf.getvalue()
+        except ImportError:
+            # Fallback: use a pre-built minimal xlsx bytes if openpyxl not available
+            raise RuntimeError("openpyxl is required to create the Excel file. Install it on the server.")
+
+        item = await _graph_put(
+            f"/drives/{_SP_DRIVE_ID}/root:/{_SP_FOLDER}/{_SP_FILENAME}:/content",
+            content,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        _SP_FILE_ID = item["id"]
+
+    return _SP_FILE_ID
+
+
+async def _append_deal_row(row: list):
+    """Append one row to the Deal Tracker worksheet via Graph workbook API."""
+    file_id = await _ensure_workbook()
+
+    # Get used range to find the next empty row
+    try:
+        used = await _graph_get(
+            f"/drives/{_SP_DRIVE_ID}/items/{file_id}/workbook/worksheets('Deals')/usedRange"
+        )
+        row_count = len(used.get("values", [])) or 1
+    except Exception:
+        row_count = 1  # fallback: header row only
+
+    next_row = row_count + 1  # 1-indexed, header is row 1
+    col_count = len(_DEAL_TRACKER_HEADERS)
+    # Excel address e.g. A3:G3
+    end_col = chr(ord('A') + col_count - 1)
+    cell_range = f"A{next_row}:{end_col}{next_row}"
+
+    await _graph_post(
+        f"/drives/{_SP_DRIVE_ID}/items/{file_id}/workbook/worksheets('Deals')/range(address='{cell_range}')",
+        {"values": [row]}
+    )
+
+
+def _parse_bracket_form(raw_body: bytes) -> dict:
+    """Parse AC webhook form-encoded payload like deal[id]=123&deal[field][35]=abc into nested dict."""
+    from urllib.parse import parse_qsl
+    flat = dict(parse_qsl(raw_body.decode("utf-8", errors="replace")))
+    result: dict = {}
+    for key, val in flat.items():
+        # e.g. "deal[field][35]" → ["deal","field","35"]
+        parts = key.replace("]", "").split("[")
+        node = result
+        for p in parts[:-1]:
+            node = node.setdefault(p, {})
+        node[parts[-1]] = val
+    return result
+
+
+@app.post("/webhook/deal-created")
+async def webhook_deal_created(request: _Request):
+    """
+    Receives ActiveCampaign deal-created webhook (form-encoded).
+    Appends a row to Deal Tracker.xlsx in SharePoint DRR/2024 Marketing Management.
+    """
+    try:
+        body = await request.body()
+        data = _parse_bracket_form(body)
+
+        deal    = data.get("deal", {})
+        contact = data.get("contact", {})
+
+        deal_id      = deal.get("id", "")
+        account_name = deal.get("orgname") or deal.get("account", {}).get("name", "") if isinstance(deal.get("account"), dict) else deal.get("orgname", "")
+        fields       = deal.get("field", {})
+        dealer_id    = fields.get("35", "")   # CF35
+        platform     = fields.get("45", "")   # CF45
+
+        first  = contact.get("first_name") or contact.get("firstName", "")
+        last   = contact.get("last_name")  or contact.get("lastName", "")
+        contact_name  = f"{first} {last}".strip()
+        contact_email = contact.get("email", "")
+
+        row_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+        row = [row_date, deal_id, account_name, dealer_id, platform, contact_name, contact_email]
+        await _append_deal_row(row)
+
+        print(f"[webhook/deal-created] ✓ appended row: deal={deal_id} acct={account_name}")
+        return {"ok": True, "deal_id": deal_id}
+
+    except Exception as e:
+        import traceback as _tb
+        print(f"[webhook/deal-created] ✗ {e}\n{_tb.format_exc()}")
+        # Return 200 so AC doesn't retry endlessly; log the error
+        return JSONResponse(status_code=200, content={"ok": False, "error": str(e)})
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
