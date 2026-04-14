@@ -6562,6 +6562,30 @@ def _parse_bracket_form(raw_body: bytes) -> dict:
     return result
 
 
+@app.get("/webhook/debug-sp")
+async def webhook_debug_sp():
+    """Debug: show resolved SharePoint IDs and file location."""
+    try:
+        await _ensure_sp_ids()
+        drives = await _graph_get(f"/sites/{_SP_SITE_ID}/drives")
+        drive_info = next((d for d in drives.get("value", []) if d["id"] == _SP_DRIVE_ID), {})
+        result = {
+            "site_id": _SP_SITE_ID,
+            "drive_id": _SP_DRIVE_ID,
+            "drive_name": drive_info.get("name"),
+            "drive_webUrl": drive_info.get("webUrl"),
+            "file_id": _SP_FILE_ID,
+        }
+        if _SP_FILE_ID:
+            item = await _graph_get(f"/drives/{_SP_DRIVE_ID}/items/{_SP_FILE_ID}")
+            result["file_name"] = item.get("name")
+            result["file_webUrl"] = item.get("webUrl")
+            result["file_path"] = item.get("parentReference", {}).get("path")
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.post("/webhook/deal-created")
 async def webhook_deal_created(request: _Request):
     """
