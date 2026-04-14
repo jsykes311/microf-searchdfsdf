@@ -6683,7 +6683,7 @@ async def _fetch_full_deal(deal_id: str) -> dict:
     # Build custom field map: metaId → value
     cf_by_id: dict = {}
     for cf in cf_resp.get("dealCustomFieldData", []):
-        mid = str(cf.get("dealCustomFieldMetaId", ""))
+        mid = str(cf.get("customFieldId") or cf.get("dealCustomFieldMetumId") or "")
         cf_by_id[mid] = cf.get("fieldValue", "") or ""
 
     # Parallel: pipeline, stage, owner, contact
