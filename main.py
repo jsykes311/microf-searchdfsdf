@@ -6451,7 +6451,12 @@ _SP_SITE_ID: str = ""
 _SP_DRIVE_ID: str = ""
 _SP_FILE_ID: str = ""
 
-_DEAL_TRACKER_HEADERS = ["Date", "Deal ID", "Account Name", "Dealer ID", "Platform", "Contact Name", "Contact Email"]
+_DEAL_TRACKER_HEADERS = [
+    "Date", "Deal ID", "Account Name", "Pipeline", "Stage", "Status",
+    "Deal Description", "Deal Owner", "Lead Source", "Docs Packet Status",
+    "Dealer ID", "Dealer Program", "Dealer Activation Timestamp",
+    "Contact Name", "Contact Phone", "Contact Email",
+]
 _SP_HOSTNAME  = "microfllc.sharepoint.com"
 _SP_FOLDER    = "2024 Marketing Management"
 _SP_FILENAME  = "Deal Tracker.xlsx"
@@ -6539,9 +6544,14 @@ async def _append_deal_row(row: list):
         r.raise_for_status()
         file_bytes = r.content
 
-    # Load, append row, save
+    # Load, ensure headers, append row, save
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes))
     ws = wb["Deals"] if "Deals" in wb.sheetnames else wb.active
+    # Update header row if it's missing or outdated
+    current_headers = [ws.cell(1, c).value for c in range(1, len(_DEAL_TRACKER_HEADERS) + 1)]
+    if current_headers != _DEAL_TRACKER_HEADERS:
+        for c, h in enumerate(_DEAL_TRACKER_HEADERS, 1):
+            ws.cell(1, c).value = h
     ws.append(row)
     buf = io.BytesIO()
     wb.save(buf)
@@ -6653,48 +6663,123 @@ async def webhook_debug_sp():
         return {"error": str(e)}
 
 
+async def _fetch_full_deal(deal_id: str) -> dict:
+    """Fetch all deal data from AC API. Returns a flat dict of all fields."""
+
+    async def safe(coro):
+        try:
+            return await coro
+        except Exception:
+            return {}
+
+    # Parallel: deal details + custom field data
+    deal_resp, cf_resp = await asyncio.gather(
+        safe(ac_get(f"deals/{deal_id}")),
+        safe(ac_get(f"deals/{deal_id}/dealCustomFieldData")),
+    )
+
+    deal = deal_resp.get("deal", {})
+
+    # Build custom field map: metaId → value
+    cf_by_id: dict = {}
+    for cf in cf_resp.get("dealCustomFieldData", []):
+        mid = str(cf.get("dealCustomFieldMetaId", ""))
+        cf_by_id[mid] = cf.get("fieldValue", "") or ""
+
+    # Parallel: pipeline, stage, owner, contact
+    pipeline_id = deal.get("group", "")
+    stage_id    = deal.get("stage", "")
+    owner_id    = deal.get("owner", "")
+    contact_id  = deal.get("contact", "")
+
+    async def _empty(): return {}
+
+    pipeline_resp, stage_resp, owner_resp, contact_resp = await asyncio.gather(
+        safe(ac_get(f"dealGroups/{pipeline_id}")) if pipeline_id else _empty(),
+        safe(ac_get(f"dealStages/{stage_id}"))    if stage_id    else _empty(),
+        safe(ac_get(f"users/{owner_id}"))          if owner_id    else _empty(),
+        safe(ac_get(f"contacts/{contact_id}"))     if contact_id  else _empty(),
+    )
+
+    pipeline_name = pipeline_resp.get("dealGroup", {}).get("title", "")
+    stage_name    = stage_resp.get("dealStage", {}).get("title", "")
+
+    user = owner_resp.get("user", {})
+    owner_name = f"{user.get('firstName','')} {user.get('lastName','')}".strip()
+
+    contact = contact_resp.get("contact", {})
+    contact_name  = f"{contact.get('firstName','')} {contact.get('lastName','')}".strip()
+    contact_email = contact.get("email", "")
+    contact_phone = contact.get("phone", "")
+
+    status_map = {"0": "Open", "1": "Won", "2": "Lost"}
+    status = status_map.get(str(deal.get("status", "0")), str(deal.get("status", "")))
+
+    return {
+        "deal_id":       deal.get("id", deal_id),
+        "account_name":  deal.get("title", ""),
+        "pipeline":      pipeline_name,
+        "stage":         stage_name,
+        "status":        status,
+        "description":   deal.get("description", ""),
+        "owner":         owner_name,
+        "lead_source":   cf_by_id.get("39", ""),   # CF39
+        "docs_packet":   cf_by_id.get("38", ""),   # CF38
+        "dealer_id":     cf_by_id.get("35", ""),   # CF35
+        "dealer_program":cf_by_id.get("45", ""),   # CF45
+        "activation_ts": cf_by_id.get("34", ""),   # CF34
+        "contact_name":  contact_name,
+        "contact_phone": contact_phone,
+        "contact_email": contact_email,
+    }
+
+
 @app.post("/webhook/deal-created")
 async def webhook_deal_created(request: _Request):
     """
     Receives ActiveCampaign deal-created webhook (form-encoded).
-    Appends a row to Deal Tracker.xlsx in SharePoint DRR/2024 Marketing Management.
+    Fetches full deal from AC API and appends row to Deal Tracker.xlsx in SharePoint.
     """
     try:
         body = await request.body()
-        # Log raw payload for debugging
-        print(f"[webhook/deal-created] RAW: {body.decode('utf-8', errors='replace')[:2000]}")
         data = _parse_bracket_form(body)
-        print(f"[webhook/deal-created] PARSED: {json.dumps(data, default=str)[:2000]}")
+        deal_payload = data.get("deal", {})
+        deal_id = deal_payload.get("id", "")
 
-        deal    = data.get("deal", {})
-        contact = data.get("contact", {})
+        if not deal_id:
+            print(f"[webhook/deal-created] no deal id in payload: {body[:500]}")
+            return {"ok": False, "error": "no deal id"}
 
-        deal_id      = deal.get("id", "")
-        account_name = deal.get("orgname") or deal.get("account", {}).get("name", "") if isinstance(deal.get("account"), dict) else deal.get("orgname", "")
-
-        # AC may send custom fields as deal[field][N] or deal[fields][N]
-        fields   = deal.get("field") or deal.get("fields") or {}
-        dealer_id = fields.get("35", "") if isinstance(fields, dict) else ""
-        platform  = fields.get("45", "") if isinstance(fields, dict) else ""
-
-        # Contact may come as contact[firstname] or contact[first_name]
-        first  = contact.get("first_name") or contact.get("firstname") or contact.get("firstName", "")
-        last   = contact.get("last_name")  or contact.get("lastname")  or contact.get("lastName", "")
-        contact_name  = f"{first} {last}".strip()
-        contact_email = contact.get("email", "")
+        # Fetch full deal details from AC API
+        d = await _fetch_full_deal(deal_id)
 
         row_date = datetime.utcnow().strftime("%Y-%m-%d")
+        row = [
+            row_date,
+            d["deal_id"],
+            d["account_name"],
+            d["pipeline"],
+            d["stage"],
+            d["status"],
+            d["description"],
+            d["owner"],
+            d["lead_source"],
+            d["docs_packet"],
+            d["dealer_id"],
+            d["dealer_program"],
+            d["activation_ts"],
+            d["contact_name"],
+            d["contact_phone"],
+            d["contact_email"],
+        ]
 
-        row = [row_date, deal_id, account_name, dealer_id, platform, contact_name, contact_email]
         await _append_deal_row(row)
-
-        print(f"[webhook/deal-created] ✓ appended row: deal={deal_id} acct={account_name} dealer={dealer_id} platform={platform} contact={contact_name}")
+        print(f"[webhook/deal-created] ✓ deal={deal_id} acct={d['account_name']} dealer={d['dealer_id']} program={d['dealer_program']}")
         return {"ok": True, "deal_id": deal_id}
 
     except Exception as e:
         import traceback as _tb
         print(f"[webhook/deal-created] ✗ {e}\n{_tb.format_exc()}")
-        # Return 200 so AC doesn't retry endlessly; log the error
         return JSONResponse(status_code=200, content={"ok": False, "error": str(e)})
 
 
