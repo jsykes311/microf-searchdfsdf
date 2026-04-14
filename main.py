@@ -6523,27 +6523,35 @@ async def _ensure_workbook() -> str:
 
 
 async def _append_deal_row(row: list):
-    """Append one row to the Deal Tracker worksheet via Graph workbook API."""
+    """Append one row by downloading the xlsx, modifying with openpyxl, and re-uploading."""
+    import openpyxl
     file_id = await _ensure_workbook()
+    token = await _get_graph_token()
 
-    # Get used range to find the next empty row
-    try:
-        used = await _graph_get(
-            f"/drives/{_SP_DRIVE_ID}/items/{file_id}/workbook/worksheets('Deals')/usedRange"
+    # Download current file
+    async with httpx.AsyncClient() as client:
+        r = await client.get(
+            f"https://graph.microsoft.com/v1.0/drives/{_SP_DRIVE_ID}/items/{file_id}/content",
+            headers={"Authorization": f"Bearer {token}"},
+            follow_redirects=True,
+            timeout=30,
         )
-        row_count = len(used.get("values", [])) or 1
-    except Exception:
-        row_count = 1  # fallback: header row only
+        r.raise_for_status()
+        file_bytes = r.content
 
-    next_row = row_count + 1  # 1-indexed, header is row 1
-    col_count = len(_DEAL_TRACKER_HEADERS)
-    # Excel address e.g. A3:G3
-    end_col = chr(ord('A') + col_count - 1)
-    cell_range = f"A{next_row}:{end_col}{next_row}"
+    # Load, append row, save
+    wb = openpyxl.load_workbook(io.BytesIO(file_bytes))
+    ws = wb["Deals"] if "Deals" in wb.sheetnames else wb.active
+    ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    new_bytes = buf.getvalue()
 
-    await _graph_patch(
-        f"/drives/{_SP_DRIVE_ID}/items/{file_id}/workbook/worksheets('Deals')/range(address='{cell_range}')",
-        {"values": [row]}
+    # Re-upload
+    await _graph_put(
+        f"/drives/{_SP_DRIVE_ID}/items/{file_id}/content",
+        new_bytes,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 
