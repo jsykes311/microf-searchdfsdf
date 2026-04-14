@@ -6581,6 +6581,16 @@ async def webhook_debug_sp():
             result["file_name"] = item.get("name")
             result["file_webUrl"] = item.get("webUrl")
             result["file_path"] = item.get("parentReference", {}).get("path")
+            result["file_sharepoint_url"] = item.get("webUrl")
+        # List children of the target folder to see what's actually there
+        try:
+            folder = await _graph_get(f"/drives/{_SP_DRIVE_ID}/root:/{_SP_FOLDER}")
+            result["folder_id"] = folder.get("id")
+            result["folder_webUrl"] = folder.get("webUrl")
+            children = await _graph_get(f"/drives/{_SP_DRIVE_ID}/items/{folder['id']}/children")
+            result["folder_contents"] = [{"name": c.get("name"), "webUrl": c.get("webUrl")} for c in children.get("value", [])]
+        except Exception as fe:
+            result["folder_error"] = str(fe)
         return result
     except Exception as e:
         return {"error": str(e)}
