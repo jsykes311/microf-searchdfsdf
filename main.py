@@ -208,7 +208,7 @@ class _MSAuthMiddleware(BaseHTTPMiddleware):
     _PUBLIC = {"/login", "/auth/start", "/auth/callback", "/logout", "/health",
                "/api/dealer-index/status", "/dealer-locator-beta",
                "/api/accounts/nearest", "/api/accounts/by-state",
-               "/webhook/deal-created", "/webhook/debug-sp"}
+               "/webhook/deal-created", "/webhook/debug-sp", "/webhook/reset-sp-file"}
 
     async def dispatch(self, request: _Request, call_next):
         path = request.url.path
@@ -6568,6 +6568,28 @@ def _parse_bracket_form(raw_body: bytes) -> dict:
             node = node.setdefault(p, {})
         node[parts[-1]] = val
     return result
+
+
+@app.post("/webhook/reset-sp-file")
+async def webhook_reset_sp_file():
+    """Delete the cached Deal Tracker file and clear cache so it gets recreated fresh."""
+    global _SP_FILE_ID
+    try:
+        await _ensure_sp_ids()
+        if _SP_FILE_ID:
+            token = await _get_graph_token()
+            async with httpx.AsyncClient() as client:
+                r = await client.delete(
+                    f"https://graph.microsoft.com/v1.0/drives/{_SP_DRIVE_ID}/items/{_SP_FILE_ID}",
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=30,
+                )
+            deleted_id = _SP_FILE_ID
+            _SP_FILE_ID = ""
+            return {"ok": True, "deleted_file_id": deleted_id, "status_code": r.status_code}
+        return {"ok": True, "message": "No file cached, nothing to delete"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 @app.get("/webhook/debug-sp")
