@@ -6661,19 +6661,25 @@ async def webhook_deal_created(request: _Request):
     """
     try:
         body = await request.body()
+        # Log raw payload for debugging
+        print(f"[webhook/deal-created] RAW: {body.decode('utf-8', errors='replace')[:2000]}")
         data = _parse_bracket_form(body)
+        print(f"[webhook/deal-created] PARSED: {json.dumps(data, default=str)[:2000]}")
 
         deal    = data.get("deal", {})
         contact = data.get("contact", {})
 
         deal_id      = deal.get("id", "")
         account_name = deal.get("orgname") or deal.get("account", {}).get("name", "") if isinstance(deal.get("account"), dict) else deal.get("orgname", "")
-        fields       = deal.get("field", {})
-        dealer_id    = fields.get("35", "")   # CF35
-        platform     = fields.get("45", "")   # CF45
 
-        first  = contact.get("first_name") or contact.get("firstName", "")
-        last   = contact.get("last_name")  or contact.get("lastName", "")
+        # AC may send custom fields as deal[field][N] or deal[fields][N]
+        fields   = deal.get("field") or deal.get("fields") or {}
+        dealer_id = fields.get("35", "") if isinstance(fields, dict) else ""
+        platform  = fields.get("45", "") if isinstance(fields, dict) else ""
+
+        # Contact may come as contact[firstname] or contact[first_name]
+        first  = contact.get("first_name") or contact.get("firstname") or contact.get("firstName", "")
+        last   = contact.get("last_name")  or contact.get("lastname")  or contact.get("lastName", "")
         contact_name  = f"{first} {last}".strip()
         contact_email = contact.get("email", "")
 
@@ -6682,7 +6688,7 @@ async def webhook_deal_created(request: _Request):
         row = [row_date, deal_id, account_name, dealer_id, platform, contact_name, contact_email]
         await _append_deal_row(row)
 
-        print(f"[webhook/deal-created] ✓ appended row: deal={deal_id} acct={account_name}")
+        print(f"[webhook/deal-created] ✓ appended row: deal={deal_id} acct={account_name} dealer={dealer_id} platform={platform} contact={contact_name}")
         return {"ok": True, "deal_id": deal_id}
 
     except Exception as e:
