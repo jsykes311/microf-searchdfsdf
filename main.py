@@ -6443,7 +6443,6 @@ _SP_FILE_ID: str = ""
 
 _DEAL_TRACKER_HEADERS = ["Date", "Deal ID", "Account Name", "Dealer ID", "Platform", "Contact Name", "Contact Email"]
 _SP_HOSTNAME  = "microfllc.sharepoint.com"
-_SP_SITE_PATH = "/DRR"
 _SP_FOLDER    = "2024 Marketing Management"
 _SP_FILENAME  = "Deal Tracker.xlsx"
 
@@ -6453,20 +6452,18 @@ async def _ensure_sp_ids():
     global _SP_SITE_ID, _SP_DRIVE_ID, _SP_FILE_ID
 
     if not _SP_SITE_ID:
-        site = await _graph_get(f"/sites/{_SP_HOSTNAME}:{_SP_SITE_PATH}")
+        # DRR is a document library on the root site, not a subsite
+        site = await _graph_get(f"/sites/{_SP_HOSTNAME}")
         _SP_SITE_ID = site["id"]
 
     if not _SP_DRIVE_ID:
         drives = await _graph_get(f"/sites/{_SP_SITE_ID}/drives")
-        # The DRR document library has the same name
         for d in drives.get("value", []):
             if d.get("name", "").upper() == "DRR":
                 _SP_DRIVE_ID = d["id"]
                 break
         if not _SP_DRIVE_ID:
-            # Fallback: use default drive
-            drive = await _graph_get(f"/sites/{_SP_SITE_ID}/drive")
-            _SP_DRIVE_ID = drive["id"]
+            raise RuntimeError(f"DRR document library not found. Available: {[d.get('name') for d in drives.get('value', [])]}")
 
     if not _SP_FILE_ID:
         try:
