@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query, Depends, Body, BackgroundTask
 from pydantic import BaseModel as _BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse, JSONResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.requests import Request as _Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -6790,7 +6790,196 @@ async def webhook_deal_created(request: _Request, background_tasks: BackgroundTa
         return JSONResponse(status_code=200, content={"ok": False, "error": str(e)})
 
 
-@app.get("/reports/slp-health")
+@app.get("/reports/slp-health", response_class=HTMLResponse)
+async def slp_health_page(user=Depends(require_auth)):
+    return HTMLResponse("""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SLP Health Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f6fa; color: #222; }
+  header { background: #1a1a2e; color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
+  .filters { background: #fff; border-radius: 8px; padding: 20px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 20px; }
+  .filter-group { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: .5px; }
+  select, input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 180px; }
+  button { padding: 9px 20px; background: #4f46e5; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:hover { background: #4338ca; }
+  button:disabled { background: #a5b4fc; cursor: not-allowed; }
+  .summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat { background: #fff; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); min-width: 140px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: #4f46e5; }
+  .stat-label { font-size: 12px; color: #888; margin-top: 4px; }
+  .results { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f8f9fb; text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #eee; }
+  td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafe; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .badge-red { background: #fee2e2; color: #b91c1c; }
+  .badge-yellow { background: #fef9c3; color: #854d0e; }
+  .badge-gray { background: #f1f5f9; color: #475569; }
+  .empty { text-align: center; padding: 48px; color: #999; }
+  .loading { text-align: center; padding: 48px; color: #999; }
+  a.ac-link { color: #4f46e5; text-decoration: none; }
+  a.ac-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚕ SLP Health Report</h1>
+</header>
+<div class="container">
+  <div class="filters">
+    <div class="filter-group">
+      <label>Issue *</label>
+      <select id="issue">
+        <option value="">— select —</option>
+        <option value="no_dealer_id">Missing Dealer ID</option>
+        <option value="no_status">Missing Status</option>
+        <option value="no_platform">Missing Program</option>
+        <option value="no_date">Missing Activation Date</option>
+        <option value="id_mismatch">Dealer ID Mismatch (SLP vs Account)</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Region</label>
+      <select id="region">
+        <option value="">All regions</option>
+        <option>Mid-West</option>
+        <option>Southeast</option>
+        <option>Northeast</option>
+        <option>Northwest</option>
+        <option>Southwest</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Program</label>
+      <select id="program">
+        <option value="">All programs</option>
+        <option>360 Finance</option>
+        <option>ComfortConnect</option>
+        <option>GoodLeap</option>
+        <option>LTO</option>
+        <option>Microf</option>
+        <option>Microf (LTO Only)</option>
+        <option>OPTIMUS</option>
+        <option>SpectrumAC</option>
+        <option>SpectrumAC (Wells Fargo)</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>&nbsp;</label>
+      <button id="run-btn" onclick="runReport()">Run Report</button>
+    </div>
+  </div>
+
+  <div id="summary" class="summary" style="display:none"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+const ISSUE_LABELS = {
+  no_dealer_id: "Missing Dealer ID",
+  no_status: "Missing Status",
+  no_platform: "Missing Program",
+  no_date: "Missing Activation Date",
+  id_mismatch: "Dealer ID Mismatch",
+};
+
+async function runReport() {
+  const issue = document.getElementById("issue").value;
+  if (!issue) { alert("Please select an issue type."); return; }
+
+  const region = document.getElementById("region").value;
+  const program = document.getElementById("program").value;
+  const btn = document.getElementById("run-btn");
+
+  btn.disabled = true;
+  btn.textContent = "Loading…";
+  document.getElementById("summary").style.display = "none";
+  document.getElementById("results").innerHTML = '<div class="loading results">Fetching SLP data…</div>';
+
+  let url = `/api/reports/slp-health?issue=${encodeURIComponent(issue)}`;
+  if (region) url += `&region=${encodeURIComponent(region)}`;
+  if (program) url += `&program=${encodeURIComponent(program)}`;
+
+  try {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!resp.ok) { throw new Error(data.detail || JSON.stringify(data)); }
+    renderReport(data);
+  } catch(e) {
+    document.getElementById("results").innerHTML = `<div class="empty results">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Run Report";
+  }
+}
+
+function renderReport(data) {
+  const summary = document.getElementById("summary");
+  summary.style.display = "flex";
+  summary.innerHTML = `
+    <div class="stat"><div class="stat-value">${data.total_slps_scanned.toLocaleString()}</div><div class="stat-label">SLPs Scanned</div></div>
+    <div class="stat"><div class="stat-value" style="color:#dc2626">${data.total_matching.toLocaleString()}</div><div class="stat-label">With Issue</div></div>
+  `;
+
+  const records = data.records;
+  if (!records.length) {
+    document.getElementById("results").innerHTML = '<div class="empty results">✓ No records with this issue found.</div>';
+    return;
+  }
+
+  const isMismatch = data.issue === "id_mismatch";
+
+  const rows = records.map(r => {
+    const acLink = r.account_id
+      ? `<a class="ac-link" href="https://microf.activehosted.com/account/${r.account_id}" target="_blank">${esc(r.account_name || r.account_id)}</a>`
+      : esc(r.account_name || "—");
+
+    const dealerCell = isMismatch
+      ? `<span class="badge badge-red">SLP: ${esc(r.dealer_id||"—")}</span> <span class="badge badge-yellow">Acct: ${esc(r.cf18||"—")}</span>`
+      : esc(r.dealer_id || "—");
+
+    return `<tr>
+      <td>${acLink}</td>
+      <td>${esc(r.program || "—")}</td>
+      <td>${esc(r.region || "—")}</td>
+      <td>${dealerCell}</td>
+      <td>${esc(r.status_detail || "—")}</td>
+      <td>${r.activation_date ? esc(r.activation_date.slice(0,10)) : "—"}</td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("results").innerHTML = `
+    <div class="results">
+      <table>
+        <thead><tr>
+          <th>Account</th><th>Program</th><th>Region</th>
+          <th>${isMismatch ? "Dealer ID" : "Dealer ID"}</th>
+          <th>Status</th><th>Activation Date</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+</script>
+</body>
+</html>""")
+
+
+@app.get("/api/reports/slp-health")
 async def slp_health_report(
     issue: str,  # required: no_dealer_id | no_status | no_platform | no_date | id_mismatch
     region: str = None,
