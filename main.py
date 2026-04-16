@@ -7150,6 +7150,321 @@ async def slp_health_report(
     }
 
 
+@app.get("/reports/contractor-states", response_class=HTMLResponse)
+async def contractor_states_page(user=Depends(require_auth)):
+    return HTMLResponse("""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contractor States Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f6fa; color: #222; }
+  header { background: #1a1a2e; color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .container { max-width: 1300px; margin: 24px auto; padding: 0 20px; }
+  .filters { background: #fff; border-radius: 8px; padding: 20px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 20px; }
+  .filter-group { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: .5px; }
+  select, input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 160px; }
+  button { padding: 9px 20px; background: #4f46e5; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:hover { background: #4338ca; }
+  button:disabled { background: #a5b4fc; cursor: not-allowed; }
+  .btn-csv { background: #059669; margin-left: 4px; }
+  .btn-csv:hover { background: #047857; }
+  .summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat { background: #fff; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); min-width: 140px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: #4f46e5; }
+  .stat-label { font-size: 12px; color: #888; margin-top: 4px; }
+  .results { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f8f9fb; text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #eee; cursor: pointer; user-select: none; }
+  th:hover { background: #f0f2f8; }
+  td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafe; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #f1f5f9; color: #475569; }
+  .states-list { display: flex; flex-wrap: wrap; gap: 4px; }
+  .state-chip { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; background: #e0e7ff; color: #3730a3; font-weight: 500; }
+  .empty { text-align: center; padding: 48px; color: #999; }
+  .loading { text-align: center; padding: 48px; color: #999; }
+  a.ac-link { color: #4f46e5; text-decoration: none; }
+  a.ac-link:hover { text-decoration: underline; }
+  .note { font-size: 12px; color: #888; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🗺 Contractor States Report</h1>
+</header>
+<div class="container">
+  <div class="filters">
+    <div class="filter-group">
+      <label>Account State</label>
+      <select id="acct-state">
+        <option value="">All states</option>
+        <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
+        <option>CA</option><option>CO</option><option>CT</option><option>DC</option>
+        <option>DE</option><option>FL</option><option>GA</option><option>HI</option>
+        <option>ID</option><option>IL</option><option>IN</option><option>IA</option>
+        <option>KS</option><option>KY</option><option>LA</option><option>ME</option>
+        <option>MD</option><option>MA</option><option>MI</option><option>MN</option>
+        <option>MS</option><option>MO</option><option>MT</option><option>NE</option>
+        <option>NV</option><option>NH</option><option>NJ</option><option>NM</option>
+        <option>NY</option><option>NC</option><option>ND</option><option>OH</option>
+        <option>OK</option><option>OR</option><option>PA</option><option>RI</option>
+        <option>SC</option><option>SD</option><option>TN</option><option>TX</option>
+        <option>UT</option><option>VT</option><option>VA</option><option>WA</option>
+        <option>WV</option><option>WI</option><option>WY</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Does Business In (state)</label>
+      <select id="biz-state">
+        <option value="">Any state</option>
+        <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
+        <option>CA</option><option>CO</option><option>CT</option><option>DC</option>
+        <option>DE</option><option>FL</option><option>GA</option><option>HI</option>
+        <option>ID</option><option>IL</option><option>IN</option><option>IA</option>
+        <option>KS</option><option>KY</option><option>LA</option><option>ME</option>
+        <option>MD</option><option>MA</option><option>MI</option><option>MN</option>
+        <option>MS</option><option>MO</option><option>MT</option><option>NE</option>
+        <option>NV</option><option>NH</option><option>NJ</option><option>NM</option>
+        <option>NY</option><option>NC</option><option>ND</option><option>OH</option>
+        <option>OK</option><option>OR</option><option>PA</option><option>RI</option>
+        <option>SC</option><option>SD</option><option>TN</option><option>TX</option>
+        <option>UT</option><option>VT</option><option>VA</option><option>WA</option>
+        <option>WV</option><option>WI</option><option>WY</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Program</label>
+      <select id="program">
+        <option value="">All programs</option>
+        <option>360 Finance</option>
+        <option>ComfortConnect</option>
+        <option>GoodLeap</option>
+        <option>LTO</option>
+        <option>Microf</option>
+        <option>Microf (LTO Only)</option>
+        <option>OPTIMUS</option>
+        <option>SpectrumAC</option>
+        <option>SpectrumAC (Wells Fargo)</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>&nbsp;</label>
+      <button id="run-btn" onclick="runReport()">Run Report</button>
+      <button class="btn-csv" onclick="downloadCSV()" id="csv-btn" style="display:none">⬇ CSV</button>
+    </div>
+  </div>
+  <p class="note" style="margin-bottom:16px">Note: this report queries all contractor SLPs live — expect 30–60 seconds to load.</p>
+
+  <div id="summary" class="summary" style="display:none"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+let _lastData = [];
+
+async function runReport() {
+  const acctState = document.getElementById("acct-state").value;
+  const bizState  = document.getElementById("biz-state").value;
+  const program   = document.getElementById("program").value;
+  const btn = document.getElementById("run-btn");
+
+  btn.disabled = true; btn.textContent = "Loading…";
+  document.getElementById("summary").style.display = "none";
+  document.getElementById("csv-btn").style.display = "none";
+  document.getElementById("results").innerHTML = '<div class="loading">Fetching data from AC — this may take 30–60 seconds…</div>';
+
+  let url = "/api/reports/contractor-states?_=1";
+  if (acctState) url += `&acct_state=${encodeURIComponent(acctState)}`;
+  if (bizState)  url += `&biz_state=${encodeURIComponent(bizState)}`;
+  if (program)   url += `&program=${encodeURIComponent(program)}`;
+
+  try {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!resp.ok) { throw new Error(data.detail || "Server error"); }
+    _lastData = data.records || [];
+    renderResults(data);
+  } catch(e) {
+    document.getElementById("results").innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Run Report";
+  }
+}
+
+function renderResults(data) {
+  const summaryEl = document.getElementById("summary");
+  summaryEl.style.display = "flex";
+  summaryEl.innerHTML = `
+    <div class="stat"><div class="stat-value">${data.total_slps.toLocaleString()}</div><div class="stat-label">Total SLPs Scanned</div></div>
+    <div class="stat"><div class="stat-value">${data.total_matching.toLocaleString()}</div><div class="stat-label">Matching Results</div></div>
+    <div class="stat"><div class="stat-value">${data.unique_accounts.toLocaleString()}</div><div class="stat-label">Unique Accounts</div></div>
+  `;
+
+  if (!data.records.length) {
+    document.getElementById("results").innerHTML = '<div class="empty">No records match the selected filters.</div>';
+    return;
+  }
+
+  document.getElementById("csv-btn").style.display = "inline-block";
+
+  const rows = data.records.map(r => {
+    const states = (r.doing_business_in_states || "")
+      .split(/[,;]+/).map(s => s.trim()).filter(Boolean)
+      .map(s => `<span class="state-chip">${s}</span>`).join(" ");
+    return `<tr>
+      <td><a class="ac-link" href="https://microf.api-us1.com/account/${r.account_id}" target="_blank">${r.account_name || "(unknown)"}</a></td>
+      <td>${r.account_state || ""}</td>
+      <td><span class="badge">${r.dealer_id || "—"}</span></td>
+      <td>${r.program || "—"}</td>
+      <td><div class="states-list">${states || "—"}</div></td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("results").innerHTML = `
+    <div class="results">
+      <table>
+        <thead><tr>
+          <th>Account Name</th>
+          <th>Account State</th>
+          <th>Dealer ID</th>
+          <th>Program</th>
+          <th>Doing Business In</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function downloadCSV() {
+  const headers = ["Account Name","Account State","Dealer ID","Program","Doing Business In"];
+  const rows = _lastData.map(r => [
+    r.account_name, r.account_state, r.dealer_id, r.program, r.doing_business_in_states
+  ].map(v => `"${(v||"").replace(/"/g,'""')}"`).join(","));
+  const csv = [headers.join(","), ...rows].join("\\n");
+  const a = document.createElement("a");
+  a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+  a.download = "contractor_states.csv";
+  a.click();
+}
+</script>
+</body>
+</html>""")
+
+
+@app.get("/api/reports/contractor-states")
+async def contractor_states_report(
+    acct_state: str = None,
+    biz_state: str = None,
+    program: str = None,
+    user=Depends(require_auth),
+):
+    SLP_SCHEMA = "d5ccf74f-981f-40ff-8a03-23cd0309808f"
+
+    def get_field(slp, fid):
+        for f in slp.get("fields", []):
+            if f.get("id") == fid:
+                return f.get("value") or ""
+        return ""
+
+    # Fetch all SLPs (single pass)
+    seen = {}
+    offset = 0
+    while True:
+        try:
+            page = await ac_get(f"customObjects/records/{SLP_SCHEMA}", {"limit": 100, "offset": offset})
+        except Exception:
+            break
+        records = page.get("records", [])
+        if not records:
+            break
+        for r in records:
+            seen[r["id"]] = r
+        total = int(page.get("meta", {}).get("total") or 0)
+        offset += len(records)
+        if total and offset >= total:
+            break
+        if len(records) < 100:
+            break
+
+    all_slps = list(seen.values())
+
+    # Optional program filter before account fetches
+    if program:
+        all_slps = [s for s in all_slps if get_field(s, "platform") == program]
+
+    # Collect unique account IDs
+    account_ids = list({
+        (s.get("relationships", {}).get("account") or [None])[0]
+        for s in all_slps
+        if (s.get("relationships", {}).get("account") or [None])[0]
+    })
+
+    # Fetch account name, state, type concurrently
+    sem = asyncio.Semaphore(10)
+
+    async def fetch_acct(aid):
+        async with sem:
+            try:
+                acct_resp = await ac_get(f"accounts/{aid}")
+                name = acct_resp.get("account", {}).get("name", "")
+                cf_resp = await ac_get(f"accounts/{aid}/accountCustomFieldData")
+                state = acct_type = ""
+                for cf in cf_resp.get("customerAccountCustomFieldData", []):
+                    fid = str(cf.get("custom_field_id", ""))
+                    val = cf.get("custom_field_text_value", "") or ""
+                    if fid == "5":  state = val
+                    if fid == "76": acct_type = val
+                return aid, name, state, acct_type
+            except Exception:
+                return aid, "", "", ""
+
+    results = await asyncio.gather(*[fetch_acct(aid) for aid in account_ids])
+    acct_map = {r[0]: {"name": r[1], "state": r[2], "type": r[3]} for r in results}
+
+    # Build records — only Contractor accounts
+    records = []
+    for slp in all_slps:
+        aid = (slp.get("relationships", {}).get("account") or [None])[0]
+        if not aid:
+            continue
+        acct = acct_map.get(aid, {})
+        if (acct.get("type") or "").strip().lower() != "contractor":
+            continue
+        dbi = get_field(slp, "doing-business-in-states")
+        # Filter by account state
+        if acct_state and acct.get("state", "").upper() != acct_state.upper():
+            continue
+        # Filter by doing-business-in state
+        if biz_state:
+            states_in = [s.strip().upper() for s in (dbi or "").replace(";", ",").split(",") if s.strip()]
+            if biz_state.upper() not in states_in:
+                continue
+        records.append({
+            "account_id":               aid,
+            "account_name":             acct.get("name", ""),
+            "account_state":            acct.get("state", ""),
+            "dealer_id":                get_field(slp, "dealer-id"),
+            "program":                  get_field(slp, "platform"),
+            "doing_business_in_states": dbi,
+        })
+
+    records.sort(key=lambda x: x["account_name"])
+    unique_accounts = len({r["account_id"] for r in records})
+
+    return {
+        "total_slps": len(seen),
+        "total_matching": len(records),
+        "unique_accounts": unique_accounts,
+        "records": records,
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
