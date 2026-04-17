@@ -242,13 +242,14 @@ function renderFiltered() {
       <td colspan="3">${escHtml(acct.name)}${badge}</td>
       <td>${escHtml(acct.region)}</td>
       <td>${escHtml(acct.owner)}</td>
-      <td>${escHtml(acct.dealer_id)}</td>
-      <td colspan="5">${typeBadge(acct.type)}&nbsp;&nbsp;<span style="font-size:10px;color:#555;font-weight:500">${escHtml(acct.state)}</span></td>
+      <td></td>
+      <td colspan="6">${typeBadge(acct.type)}&nbsp;&nbsp;<span style="font-size:10px;color:#555;font-weight:500">${escHtml(acct.state)}</span></td>
     </tr>`;
     slps.forEach(slp => {
       rows += `<tr class="slp-row">
         <td>↳</td>
-        <td></td><td></td><td></td><td></td><td></td><td></td>
+        <td></td><td></td><td></td><td></td><td></td>
+        <td>${escHtml(slp.dealer_id)}</td>
         <td>${escHtml(slp.program)}</td>
         <td>${statusBadge(slp.status)}</td>
         <td>${escHtml(slp.activation_date ? slp.activation_date.split('T')[0] : '')}</td>
