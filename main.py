@@ -7129,6 +7129,106 @@ async def account_slp_report(user=Depends(require_auth)):
     }
 
 
+# ── Parent-Child Report (Account-first, all account types) ───────────────────
+
+@app.get("/reports/parent-child")
+async def parent_child_page(user=Depends(require_auth)):
+    return FileResponse("static/reports/parent-child.html")
+
+@app.get("/api/reports/parent-child")
+async def parent_child_report(
+    acct_type:  str  = None,
+    region:     str  = None,
+    acct_state: str  = None,
+    program:    str  = None,
+    slp_status: str  = None,
+    has_slps:   bool = None,   # None=all, True=only with SLPs, False=only without
+    user=Depends(require_auth),
+):
+    def get_field(slp, fid):
+        for f in slp.get("fields", []):
+            if f.get("id") == fid:
+                return f.get("value") or ""
+        return ""
+
+    # Build account→SLPs map from shared cache
+    all_slps   = list(await get_slp_cache())
+    cache_age  = round(_time.time() - _slp_cache_ts) if _slp_cache_ts else None
+
+    slps_by_account: dict = defaultdict(list)
+    for slp in all_slps:
+        aid = (slp.get("relationships", {}).get("account") or [None])[0]
+        if aid:
+            slps_by_account[str(aid)].append(slp)
+
+    accounts_out = []
+    for aid_str, name in _account_to_name.items():
+        if not name:
+            continue
+
+        # Account-level filters
+        if acct_type  and _account_to_type.get(aid_str, "")          != acct_type:
+            continue
+        if region     and _account_to_region.get(aid_str, "")        != region:
+            continue
+        if acct_state and _account_to_state_prov.get(aid_str, "").upper() != acct_state.upper():
+            continue
+
+        raw_slps = slps_by_account.get(aid_str, [])
+
+        # Build filtered SLP child list
+        slp_list = []
+        for slp in raw_slps:
+            p = get_field(slp, "platform")
+            s = get_field(slp, "slp-status-detail")
+            if program    and p != program:    continue
+            if slp_status and s != slp_status: continue
+            slp_list.append({
+                "slp_id":            slp["id"],
+                "program":           p,
+                "status":            s,
+                "activation_date":   get_field(slp, "contractor-activated-date"),
+                "oracle_ids":        get_field(slp, "oracle-producer-ids"),
+                "bdr":               get_field(slp, "assigned-bdr"),
+                "doing_business_in": get_field(slp, "doing-business-in-states"),
+                "dealer_id":         get_field(slp, "dealer-id"),
+            })
+        slp_list.sort(key=lambda x: x["program"])
+
+        # has_slps filter (applies to filtered SLP count)
+        if has_slps is True  and len(slp_list) == 0: continue
+        if has_slps is False and len(raw_slps) > 0:  continue
+
+        owner_uid  = _account_to_owner.get(aid_str, "")
+        owner_name = _user_id_to_name.get(owner_uid, owner_uid) if owner_uid else ""
+
+        accounts_out.append({
+            "account_id": aid_str,
+            "name":       name,
+            "type":       _account_to_type.get(aid_str, ""),
+            "state":      _account_to_state_prov.get(aid_str, ""),
+            "region":     _account_to_region.get(aid_str, ""),
+            "dealer_id":  _account_to_dealer.get(aid_str, ""),
+            "owner":      owner_name,
+            "slp_count":  len(raw_slps),
+            "slps":       slp_list,
+        })
+
+    accounts_out.sort(key=lambda x: x["name"].upper())
+
+    with_slps    = sum(1 for a in accounts_out if a["slp_count"] > 0)
+    total_slps_r = sum(len(a["slps"]) for a in accounts_out)
+
+    return {
+        "total_accounts":        len(accounts_out),
+        "accounts_with_slps":    with_slps,
+        "accounts_without_slps": len(accounts_out) - with_slps,
+        "total_slps":            total_slps_r,
+        "cache_age_seconds":     cache_age,
+        "accounts":              accounts_out,
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -833,7 +833,12 @@ select, input { font-family: inherit; }
       <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-account-slp" onclick="window.open('/reports/account-slp','_blank')">
         <div class="ac-icon">🏢</div>
         <div class="ac-title">Account / SLP Report</div>
-        <div class="ac-desc">Parent-child view of all accounts and their SLPs. Filter by type, region, program, and status.</div>
+        <div class="ac-desc">SLP-driven view — only accounts with SLPs. Filter by type, region, program, and status.</div>
+      </button>
+      <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-parent-child" onclick="window.open('/reports/parent-child','_blank')">
+        <div class="ac-icon">🔗</div>
+        <div class="ac-title">Parent-Child Report</div>
+        <div class="ac-desc">All accounts with SLP children below — all account types, toggle to include accounts with no SLPs.</div>
       </button>
       <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-slp-health" onclick="window.open('/reports/slp-health','_blank')">
         <div class="ac-icon">🩺</div>

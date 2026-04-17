@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parent-Child Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f6fa; color: #222; }
+  header { background: #1a1a2e; color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .container { max-width: 1400px; margin: 24px auto; padding: 0 20px; }
+
+  /* Filters */
+  .filters { background: #fff; border-radius: 8px; padding: 20px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 16px; }
+  .filter-group { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: .5px; }
+  select, input[type="text"] { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 160px; }
+  .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #444; padding-top: 2px; }
+  .toggle-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: #4f46e5; cursor: pointer; }
+  button { padding: 9px 20px; background: #4f46e5; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:hover { background: #4338ca; }
+  button:disabled { background: #a5b4fc; cursor: not-allowed; }
+  .btn-csv { background: #059669; }
+  .btn-csv:hover { background: #047857; }
+
+  /* Summary stats */
+  .summary { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .stat { background: #fff; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); min-width: 140px; }
+  .stat-value { font-size: 26px; font-weight: 700; color: #4f46e5; }
+  .stat-value.green  { color: #059669; }
+  .stat-value.amber  { color: #d97706; }
+  .stat-value.slate  { color: #64748b; }
+  .stat-label { font-size: 12px; color: #888; margin-top: 4px; }
+
+  .cache-note { font-size: 12px; color: #94a3b8; margin-bottom: 12px; }
+
+  /* Table */
+  .results-wrap { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f1f5f9; text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid #e2e8f0; position: sticky; top: 0; z-index: 2; }
+
+  /* Account (parent) rows */
+  tr.acct-row td { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 14px; vertical-align: middle; }
+  tr.acct-row:hover td { background: #f8fafc; }
+  .acct-name { font-weight: 700; font-size: 13px; color: #1e293b; }
+  .acct-meta { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .slp-count { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 700; background: #4f46e5; color: #fff; margin-left: 6px; vertical-align: middle; }
+  .slp-count.zero { background: #e2e8f0; color: #94a3b8; }
+  .type-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: #f1f5f9; color: #475569; }
+
+  /* SLP (child) rows */
+  tr.slp-row td { background: #eef2ff; border-bottom: 1px solid #e0e7ff; padding: 8px 14px; vertical-align: middle; font-size: 12px; color: #3730a3; }
+  tr.slp-row:hover td { background: #e0e7ff; }
+  tr.slp-row td:first-child { color: #a5b4fc; font-weight: 700; padding-left: 28px; }
+
+  /* Last SLP row before next account gets a thicker divider */
+  tr.slp-last td { border-bottom: 2px solid #c7d2fe; }
+
+  /* Badges */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-green  { background: #dcfce7; color: #166534; }
+  .badge-red    { background: #fee2e2; color: #b91c1c; }
+  .badge-yellow { background: #fef9c3; color: #854d0e; }
+  .badge-gray   { background: #f1f5f9; color: #475569; }
+  .badge-blue   { background: #dbeafe; color: #1d4ed8; }
+
+  .empty  { text-align: center; padding: 48px; color: #94a3b8; }
+  .loading { text-align: center; padding: 48px; color: #94a3b8; }
+
+  a.ac-link { color: #4f46e5; text-decoration: none; font-weight: 700; }
+  a.ac-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔗 Parent-Child Report</h1>
+</header>
+<div class="container">
+
+  <div class="filters">
+    <div class="filter-group">
+      <label>Search</label>
+      <input type="text" id="search" placeholder="Account name or Dealer ID…" oninput="onFilterChange()">
+    </div>
+    <div class="filter-group">
+      <label>Account Type</label>
+      <select id="acct-type" onchange="onFilterChange()">
+        <option value="">All Types</option>
+        <option>Contractor</option>
+        <option>Dealer</option>
+        <option>Strategic Partner</option>
+        <option>Distributor</option>
+        <option>Manufacturer</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Sales Region</label>
+      <select id="region" onchange="onFilterChange()">
+        <option value="">All Regions</option>
+        <option>Mid-West</option>
+        <option>Southeast</option>
+        <option>Northeast</option>
+        <option>Northwest</option>
+        <option>Southwest</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Account State</label>
+      <select id="acct-state" onchange="onFilterChange()">
+        <option value="">All States</option>
+        <option>AL</option><option>AK</option><option>AZ</option><option>AR</option>
+        <option>CA</option><option>CO</option><option>CT</option><option>DC</option>
+        <option>DE</option><option>FL</option><option>GA</option><option>HI</option>
+        <option>ID</option><option>IL</option><option>IN</option><option>IA</option>
+        <option>KS</option><option>KY</option><option>LA</option><option>ME</option>
+        <option>MD</option><option>MA</option><option>MI</option><option>MN</option>
+        <option>MS</option><option>MO</option><option>MT</option><option>NE</option>
+        <option>NV</option><option>NH</option><option>NJ</option><option>NM</option>
+        <option>NY</option><option>NC</option><option>ND</option><option>OH</option>
+        <option>OK</option><option>OR</option><option>PA</option><option>RI</option>
+        <option>SC</option><option>SD</option><option>TN</option><option>TX</option>
+        <option>UT</option><option>VT</option><option>VA</option><option>WA</option>
+        <option>WV</option><option>WI</option><option>WY</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Program</label>
+      <select id="program" onchange="onFilterChange()">
+        <option value="">All Programs</option>
+        <option>360 Finance</option>
+        <option>ComfortConnect</option>
+        <option>GoodLeap</option>
+        <option>LTO</option>
+        <option>Microf</option>
+        <option>Microf (LTO Only)</option>
+        <option>OPTIMUS</option>
+        <option>SpectrumAC</option>
+        <option>SpectrumAC (Wells Fargo)</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>SLP Status</label>
+      <select id="slp-status" onchange="onFilterChange()">
+        <option value="">All Statuses</option>
+        <option>Contractor Activated</option>
+        <option>Deactivated</option>
+        <option>Not Started</option>
+        <option>Not Active</option>
+        <option>Account on Hold (Suspended)</option>
+        <option>Declined by Onboarding</option>
+        <option>Deactivated for Dormancy</option>
+        <option>Pending - Training Not Completed</option>
+        <option>Waiting_on_BDR_Approval</option>
+        <option>On Indefinite Hold - Agreement/Docs Not Signed</option>
+        <option>Pending - Waiting on Online Reviews</option>
+        <option>In Progress – Other</option>
+        <option>In Progress – Signed Contract Needed</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>&nbsp;</label>
+      <div style="display:flex;gap:8px;">
+        <button id="run-btn" onclick="loadReport()">Run Report</button>
+        <button class="btn-csv" onclick="exportCsv()" id="csv-btn" style="display:none">⬇ CSV</button>
+      </div>
+      <div class="toggle-row" style="margin-top:8px">
+        <input type="checkbox" id="has-slps" checked onchange="onFilterChange()">
+        <label for="has-slps" style="text-transform:none;letter-spacing:0;font-size:13px;cursor:pointer">Only accounts with SLPs</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary" id="summary" style="display:none">
+    <div class="stat"><div class="stat-value" id="s-total">—</div><div class="stat-label">Total Accounts</div></div>
+    <div class="stat"><div class="stat-value green" id="s-with">—</div><div class="stat-label">With SLPs</div></div>
+    <div class="stat"><div class="stat-value amber" id="s-without">—</div><div class="stat-label">Without SLPs</div></div>
+    <div class="stat"><div class="stat-value slate" id="s-slps">—</div><div class="stat-label">Total SLPs (filtered)</div></div>
+  </div>
+  <div class="cache-note" id="cache-note" style="display:none"></div>
+
+  <div id="table-wrap">
+    <div class="empty">Use the filters above and click <strong>Run Report</strong>.</div>
+  </div>
+</div>
+
+<script>
+let _raw      = null;
+let _filtered = null;
+
+// ── Badge helpers ────────────────────────────────────────────────────────────
+function statusBadge(s) {
+  if (!s) return '<span class="badge badge-gray">—</span>';
+  if (s.includes('Activated') && !s.includes('Not')) return `<span class="badge badge-green">${esc(s)}</span>`;
+  if (s.includes('Deactivated') || s.includes('Declined'))  return `<span class="badge badge-red">${esc(s)}</span>`;
+  if (s.includes('Pending') || s.includes('Progress') || s.includes('Waiting') || s.includes('Hold'))
+    return `<span class="badge badge-yellow">${esc(s)}</span>`;
+  if (s.includes('Not Started') || s.includes('Not Active')) return `<span class="badge badge-gray">${esc(s)}</span>`;
+  return `<span class="badge badge-blue">${esc(s)}</span>`;
+}
+function typeBadge(t) {
+  if (!t) return '<span class="badge badge-gray">—</span>';
+  return `<span class="type-chip">${esc(t)}</span>`;
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Filter change ─────────────────────────────────────────────────────────────
+function onFilterChange() { if (_raw) renderFiltered(); }
+
+function applyFilters(data) {
+  const search     = document.getElementById('search').value.trim().toLowerCase();
+  const acctType   = document.getElementById('acct-type').value;
+  const region     = document.getElementById('region').value;
+  const acctState  = document.getElementById('acct-state').value;
+  const program    = document.getElementById('program').value;
+  const slpStatus  = document.getElementById('slp-status').value;
+  const hasSlps    = document.getElementById('has-slps').checked;
+
+  return data.accounts
+    .map(acct => {
+      // Account-level filters
+      if (acctType  && acct.type   !== acctType)  return null;
+      if (region    && acct.region !== region)    return null;
+      if (acctState && acct.state  !== acctState) return null;
+      if (search) {
+        const hay = (acct.name + ' ' + acct.dealer_id + ' ' +
+          acct.slps.map(s => s.dealer_id).join(' ')).toLowerCase();
+        if (!hay.includes(search)) return null;
+      }
+
+      // Filter SLP children
+      let filteredSlps = acct.slps;
+      if (program)   filteredSlps = filteredSlps.filter(s => s.program   === program);
+      if (slpStatus) filteredSlps = filteredSlps.filter(s => s.status    === slpStatus);
+
+      // has-slps toggle
+      if (hasSlps && filteredSlps.length === 0 && acct.slp_count === 0) return null;
+
+      return { ...acct, _filtered_slps: filteredSlps };
+    })
+    .filter(Boolean);
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function renderFiltered() {
+  _filtered = applyFilters(_raw);
+
+  const withSlps    = _filtered.filter(a => a._filtered_slps.length > 0).length;
+  const withoutSlps = _filtered.filter(a => a._filtered_slps.length === 0).length;
+  const totalSlps   = _filtered.reduce((n, a) => n + a._filtered_slps.length, 0);
+
+  document.getElementById('s-total').textContent   = _filtered.length.toLocaleString();
+  document.getElementById('s-with').textContent    = withSlps.toLocaleString();
+  document.getElementById('s-without').textContent = withoutSlps.toLocaleString();
+  document.getElementById('s-slps').textContent    = totalSlps.toLocaleString();
+  document.getElementById('summary').style.display = 'flex';
+  document.getElementById('csv-btn').style.display = 'inline-block';
+
+  if (!_filtered.length) {
+    document.getElementById('table-wrap').innerHTML = '<div class="empty">No accounts match the selected filters.</div>';
+    return;
+  }
+
+  let rows = '';
+  _filtered.forEach((acct, idx) => {
+    const slps  = acct._filtered_slps;
+    const cnt   = slps.length;
+    const badge = cnt > 0
+      ? `<span class="slp-count">${cnt}</span>`
+      : `<span class="slp-count zero">0</span>`;
+    const acLink = `<a class="ac-link" href="https://microf.api-us1.com/account/${acct.account_id}" target="_blank">${esc(acct.name)}</a>${badge}`;
+
+    rows += `<tr class="acct-row">
+      <td style="font-weight:700;font-size:11px;color:#a5b4fc;width:28px">${idx+1}</td>
+      <td>${acLink}</td>
+      <td>${typeBadge(acct.type)}</td>
+      <td>${esc(acct.state)}</td>
+      <td>${esc(acct.region)}</td>
+      <td>${esc(acct.owner)}</td>
+      <td colspan="5" style="font-size:11px;color:#94a3b8">${acct.slp_count === 0 ? '<em>No SLPs</em>' : ''}</td>
+    </tr>`;
+
+    slps.forEach((slp, si) => {
+      const isLast = si === slps.length - 1;
+      rows += `<tr class="slp-row${isLast ? ' slp-last' : ''}">
+        <td>↳</td>
+        <td style="color:#4f46e5;font-size:12px">${esc(slp.dealer_id)}</td>
+        <td></td><td></td><td></td><td></td>
+        <td>${esc(slp.program)}</td>
+        <td>${statusBadge(slp.status)}</td>
+        <td>${esc(slp.activation_date ? slp.activation_date.split('T')[0] : '')}</td>
+        <td style="font-family:monospace;font-size:11px">${esc(slp.oracle_ids)}</td>
+        <td>${esc(slp.bdr)}</td>
+      </tr>`;
+    });
+  });
+
+  document.getElementById('table-wrap').innerHTML = `
+    <div class="results-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:28px">#</th>
+          <th>Account Name</th>
+          <th>Type</th>
+          <th>State</th>
+          <th>Region</th>
+          <th>Owner</th>
+          <th>Program</th>
+          <th>SLP Status</th>
+          <th>Activation Date</th>
+          <th>Oracle IDs</th>
+          <th>BDR</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── Load from API ─────────────────────────────────────────────────────────────
+async function loadReport() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  document.getElementById('summary').style.display   = 'none';
+  document.getElementById('cache-note').style.display = 'none';
+  document.getElementById('csv-btn').style.display   = 'none';
+  document.getElementById('table-wrap').innerHTML    = '<div class="loading">Fetching accounts and SLP data…</div>';
+
+  try {
+    const r = await fetch('/api/reports/parent-child');
+    if (!r.ok) throw new Error(await r.text());
+    _raw = await r.json();
+
+    if (_raw.cache_age_seconds !== undefined) {
+      const age  = _raw.cache_age_seconds;
+      const mins = Math.floor(age / 60), secs = age % 60;
+      const ageStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+      const note = document.getElementById('cache-note');
+      note.textContent = `SLP data cached ${ageStr} ago · ${_raw.total_accounts.toLocaleString()} total accounts in index`;
+      note.style.display = 'block';
+    }
+
+    renderFiltered();
+  } catch(e) {
+    document.getElementById('table-wrap').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Run Report';
+  }
+}
+
+// ── CSV export ─────────────────────────────────────────────────────────────────
+function exportCsv() {
+  if (!_filtered) { alert('Run the report first.'); return; }
+  const rows = [['Account Name','Account ID','Account Type','State','Region','Owner','Dealer ID','Program','SLP Status','Activation Date','Oracle IDs','BDR','Doing Business In']];
+  _filtered.forEach(acct => {
+    const slps = acct._filtered_slps;
+    if (slps.length === 0) {
+      rows.push([acct.name, acct.account_id, acct.type, acct.state, acct.region, acct.owner, acct.dealer_id, '', '', '', '', '', '']);
+    } else {
+      slps.forEach(slp => {
+        rows.push([acct.name, acct.account_id, acct.type, acct.state, acct.region, acct.owner,
+          slp.dealer_id, slp.program, slp.status,
+          slp.activation_date ? slp.activation_date.split('T')[0] : '',
+          slp.oracle_ids, slp.bdr, slp.doing_business_in]);
+      });
+    }
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'parent_child_report.csv';
+  a.click();
+}
+</script>
+</body>
+</html>
