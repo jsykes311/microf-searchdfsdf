@@ -713,61 +713,76 @@ CACHE_TIMESTAMPS: dict = {
 CACHE_TTL = 300  # seconds
 
 # ── SLP record cache (shared across all report endpoints) ────────────────────
-_slp_cache_records: list  = []   # list of raw SLP record dicts
-_slp_cache_ts:      float = 0.0  # epoch of last successful refresh
+_slp_cache_records: list  = []    # list of raw SLP record dicts
+_slp_cache_ts:      float = 0.0   # epoch of last successful refresh
 _slp_cache_lock             = asyncio.Lock()
 _SLP_CACHE_TTL              = 300  # 5 minutes
+_slp_refreshing:    bool   = False  # True while a refresh is in flight
 
 async def _refresh_slp_cache() -> None:
-    """Fetch all SLP records from AC and store in _slp_cache_records."""
-    global _slp_cache_records, _slp_cache_ts
+    """Fetch ALL SLP records from AC and atomically swap into _slp_cache_records."""
+    global _slp_cache_records, _slp_cache_ts, _slp_refreshing
     async with _slp_cache_lock:
         # Double-check inside the lock — another waiter may have just refreshed
         if _slp_cache_records and (_time.time() - _slp_cache_ts) < _SLP_CACHE_TTL:
             return
+
+        _slp_refreshing = True
         print("[slp-cache] Refreshing SLP records…")
-        records:  list = []
-        seen_ids: set  = set()
+
+        temp_records: list = []
+        seen_ids:     set  = set()
         offset = 0
         limit  = 100
         total  = 0
 
-        while True:
-            try:
-                resp = await ac_get(
-                    f"customObjects/records/{SLP_SCHEMA_ID}",
-                    {"limit": limit, "offset": offset},
-                )
-            except Exception as _e:
-                print(f"[slp-cache] fetch error at offset {offset}: {_e}")
-                break
+        try:
+            while True:
+                try:
+                    resp = await ac_get(
+                        f"customObjects/records/{SLP_SCHEMA_ID}",
+                        {"limit": limit, "offset": offset},
+                    )
+                except Exception as _e:
+                    print(f"[slp-cache] fetch error at offset {offset}: {_e}")
+                    break
 
-            batch = resp.get("records", [])
-            meta  = resp.get("meta", {})
-            total = int(meta.get("total", 0))
+                batch = resp.get("records", [])
+                meta  = resp.get("meta", {})
+                total = int(meta.get("total", 0))
 
-            if not batch:
-                break
+                if not batch:
+                    break
 
-            for r in batch:
-                rid = str(r.get("id"))
-                if rid not in seen_ids:
-                    seen_ids.add(rid)
-                    records.append(r)
+                for r in batch:
+                    rid = str(r.get("id"))
+                    if rid not in seen_ids:
+                        seen_ids.add(rid)
+                        temp_records.append(r)
 
-            offset += len(batch)
+                offset += len(batch)
 
-            print(f"[SLP CACHE] fetched={len(records)} / total={total}")
+                print(f"[SLP CACHE] fetched={len(temp_records)} / total={total}")
 
-            if len(records) >= total:
-                break
+                if len(temp_records) >= total:
+                    break
 
-        print(f"[SLP CACHE FINAL] loaded={len(records)} expected={total}")
-        _slp_cache_records = records
-        _slp_cache_ts      = _time.time()
+            # Atomic swap — _slp_cache_records is NEVER written until all pages are done
+            print(f"[SLP CACHE FINAL] loaded={len(temp_records)} expected={total}")
+            _slp_cache_records = temp_records
+            _slp_cache_ts      = _time.time()
+        finally:
+            _slp_refreshing = False
 
 async def get_slp_cache() -> list:
-    """Return cached SLP records, refreshing if stale or empty."""
+    """Return cached SLP records, refreshing if stale or empty.
+
+    If a refresh is already in flight, return the existing cache immediately
+    rather than blocking — callers see complete (possibly slightly stale) data.
+    """
+    if _slp_refreshing:
+        # Refresh in progress — return current complete cache, do not wait
+        return _slp_cache_records
     if not _slp_cache_records or (_time.time() - _slp_cache_ts) > _SLP_CACHE_TTL:
         await _refresh_slp_cache()
     return _slp_cache_records
