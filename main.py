@@ -6936,9 +6936,9 @@ async def slp_health_report(
 
     def get_field(slp, slug):
         for f in slp.get("fields", []):
-            if f.get("slug") == slug:
-                return f.get("value") or f.get("values")
-        return None
+            if f.get("id") == slug:
+                return f.get("value") or ""
+        return ""
 
     # Use shared SLP cache — no AC calls needed
     all_slps = await get_slp_cache()
