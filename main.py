@@ -7167,22 +7167,7 @@ async def parent_child_report(
         if aid:
             slps_by_account[str(aid)].append(slp)
 
-    accounts_out = []
-    for aid_str, name in _account_to_name.items():
-        if not name:
-            continue
-
-        # Account-level filters
-        if acct_type  and norm(_account_to_type.get(aid_str, ""))      != norm(acct_type):
-            continue
-        if region     and norm(_account_to_region.get(aid_str, ""))    != norm(region):
-            continue
-        if acct_state and norm(_account_to_state_prov.get(aid_str, "")) != norm(acct_state):
-            continue
-
-        raw_slps = slps_by_account.get(aid_str, [])
-
-        # Build filtered SLP child list
+    def _build_slp_list(raw_slps):
         slp_list = []
         for slp in raw_slps:
             p = get_field(slp, "platform")
@@ -7200,8 +7185,28 @@ async def parent_child_report(
                 "dealer_id":         get_field(slp, "dealer-id"),
             })
         slp_list.sort(key=lambda x: x["program"])
+        return slp_list
 
-        # has_slps filter (applies to filtered SLP count)
+    accounts_out = []
+    indexed_aids: set = set()
+
+    # ── Pass 1: accounts present in the index ─────────────────────────────────
+    for aid_str, name in _account_to_name.items():
+        if not name:
+            continue
+        indexed_aids.add(aid_str)
+
+        # Account-level filters
+        if acct_type  and norm(_account_to_type.get(aid_str, ""))       != norm(acct_type):
+            continue
+        if region     and norm(_account_to_region.get(aid_str, ""))     != norm(region):
+            continue
+        if acct_state and norm(_account_to_state_prov.get(aid_str, "")) != norm(acct_state):
+            continue
+
+        raw_slps = slps_by_account.get(aid_str, [])
+        slp_list = _build_slp_list(raw_slps)
+
         if has_slps is True  and len(slp_list) == 0: continue
         if has_slps is False and len(raw_slps) > 0:  continue
 
@@ -7220,15 +7225,45 @@ async def parent_child_report(
             "slps":       slp_list,
         })
 
+    # ── Pass 2: SLPs whose account ID is not in the index (orphaned) ─────────
+    # These account IDs exist in AC but weren't fetched into _account_to_name.
+    # Include them so the total SLP count matches the cache exactly.
+    for aid_str, raw_slps in slps_by_account.items():
+        if aid_str in indexed_aids:
+            continue  # already handled in pass 1
+
+        # Account-level filters cannot be applied (no index data) — skip if any are set
+        if acct_type or region or acct_state:
+            continue
+
+        slp_list = _build_slp_list(raw_slps)
+
+        if has_slps is True  and len(slp_list) == 0: continue
+        if has_slps is False and len(raw_slps) > 0:  continue
+
+        accounts_out.append({
+            "account_id": aid_str,
+            "name":       f"(unindexed account {aid_str})",
+            "type":       "",
+            "state":      "",
+            "region":     "",
+            "dealer_id":  "",
+            "owner":      "",
+            "slp_count":  len(raw_slps),
+            "slps":       slp_list,
+        })
+
     accounts_out.sort(key=lambda x: x["name"].upper())
 
-    with_slps    = sum(1 for a in accounts_out if a["slp_count"] > 0)
-    total_slps_r = sum(len(a["slps"]) for a in accounts_out)
+    with_slps      = sum(1 for a in accounts_out if a["slp_count"] > 0)
+    total_slps_r   = sum(len(a["slps"]) for a in accounts_out)
+    orphaned_count = sum(1 for a in accounts_out if a["name"].startswith("(unindexed"))
 
     return {
         "total_accounts":        len(accounts_out),
         "accounts_with_slps":    with_slps,
         "accounts_without_slps": len(accounts_out) - with_slps,
+        "orphaned_slp_accounts": orphaned_count,
         "total_slps":            total_slps_r,
         "cache_age_seconds":     cache_age,
         "accounts":              accounts_out,
