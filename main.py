@@ -694,32 +694,48 @@ async def _refresh_slp_cache() -> None:
         if _slp_cache_records and (_time.time() - _slp_cache_ts) < _SLP_CACHE_TTL:
             return
         print("[slp-cache] Refreshing SLP records…")
-        seen: dict = {}
+        records:  list = []
+        seen_ids: set  = set()
         offset = 0
+        limit  = 100
+        total  = None   # populated after first page
+
         while True:
             try:
-                page = await ac_get(
+                resp = await ac_get(
                     f"customObjects/records/{SLP_SCHEMA_ID}",
-                    {"limit": 100, "offset": offset},
+                    {"limit": limit, "offset": offset},
                 )
             except Exception as _e:
                 print(f"[slp-cache] fetch error at offset {offset}: {_e}")
                 break
-            records = page.get("records", [])
-            if not records:
+
+            batch = resp.get("records", [])
+            meta  = resp.get("meta", {})
+
+            if total is None:
+                total = int(meta.get("total") or 0)
+
+            if not batch:
                 break
-            for r in records:
-                seen[r["id"]] = r
-            total = int(page.get("meta", {}).get("total") or 0)
-            offset += len(records)
-            if total and offset >= total:
+
+            for r in batch:
+                rid = r.get("id")
+                if rid and rid not in seen_ids:
+                    seen_ids.add(rid)
+                    records.append(r)
+
+            offset += len(batch)
+
+            if total and len(records) >= total:
                 break
-            if len(records) < 100:
+
+            if len(batch) < limit:
                 break
-        if seen:
-            _slp_cache_records = list(seen.values())
-            _slp_cache_ts      = _time.time()
-            print(f"[slp-cache] Cached {len(_slp_cache_records)} SLP records.")
+
+        print(f"[SLP CACHE] loaded={len(records)} expected={total}")
+        _slp_cache_records = records
+        _slp_cache_ts      = _time.time()
 
 async def get_slp_cache() -> list:
     """Return cached SLP records, refreshing if stale or empty."""
