@@ -327,12 +327,13 @@ async def dealer_locator_page():
 
 @app.on_event("startup")
 async def _startup():
-    """Kick off the dealer ID index build in the background so it doesn't block startup."""
+    """Kick off background tasks. SLP cache loads immediately so reports are ready fast."""
     asyncio.create_task(_build_dealer_id_index())
     asyncio.create_task(_keep_alive())
     asyncio.create_task(_build_slp_state_index())
     asyncio.create_task(_build_location_index())
-    asyncio.create_task(_slp_cache_loop())
+    asyncio.create_task(_refresh_slp_cache())   # immediate first load
+    asyncio.create_task(_slp_cache_loop())       # then keep refreshing every 5 min
     _load_schedules_from_disk()
     _scheduler.start()
     print(f"[scheduler] Started with {len(_schedules)} job(s)")
@@ -777,11 +778,12 @@ async def _refresh_slp_cache() -> None:
 async def get_slp_cache() -> list:
     """Return cached SLP records, refreshing if stale or empty.
 
-    If a refresh is already in flight, return the existing cache immediately
-    rather than blocking — callers see complete (possibly slightly stale) data.
+    If a refresh is already in flight AND the cache already has data, return
+    the existing complete (slightly stale) data immediately rather than blocking.
+    If the cache is empty (initial startup), always wait for the refresh to finish.
     """
-    if _slp_refreshing:
-        # Refresh in progress — return current complete cache, do not wait
+    if _slp_refreshing and _slp_cache_records:
+        # Background refresh running but we have a previous complete snapshot — use it
         return _slp_cache_records
     if not _slp_cache_records or (_time.time() - _slp_cache_ts) > _SLP_CACHE_TTL:
         await _refresh_slp_cache()
