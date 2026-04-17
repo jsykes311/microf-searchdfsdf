@@ -7240,6 +7240,13 @@ async def parent_child_report(
             assigned = True
 
         # FALLBACK: dealer-id → _dealer_id_index (normalized matching)
+        # NOTE: _dealer_id_index values are {"id": account_id, "name": ...} dicts
+        def _resolve_entry(entry) -> str | None:
+            """Extract account ID string from a _dealer_id_index entry (dict or plain str)."""
+            if isinstance(entry, dict):
+                return str(entry["id"]) if entry.get("id") else None
+            return str(entry) if entry else None
+
         if not assigned:
             dealer_id      = get_field(slp, "dealer-id")
             dealer_id_norm = norm_id(dealer_id)
@@ -7247,21 +7254,21 @@ async def parent_child_report(
 
             # 1) Exact match
             if dealer_id:
-                acct_id = _dealer_id_index.get(dealer_id)
+                acct_id = _resolve_entry(_dealer_id_index.get(dealer_id))
 
             # 2) Normalized match (strip leading zeros from SLP dealer-id)
             if not acct_id and dealer_id_norm:
-                acct_id = _dealer_id_index.get(dealer_id_norm)
+                acct_id = _resolve_entry(_dealer_id_index.get(dealer_id_norm))
 
             # 3) Reverse-normalize index keys (strip leading zeros from stored keys)
             if not acct_id and dealer_id_norm:
                 for k, v in _dealer_id_index.items():
                     if norm_id(k) == dealer_id_norm:
-                        acct_id = v
+                        acct_id = _resolve_entry(v)
                         break
 
             if acct_id:
-                slps_by_account[str(acct_id)].append(slp)
+                slps_by_account[acct_id].append(slp)
                 fallback_used += 1
                 assigned = True
             else:
