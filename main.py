@@ -462,6 +462,10 @@ def norm(x) -> str:
     """Normalize a string for case/whitespace-insensitive comparisons."""
     return (x or "").strip().lower()
 
+def norm_id(x) -> str:
+    """Normalize a dealer ID: strip whitespace and leading zeros."""
+    return str(x or "").strip().lstrip("0")
+
 
 def _extract_cf_value(cf: dict) -> str:
     """Read the first non-empty value across all custom field value types."""
@@ -7178,8 +7182,9 @@ async def parent_child_report(
     cache_age  = round(_time.time() - _slp_cache_ts) if _slp_cache_ts else None
 
     slps_by_account: dict = defaultdict(list)
-    fallback_used = 0
-    unlinked_slps = 0
+    fallback_used  = 0
+    unlinked_slps  = 0
+    failed_matches = 0
 
     for slp in all_slps:
         # PRIMARY: relationship
@@ -7188,19 +7193,38 @@ async def parent_child_report(
             slps_by_account[str(aid)].append(slp)
             continue
 
-        # FALLBACK: dealer-id → _dealer_id_index
-        dealer_id = get_field(slp, "dealer-id")
+        # FALLBACK: dealer-id → _dealer_id_index (normalized matching)
+        dealer_id      = get_field(slp, "dealer-id")
+        dealer_id_norm = norm_id(dealer_id)
+        acct_id        = None
+
+        # 1) Exact match
         if dealer_id:
             acct_id = _dealer_id_index.get(dealer_id)
-            if acct_id:
-                slps_by_account[str(acct_id)].append(slp)
-                fallback_used += 1
-                continue
+
+        # 2) Normalized match (strip leading zeros from SLP dealer-id)
+        if not acct_id and dealer_id_norm:
+            acct_id = _dealer_id_index.get(dealer_id_norm)
+
+        # 3) Reverse-normalize index keys (strip leading zeros from stored keys)
+        if not acct_id and dealer_id_norm:
+            for k, v in _dealer_id_index.items():
+                if norm_id(k) == dealer_id_norm:
+                    acct_id = v
+                    break
+
+        if acct_id:
+            slps_by_account[str(acct_id)].append(slp)
+            fallback_used += 1
+            continue
 
         # STILL UNLINKED
+        if dealer_id:
+            failed_matches += 1
         unlinked_slps += 1
 
-    print(f"[PARENT-CHILD] total={len(all_slps)} fallback_used={fallback_used} unlinked={unlinked_slps}")
+    print(f"[PARENT-CHILD] total={len(all_slps)} fallback_used={fallback_used} "
+          f"unlinked={unlinked_slps} failed_dealer_matches={failed_matches}")
 
     def _build_slp_list(raw_slps):
         slp_list = []
