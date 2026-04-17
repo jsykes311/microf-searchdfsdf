@@ -7162,24 +7162,29 @@ async def parent_child_report(
     cache_age  = round(_time.time() - _slp_cache_ts) if _slp_cache_ts else None
 
     slps_by_account: dict = defaultdict(list)
-    fallback_linked = 0
+    fallback_used = 0
+    unlinked_slps = 0
+
     for slp in all_slps:
+        # PRIMARY: relationship
         aid = (slp.get("relationships", {}).get("account") or [None])[0]
         if aid:
             slps_by_account[str(aid)].append(slp)
             continue
 
-        # FALLBACK: no relationship → try dealer-id → _dealer_id_index
-        dealer_id = ""
-        for f in slp.get("fields", []):
-            if f.get("id") == "dealer-id":
-                dealer_id = f.get("value") or ""
-                break
+        # FALLBACK: dealer-id → _dealer_id_index
+        dealer_id = get_field(slp, "dealer-id")
         if dealer_id:
             acct_id = _dealer_id_index.get(dealer_id)
             if acct_id:
                 slps_by_account[str(acct_id)].append(slp)
-                fallback_linked += 1
+                fallback_used += 1
+                continue
+
+        # STILL UNLINKED
+        unlinked_slps += 1
+
+    print(f"[PARENT-CHILD] total={len(all_slps)} fallback_used={fallback_used} unlinked={unlinked_slps}")
 
     def _build_slp_list(raw_slps):
         slp_list = []
@@ -7278,7 +7283,8 @@ async def parent_child_report(
         "accounts_with_slps":    with_slps,
         "accounts_without_slps": len(accounts_out) - with_slps,
         "orphaned_slp_accounts": orphaned_count,
-        "fallback_linked_slps":  fallback_linked,
+        "fallback_linked_slps":  fallback_used,
+        "unlinked_slps":         unlinked_slps,
         "total_slps":            total_slps_r,
         "cache_age_seconds":     cache_age,
         "accounts":              accounts_out,
