@@ -792,14 +792,22 @@ async def get_slp_cache() -> list:
     return _slp_cache_records
 
 async def _slp_cache_loop() -> None:
-    """Background task: keep SLP cache warm, refreshing every 5 minutes."""
-    await asyncio.sleep(60)   # give startup tasks a head-start
+    """Background task: keep SLP cache warm, refreshing every 5 minutes.
+    On failure (0 records), retries every 30s until data is loaded, then
+    switches to the normal 5-minute refresh interval.
+    """
+    await asyncio.sleep(90)   # give index builders a head-start before first fetch
     while True:
         try:
             await _refresh_slp_cache()
         except Exception as _e:
             print(f"[slp-cache] loop error: {_e}")
-        await asyncio.sleep(_SLP_CACHE_TTL)
+        # If cache is still empty, retry quickly; otherwise use normal TTL
+        if _slp_cache_records:
+            await asyncio.sleep(_SLP_CACHE_TTL)
+        else:
+            print("[slp-cache] cache still empty — retrying in 30s")
+            await asyncio.sleep(30)
 
 def get_cached(cache_type: str, key: str):
     if key in CACHE[cache_type]:
