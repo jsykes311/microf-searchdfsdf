@@ -732,48 +732,60 @@ async def _refresh_slp_cache() -> None:
 
         temp_records: list = []
         seen_ids:     set  = set()
-        offset = 0
-        limit  = 100
-        total  = 0
+        limit      = 100
+        total      = 0
+        MAX_PASSES = 5   # retry full scans until unique count == total
 
         try:
-            while True:
-                try:
-                    resp = await ac_get(
-                        f"customObjects/records/{SLP_SCHEMA_ID}",
-                        {"limit": limit, "offset": offset},
-                    )
-                except Exception as _e:
-                    print(f"[slp-cache] fetch error at offset {offset}: {_e}")
+            for pass_num in range(1, MAX_PASSES + 1):
+                offset      = 0
+                new_this_pass = 0
+
+                while True:
+                    try:
+                        resp = await ac_get(
+                            f"customObjects/records/{SLP_SCHEMA_ID}",
+                            {"limit": limit, "offset": offset},
+                        )
+                    except Exception as _e:
+                        print(f"[slp-cache] fetch error pass={pass_num} offset={offset}: {_e}")
+                        break
+
+                    batch = resp.get("records", [])
+                    meta  = resp.get("meta", {})
+                    total = int(meta.get("total", 0))
+
+                    # Empty batch = no more pages for this pass
+                    if not batch:
+                        break
+
+                    for r in batch:
+                        rid = str(r.get("id"))
+                        if rid not in seen_ids:
+                            seen_ids.add(rid)
+                            temp_records.append(r)
+                            new_this_pass += 1
+
+                    offset += len(batch)
+                    print(f"[SLP CACHE] pass={pass_num} fetched={len(temp_records)}/{total} offset={offset}")
+
+                print(f"[SLP CACHE] pass={pass_num} complete — unique={len(temp_records)} total={total} new={new_this_pass}")
+
+                # Perfect match — done
+                if total and len(temp_records) >= total:
+                    print(f"[SLP CACHE] ✓ unique count matches total after {pass_num} pass(es)")
                     break
 
-                batch = resp.get("records", [])
-                meta  = resp.get("meta", {})
-                total = int(meta.get("total", 0))
-
-                # Empty batch = AC has no more pages — the only authoritative stop signal
-                if not batch:
+                # No new records found this pass — AC genuinely has fewer than reported
+                if new_this_pass == 0:
+                    print(f"[SLP CACHE] WARNING: no new records on pass {pass_num}, stopping (AC may have gaps)")
                     break
 
-                for r in batch:
-                    rid = str(r.get("id"))
-                    if rid not in seen_ids:
-                        seen_ids.add(rid)
-                        temp_records.append(r)
+                if pass_num < MAX_PASSES:
+                    print(f"[SLP CACHE] {len(temp_records)}/{total} — retrying from offset 0 to catch missed records")
 
-                offset += len(batch)
-
-                print(f"[SLP CACHE] fetched={len(temp_records)} unique / total={total} offset={offset}")
-
-                # Do NOT stop early based on count — duplicates or gaps in AC's
-                # pagination can make len(records) < total even mid-stream.
-                # Paginate to empty-batch completion, then verify.
-
-            # Sanity check: warn if unique count doesn't match AC's reported total
             if total and len(temp_records) < total:
-                print(f"[SLP CACHE] WARNING: got {len(temp_records)} unique records but AC reports {total} — possible gaps")
-            elif total and len(temp_records) > total:
-                print(f"[SLP CACHE] NOTE: got {len(temp_records)} unique records (AC total={total}, dedup removed extras)")
+                print(f"[SLP CACHE] WARNING: final unique={len(temp_records)} vs AC total={total} after {pass_num} passes")
 
             # Atomic swap — only write if we actually got records
             print(f"[SLP CACHE FINAL] loaded={len(temp_records)} expected={total}")
