@@ -751,6 +751,7 @@ async def _refresh_slp_cache() -> None:
                 meta  = resp.get("meta", {})
                 total = int(meta.get("total", 0))
 
+                # Empty batch = AC has no more pages — the only authoritative stop signal
                 if not batch:
                     break
 
@@ -762,10 +763,17 @@ async def _refresh_slp_cache() -> None:
 
                 offset += len(batch)
 
-                print(f"[SLP CACHE] fetched={len(temp_records)} / total={total}")
+                print(f"[SLP CACHE] fetched={len(temp_records)} unique / total={total} offset={offset}")
 
-                if len(temp_records) >= total:
-                    break
+                # Do NOT stop early based on count — duplicates or gaps in AC's
+                # pagination can make len(records) < total even mid-stream.
+                # Paginate to empty-batch completion, then verify.
+
+            # Sanity check: warn if unique count doesn't match AC's reported total
+            if total and len(temp_records) < total:
+                print(f"[SLP CACHE] WARNING: got {len(temp_records)} unique records but AC reports {total} — possible gaps")
+            elif total and len(temp_records) > total:
+                print(f"[SLP CACHE] NOTE: got {len(temp_records)} unique records (AC total={total}, dedup removed extras)")
 
             # Atomic swap — only write if we actually got records
             print(f"[SLP CACHE FINAL] loaded={len(temp_records)} expected={total}")
