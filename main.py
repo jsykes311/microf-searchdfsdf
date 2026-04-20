@@ -1267,7 +1267,7 @@ def _flatten_custom_object(r: dict) -> dict:
     return flat
 
 async def fetch_slp_records() -> list:
-    raw = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    raw = await get_slp_cache()
     return [_flatten_custom_object(r) for r in raw]
 
 async def fetch_license_records() -> list:
@@ -1647,7 +1647,7 @@ async def enrich_with_slp(records: list, source_type: str) -> list:
         return records
 
     print(f"Fetching SLP records for {len(account_ids)} accounts...")
-    all_slp = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    all_slp = await get_slp_cache()
 
     by_account: dict = defaultdict(list)
     for r in all_slp:
@@ -1981,9 +1981,7 @@ async def activations_report(
     """Partner activations: SLP records with Contractor Activated status, joined to accounts."""
     from datetime import timezone
     print("\nActivations report...")
-    slp_records = await ac_get_all(
-        f"customObjects/records/{SLP_SCHEMA_ID}", "records",
-    )
+    slp_records = await get_slp_cache()
     exclude_set = {p.strip() for p in exclude_platforms.split(",")} if exclude_platforms else set()
 
     account_ids: set = set()
@@ -2313,7 +2311,7 @@ async def bdr_summary_report(
     from datetime import timezone
     print("\nBDR summary report...")
     try:
-        slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+        slp_records = await get_slp_cache()
     except BaseException as _e:
         print(f"[bdr-summary] CAUGHT {type(_e).__name__}: {_e}")
         return JSONResponse(status_code=500, content={"detail": str(_e), "type": type(_e).__name__})
@@ -2504,7 +2502,7 @@ async def dealer_profile(
     contact_ids = [ac.get("contact") for ac in (acc_contacts.get("accountContacts", []) if isinstance(acc_contacts, dict) else [])]
 
     # Fetch SLPs, trainings, deals, contacts in parallel
-    slp_task      = ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_task      = get_slp_cache()
     training_task = ac_get_all(f"customObjects/records/{TRAINING_SCHEMA_ID}", "records", {})
     deal_task     = ac_get_all("deals", "deals", {})
 
@@ -2856,7 +2854,7 @@ async def _get_qualifying_microf_accounts() -> set:
     if _qualifying_accounts_cache and (now - _qualifying_accounts_ts) < _SLP_STATE_TTL:
         return _qualifying_accounts_cache
 
-    raw = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    raw = await get_slp_cache()
     result: set = set()
     for r in raw:
         fields = {f.get("field") or f.get("id"): f.get("value") for f in r.get("fields", [])}
@@ -4096,7 +4094,7 @@ async def report_stale_untrained(
     today        = date.today()
     stale_cutoff = str(today - timedelta(days=stale_days))
 
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_records = await get_slp_cache()
     tr_records  = await ac_get_all(f"customObjects/records/{TRAINING_SCHEMA_ID}", "records", {})
 
     training_by_acct: dict = defaultdict(list)
@@ -4194,7 +4192,7 @@ async def report_platform_breakdown(
     from_dt = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=tz) if from_date else None
     to_dt   = datetime.strptime(to_date,   "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=tz) if to_date else None
 
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_records = await get_slp_cache()
     plat_data: dict = defaultdict(lambda: {"new_activations": 0, "active_slps": 0,
                                            "total_slps": 0, "bdrs": defaultdict(int)})
     for r in slp_records:
@@ -4282,7 +4280,7 @@ async def report_oracle_missing(
     bdr:       Optional[str] = Query(None),
     format:    str           = Query("json"),
 ):
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_records = await get_slp_cache()
     cf_map      = await _fetch_acct_cf_map({"118"})
 
     account_ids: set = set()
@@ -4344,7 +4342,7 @@ async def report_account_program_search(
     # Split into words for multi-term matching (e.g. "ARS optimus" → ["ars", "optimus"])
     name_terms = [t for t in _re.split(r'\s+', name_q) if t] if name_q else []
 
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_records = await get_slp_cache()
 
     # Build account_id → list of SLP summaries
     slp_by_account: dict = {}
@@ -4598,7 +4596,7 @@ async def _job_activations(start_date: Optional[date] = None, end_date: Optional
     date_label = str(_start) if _start == _end else f"{_start} to {_end}"
     print(f"[reports] Activations for {date_label}")
 
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_records = await get_slp_cache()
     account_ids: set = set()
     candidates = []
     for r in slp_records:
@@ -4775,7 +4773,7 @@ async def _job_bdr_summary(start_date: Optional[date] = None, end_date: Optional
     to_dt      = datetime(_end.year,   _end.month,   _end.day,   23, 59, 59, tzinfo=tz_utc)
     print(f"[reports] BDR summary {week_start} → {week_end}")
 
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_records = await get_slp_cache()
 
     # Pass 1 – collect raw data; find accounts where BDR or platform is missing
     raw_slps = []
@@ -4946,7 +4944,7 @@ async def _job_stale_untrained(start_date: Optional[date] = None, end_date: Opti
     stale_cutoff = today - timedelta(days=90)
     print("[reports] Stale/untrained dealers")
 
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_records = await get_slp_cache()
     tr_records  = await ac_get_all(f"customObjects/records/{TRAINING_SCHEMA_ID}", "records", {})
 
     training_by_acct: dict = defaultdict(list)
@@ -5086,7 +5084,7 @@ async def _job_platform_breakdown(start_date: Optional[date] = None, end_date: O
     date_label = str(_start) if _start == _end else f"{_start} to {_end}"
     print(f"[reports] Platform breakdown {date_label}")
 
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_records = await get_slp_cache()
     plat_data: dict = defaultdict(lambda: {"new_activations": 0, "active_slps": 0,
                                            "total_slps": 0, "bdrs": defaultdict(int)})
     for r in slp_records:
@@ -5212,7 +5210,7 @@ async def _job_oracle_missing(start_date: Optional[date] = None, end_date: Optio
     _start, _end = _resolve_date_range(start_date, end_date, preset)
     print("[reports] Oracle Producer ID missing")
 
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_records = await get_slp_cache()
     cf_map      = await _fetch_acct_cf_map({"118"})  # oracle_producer_id
 
     account_ids: set = set()
@@ -5678,7 +5676,7 @@ async def _job_not_activated(start_date=None, end_date=None,
                               preset: Optional[str] = None, recipients: list = None):
     """Email all SLP records that are NOT 'Contractor Activated'."""
     print("[reports] Not-activated report")
-    slp_records = await ac_get_all(f"customObjects/records/{SLP_SCHEMA_ID}", "records", {})
+    slp_records = await get_slp_cache()
 
     account_ids: set = set()
     candidates = []
