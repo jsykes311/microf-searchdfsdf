@@ -3922,7 +3922,7 @@ let _mfPinLayer = null;
 function showMicrofMap() {
   const panel = document.getElementById('weather-map-panel');
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-  if (panel.style.display === 'block') initMicrofMap();
+  if (panel.style.display === 'block') { initMicrofMap(); panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 }
 
 function openMfCard(a) {
@@ -4122,7 +4122,7 @@ function initMicrofMap() {
 function showMoveRecords() {
   const panel = document.getElementById('move-records-panel');
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-  if (panel.style.display === 'block') mvShowTab('deal');
+  if (panel.style.display === 'block') { mvShowTab('deal'); panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 }
 function mvShowTab(tab) {
   ['deal','contact','slp'].forEach(t => {
@@ -4169,6 +4169,7 @@ function showOptimusDeactivator() {
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   document.getElementById('optimus-preview-area').innerHTML = '';
   document.getElementById('optimus-status').textContent = '';
+  if (panel.style.display === 'block') panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function optimusPreview() {
@@ -4256,6 +4257,7 @@ function showOptimusReactivator() {
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   document.getElementById('optimus-react-preview-area').innerHTML = '';
   document.getElementById('optimus-react-status').textContent = '';
+  if (panel.style.display === 'block') panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function optimusReactPreview() {
