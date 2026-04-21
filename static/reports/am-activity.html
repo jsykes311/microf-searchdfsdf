@@ -119,6 +119,18 @@
     font-family: inherit;
   }
   .export-btn:hover { background: #eff5ff; }
+
+  /* ── Last contacted async loading ── */
+  .lc-loading { color: #c4b5fd; font-size: .75rem; }
+  .lc-spin {
+    display: inline-block; width: 10px; height: 10px;
+    border: 2px solid #e5e7eb; border-top-color: #8b5cf6;
+    border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle;
+  }
+  .notes-status {
+    font-size: .72rem; color: #6b7280; padding: 6px 18px 8px;
+    border-top: 1px solid #f3f4f6; display: flex; align-items: center; gap: 6px;
+  }
 </style>
 </head>
 <body>
@@ -213,9 +225,11 @@
 </div>
 
 <script>
-let _data = [];   // current filtered + sorted rows
-let _sortCol = null;
+let _data = [];             // current filtered + sorted rows
+let _sortCol  = null;
 let _sortAsc  = true;
+let _lastContacted = {};   // account_id → "YYYY-MM-DD"
+let _lcLoaded = false;     // whether the async fetch has completed
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function load() {
@@ -333,10 +347,21 @@ function renderTable(rows) {
     return;
   }
 
+  const today    = new Date().toISOString().slice(0,10);
+  const lcHeader = _lcLoaded
+    ? `<th onclick="colSort('last_contacted')">Last Contacted</th><th onclick="colSort('days_since_lc')">Days Since</th>`
+    : `<th>Last Contacted <span class="lc-spin"></span></th><th></th>`;
+
   const tbody = rows.map(a => {
-    const cls    = rowClass(a);
-    const acUrl  = `https://microf.activehosted.com/app/accounts/${a.id}`;
-    return `<tr class="${cls}">
+    const cls   = rowClass(a);
+    const acUrl = `https://microf.activehosted.com/app/accounts/${a.id}`;
+    const lcDate   = _lastContacted[a.id] || '';
+    const lcDays   = lcDate ? daysBetween(lcDate, today) : null;
+    const lcCell   = _lcLoaded
+      ? (lcDate ? esc(lcDate) : '<span class="days-na">—</span>')
+      : `<span class="lc-loading"><span class="lc-spin"></span></span>`;
+    const lcBadge  = _lcLoaded ? daysBadge(lcDays, !!lcDate) : '';
+    return `<tr class="${cls}" data-id="${a.id}">
       <td class="acct-name"><a href="${acUrl}" target="_blank">${esc(a.name)}</a></td>
       <td>${esc(a.owner_name || '—')}</td>
       <td class="tag-region">${esc(a.region || '—')}</td>
@@ -345,6 +370,8 @@ function renderTable(rows) {
       <td>${daysBadge(a.days_since_app, !!a.last_app_date)}</td>
       <td>${a.last_rpa_date ? esc(a.last_rpa_date) : '<span class="days-na">—</span>'}</td>
       <td>${daysBadge(a.days_since_rpa, !!a.last_rpa_date)}</td>
+      <td class="lc-date-cell">${lcCell}</td>
+      <td class="lc-badge-cell">${lcBadge}</td>
     </tr>`;
   }).join('');
 
@@ -358,9 +385,13 @@ function renderTable(rows) {
       <th onclick="colSort('days_since_app')">Days Since App</th>
       <th onclick="colSort('last_rpa_date')">Last RPA Date</th>
       <th onclick="colSort('days_since_rpa')">Days Since RPA</th>
+      ${lcHeader}
     </tr></thead>
     <tbody>${tbody}</tbody>
-  </table>`;
+  </table>
+  <div class="notes-status" id="notes-status">
+    ${_lcLoaded ? `✓ Last Contacted loaded from Account Activity + Notes` : `<span class="lc-spin"></span> Loading last contacted dates…`}
+  </div>`;
 
   // Re-apply sort indicator
   if (_sortCol) {
@@ -392,8 +423,18 @@ function colSort(col) {
       case 'dealer_id':      va = (a.dealer_id||'');               vb = (b.dealer_id||'');               break;
       case 'last_app_date':  va = a.last_app_date||'0000-00-00';   vb = b.last_app_date||'0000-00-00';   break;
       case 'days_since_app': va = a.days_since_app ?? BIG;         vb = b.days_since_app ?? BIG;         break;
-      case 'last_rpa_date':  va = a.last_rpa_date||'0000-00-00';   vb = b.last_rpa_date||'0000-00-00';   break;
-      case 'days_since_rpa': va = a.days_since_rpa ?? BIG;         vb = b.days_since_rpa ?? BIG;         break;
+      case 'last_rpa_date':    va = a.last_rpa_date||'0000-00-00';        vb = b.last_rpa_date||'0000-00-00';        break;
+      case 'days_since_rpa':   va = a.days_since_rpa ?? BIG;              vb = b.days_since_rpa ?? BIG;              break;
+      case 'last_contacted': {
+        const ta = _lastContacted[a.id]||'0000-00-00', tb = _lastContacted[b.id]||'0000-00-00';
+        va = ta; vb = tb; break;
+      }
+      case 'days_since_lc': {
+        const today = new Date().toISOString().slice(0,10);
+        va = _lastContacted[a.id] ? daysBetween(_lastContacted[a.id], today) ?? BIG : BIG;
+        vb = _lastContacted[b.id] ? daysBetween(_lastContacted[b.id], today) ?? BIG : BIG;
+        break;
+      }
       default: return 0;
     }
     if (va < vb) return _sortAsc ? -1 : 1;
@@ -419,9 +460,12 @@ function exportCsv() {
     ? _data.filter(a => (a.region||'').toLowerCase() === regionFilter)
     : _data;
 
-  const headers = ['Account','Account ID','AM','Region','Dealer ID','Last App Date','Days Since App','Last RPA Date','Days Since RPA'];
+  const today   = new Date().toISOString().slice(0,10);
+  const headers = ['Account','Account ID','AM','Region','Dealer ID','Last App Date','Days Since App','Last RPA Date','Days Since RPA','Last Contacted','Days Since Contacted'];
   const lines   = [headers.join(',')];
   rows.forEach(a => {
+    const lcDate = _lastContacted[a.id] || '';
+    const lcDays = lcDate ? daysBetween(lcDate, today) : '';
     lines.push([
       `"${(a.name||'').replace(/"/g,'""')}"`,
       a.id,
@@ -432,6 +476,8 @@ function exportCsv() {
       a.days_since_app ?? '',
       a.last_rpa_date||'',
       a.days_since_rpa ?? '',
+      lcDate,
+      lcDays ?? '',
     ].join(','));
   });
 
@@ -443,7 +489,6 @@ function exportCsv() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-// Pre-populate AM dropdown on load
 (async () => {
   try {
     const res  = await fetch('/api/reports/am-activity?acct_type=Contractor');
@@ -461,9 +506,51 @@ function exportCsv() {
   } catch(e) {
     console.warn('AM Activity init failed:', e);
   }
+  // Load last-contacted in background — table already visible, cells update in place
+  loadLastContacted();
 })();
 
+// ── Async: load Last Contacted ────────────────────────────────────────────────
+async function loadLastContacted() {
+  try {
+    const res  = await fetch('/api/reports/am-activity/last-contacted');
+    const data = await res.json();
+    _lastContacted = data.last_contacted || {};
+    _lcLoaded = true;
+    // Patch existing table cells without full re-render
+    const today = new Date().toISOString().slice(0,10);
+    document.querySelectorAll('tr[data-id]').forEach(row => {
+      const aid    = row.dataset.id;
+      const lcDate = _lastContacted[aid] || '';
+      const lcDays = lcDate ? daysBetween(lcDate, today) : null;
+      const dateCell  = row.querySelector('.lc-date-cell');
+      const badgeCell = row.querySelector('.lc-badge-cell');
+      if (dateCell)  dateCell.innerHTML  = lcDate ? esc(lcDate) : '<span class="days-na">—</span>';
+      if (badgeCell) badgeCell.innerHTML = daysBadge(lcDays, !!lcDate);
+    });
+    // Update column header
+    const ths = document.querySelectorAll('table thead th');
+    if (ths.length >= 9) {
+      ths[8].innerHTML = 'Last Contacted';
+      ths[8].onclick   = () => colSort('last_contacted');
+      if (ths[9]) { ths[9].innerHTML = 'Days Since'; ths[9].onclick = () => colSort('days_since_lc'); }
+    }
+    // Update status bar
+    const ns = document.getElementById('notes-status');
+    if (ns) ns.innerHTML = '✓ Last Contacted loaded from Account Activity + Notes';
+  } catch(e) {
+    const ns = document.getElementById('notes-status');
+    if (ns) ns.innerHTML = `⚠ Could not load last contacted: ${esc(e.message)}`;
+  }
+}
+
 // ── Util ──────────────────────────────────────────────────────────────────────
+function daysBetween(a, b) {
+  try {
+    return Math.round((new Date(b) - new Date(a)) / 86400000);
+  } catch { return null; }
+}
+
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

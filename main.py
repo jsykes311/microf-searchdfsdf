@@ -7127,6 +7127,61 @@ async def am_activity_report(
     }
 
 
+@app.get("/api/reports/am-activity/last-contacted")
+async def am_last_contacted(user=Depends(require_auth)):
+    """
+    Returns {account_id: "YYYY-MM-DD"} for the most recent contact per account,
+    sourced from:
+      1. Account Activity custom object (activity-date field)
+      2. Account Notes (reltype=CustomerAccount, cdate)
+    Fetch is live (not cached) so data is always fresh.
+    """
+    today = date.today()
+
+    # latest[account_id] = "YYYY-MM-DD"
+    latest: dict = {}
+
+    def _update(aid: str, raw_date: str) -> None:
+        if not aid or not raw_date:
+            return
+        try:
+            d = date.fromisoformat(str(raw_date)[:10])
+            if d.year < 2000 or d > today:
+                return
+            ds = d.isoformat()
+            if aid not in latest or ds > latest[aid]:
+                latest[aid] = ds
+        except Exception:
+            pass
+
+    # ── 1. Account Activity custom object ────────────────────────────────────
+    try:
+        activity_records = await ac_get_all(
+            f"customObjects/records/{ACCT_ACTIVITY_SCHEMA_ID}", "records", {}
+        )
+        for r in activity_records:
+            fmap   = {f["id"]: (f.get("value") or "") for f in r.get("fields", [])}
+            act_dt = str(fmap.get("activity-date", ""))[:10]
+            aid    = next(iter(r.get("relationships", {}).get("account", [])), "")
+            _update(aid, act_dt)
+    except Exception as e:
+        print(f"[am-activity/last-contacted] activity fetch error: {e}")
+
+    # ── 2. Account Notes ──────────────────────────────────────────────────────
+    try:
+        all_notes = await ac_get_all("notes", "notes",
+                                     {"reltype": "CustomerAccount", "limit": 100})
+        for n in all_notes:
+            if (n.get("reltype") or "").lower() != "customeraccount":
+                continue
+            aid = str(n.get("rel_id") or n.get("relid") or "")
+            _update(aid, n.get("cdate", ""))
+    except Exception as e:
+        print(f"[am-activity/last-contacted] notes fetch error: {e}")
+
+    return {"last_contacted": latest}
+
+
 
 @app.get("/api/reports/slp-health")
 async def slp_health_report(
