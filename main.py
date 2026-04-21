@@ -7193,6 +7193,104 @@ async def am_last_contacted(user=Depends(require_auth)):
     return {"last_contacted": latest}
 
 
+# ── Verdata Active Report ─────────────────────────────────────────────────────
+
+@app.get("/api/report/verdata-active")
+async def verdata_active_report(
+    format: str = Query("json"),
+    user=Depends(require_auth),
+):
+    """Active accounts with SLP activation dates — Verdata feed."""
+    # Fetch custom fields on-demand
+    # CF2=Physical Address, CF4=City, CF5=State, CF6=Zip,
+    # CF15=DBA Name, CF19=Account Status, CF39=Website, CF40=Vendor Tax-ID
+    cf_map = await _fetch_acct_cf_map({"2", "4", "5", "6", "15", "19", "39", "40"})
+
+    slp_records = await get_slp_cache()
+
+    def _slp_field(slp, fid):
+        for f in slp.get("fields", []):
+            if f.get("id") == fid:
+                return (f.get("value") or "").strip()
+        return ""
+
+    # RTO = rent-to-own / LTO-family programs
+    RTO_PLATFORMS = {"LTO", "Microf", "Microf (LTO Only)"}
+
+    rto_dates:    dict = {}   # account_id -> earliest RTO activation date str
+    custom_dates: dict = {}   # account_id -> earliest Custom Fin activation date str
+
+    for slp in slp_records:
+        platform = _slp_field(slp, "platform")
+        act_date = _slp_field(slp, "contractor-activated-date")
+        if not act_date:
+            continue
+        act_str = str(act_date)[:10]
+        if len(act_str) < 10:
+            continue
+
+        rels = slp.get("relationships", {})
+        account_rel = rels.get("account")
+        aids = account_rel if isinstance(account_rel, list) else ([account_rel] if account_rel else [])
+
+        for aid in aids:
+            if not aid:
+                continue
+            aid = str(aid)
+            if platform in RTO_PLATFORMS:
+                if aid not in rto_dates or act_str < rto_dates[aid]:
+                    rto_dates[aid] = act_str
+            else:
+                if aid not in custom_dates or act_str < custom_dates[aid]:
+                    custom_dates[aid] = act_str
+
+    records = []
+    for account_id, cf_vals in cf_map.items():
+        status = cf_vals.get("19", "").strip()
+        if status.lower() != "active":
+            continue
+
+        dealer_id = _account_to_dealer.get(account_id, "")
+        acct_name = _account_to_name.get(account_id, "")
+        dba_name  = cf_vals.get("15", "")
+        tax_id    = cf_vals.get("40", "")
+        website   = cf_vals.get("39", "")
+        address   = cf_vals.get("2", "")
+        city      = cf_vals.get("4", "")
+        state     = cf_vals.get("5", "")
+        zip_code  = cf_vals.get("6", "")
+
+        records.append({
+            "Dealer ID":                  dealer_id,
+            "Account Name":               acct_name,
+            "DBA Name":                   dba_name,
+            "RTO Activation Date":        rto_dates.get(account_id, ""),
+            "Custom Fin Activation Date": custom_dates.get(account_id, ""),
+            "Account Status":             status,
+            "Vendor Tax-ID":              tax_id,
+            "Website":                    website,
+            "Physical Address":           address,
+            "Physical City":              city,
+            "Physical State":             state,
+            "Physical Zip":               zip_code,
+        })
+
+    records.sort(key=lambda r: (r["Account Name"] or "").lower())
+
+    if format == "csv":
+        output = io.StringIO()
+        if records:
+            writer = csv.DictWriter(output, fieldnames=list(records[0].keys()))
+            writer.writeheader()
+            writer.writerows(records)
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": 'attachment; filename="verdata_active.csv"'},
+        )
+
+    return {"count": len(records), "records": records}
+
 
 @app.get("/api/reports/slp-health")
 async def slp_health_report(

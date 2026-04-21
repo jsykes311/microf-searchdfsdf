@@ -1564,6 +1564,18 @@ select, input { font-family: inherit; }
       <div id="aps-result" style="margin-top:12px;"></div>
     </div>
 
+    <!-- Verdata Active Report -->
+    <div class="report-card">
+      <span class="badge-icon">📊</span>
+      <h3>Verdata Active Report</h3>
+      <p>All accounts with Account Status = "Active" — includes Dealer ID, DBA Name, RTO &amp; Custom Fin activation dates, Tax-ID, website, and address.</p>
+      <div class="btn-row" style="margin-top:auto;">
+        <button class="btn btn-primary" onclick="runPrebuilt('verdata-active')">▶ Run</button>
+        <button class="btn btn-success" onclick="downloadPrebuilt('verdata-active')">⬇ CSV</button>
+      </div>
+      <div id="verdata-result" style="margin-top:12px;"></div>
+    </div>
+
   </div>
 
   <!-- Email Reports -->
@@ -2633,6 +2645,9 @@ function prebuiltParams(type) {
   if (type === 'ars-360') {
     return { endpoint: 'ars-360', params: p };
   }
+  if (type === 'verdata-active') {
+    return { endpoint: 'verdata-active', params: p };
+  }
   if (type === 'account-program-search') {
     const name = document.getElementById('aps-name').value.trim();
     const prog = document.getElementById('aps-program').value;
@@ -2655,6 +2670,7 @@ async function runPrebuilt(type) {
     'partner-activation': 'pa-result', 'oracle-missing': 'om-result',
     'ars-360': 'ars360-result',
     'account-program-search': 'aps-result',
+    'verdata-active': 'verdata-result',
   }[type];
   document.getElementById(resultId).innerHTML = '<span style="color:#6b7280; font-size:0.82rem;">Loading…</span>';
 
