@@ -424,7 +424,8 @@ _account_to_state_prov: dict = {}  # account_id (str) → state/province (custom
 _account_to_phone: dict = {}    # account_id (str) → phone number (customfield 11)
 _account_to_website: dict = {}  # account_id (str) → website (customfield 39)
 _account_to_address: dict = {}  # account_id (str) → address 1 (customfield 2)
-_account_to_last_app: dict = {} # account_id (str) → last app date (customfield 140)
+_account_to_last_app: dict = {} # account_id (str) → last app date (customfield 37)
+_account_to_last_rpa: dict = {} # account_id (str) → last RPA date (customfield 38)
 _account_to_type: dict = {}     # account_id (str) → account type (customfield 76)
 _account_to_region: dict = {}   # account_id (str) → sales region (customfield 23)
 _user_id_to_name: dict = {}     # AC user_id (str) → "First Last"
@@ -523,6 +524,7 @@ async def _build_dealer_id_index() -> None:
     WEBSITE_CF_ID  = 39    # customFieldId for "Website"
     ADDRESS_CF_ID  = 2     # customFieldId for "Address 1"
     LAST_APP_CF_ID = 37    # customFieldId for "Last Application Date" (CF140 is unpopulated)
+    LAST_RPA_CF_ID = 38    # customFieldId for "Last RPA Date"
     ACCT_TYPE_CF   = 76    # customFieldId for "Account Type"
     REGION_CF_ID   = 23    # customFieldId for "Sales Region"
     CF_PAGE        = 1000  # 1000 records/page → ~190 pages instead of ~1900
@@ -547,6 +549,7 @@ async def _build_dealer_id_index() -> None:
         acct_to_website:    dict = {}
         acct_to_address:    dict = {}
         acct_to_last_app:   dict = {}
+        acct_to_last_rpa:   dict = {}
         acct_to_type:       dict = {}
         acct_to_region:     dict = {}
 
@@ -582,6 +585,8 @@ async def _build_dealer_id_index() -> None:
                     acct_to_address[aid]    = val
                 elif cf_id == LAST_APP_CF_ID:
                     acct_to_last_app[aid]   = val[:10] if val else ""
+                elif cf_id == LAST_RPA_CF_ID:
+                    acct_to_last_rpa[aid]   = val[:10] if val else ""
                 elif cf_id == ACCT_TYPE_CF:
                     acct_to_type[aid]       = val
                 elif cf_id == REGION_CF_ID:
@@ -647,6 +652,7 @@ async def _build_dealer_id_index() -> None:
         _account_to_website.clear();     _account_to_website.update(acct_to_website)
         _account_to_address.clear();     _account_to_address.update(acct_to_address)
         _account_to_last_app.clear();    _account_to_last_app.update(acct_to_last_app)
+        _account_to_last_rpa.clear();    _account_to_last_rpa.update(acct_to_last_rpa)
         _account_to_type.clear();        _account_to_type.update(acct_to_type)
         _account_to_region.clear();      _account_to_region.update(acct_to_region)
 
@@ -7008,6 +7014,94 @@ async def webhook_deal_created(request: _Request, background_tasks: BackgroundTa
 @app.get("/reports/slp-health")
 async def slp_health_page(user=Depends(require_auth)):
     return FileResponse("static/reports/slp-health.html")
+
+
+# ── AM Activity Dashboard ─────────────────────────────────────────────────────
+
+@app.get("/reports/am-activity")
+async def am_activity_page(user=Depends(require_auth)):
+    return FileResponse("static/reports/am-activity.html")
+
+
+@app.get("/api/reports/am-activity")
+async def am_activity_report(
+    owner: Optional[str] = Query(None, description="Filter by AC owner user ID"),
+    acct_type: Optional[str] = Query("Contractor", description="Filter by Account Type; empty = all"),
+    user=Depends(require_auth),
+):
+    """
+    Returns all accounts (filtered by owner/type) with last app date, last RPA date,
+    and days-since for each. Sorted most-stale first (nulls at top).
+    Also returns a managers list for the dropdown.
+    """
+    today = date.today()
+
+    def days_since(date_str: str) -> Optional[int]:
+        if not date_str:
+            return None
+        try:
+            return (today - date.fromisoformat(str(date_str)[:10])).days
+        except Exception:
+            return None
+
+    accounts = []
+    for aid, name in _account_index.items():
+        # Account type filter
+        typ = _account_to_type.get(aid, "")
+        if acct_type and typ.lower() != acct_type.lower():
+            continue
+
+        owner_id   = _account_to_owner.get(aid, "")
+        if owner and owner_id != owner:
+            continue
+
+        last_app   = _account_to_last_app.get(aid, "")
+        last_rpa   = _account_to_last_rpa.get(aid, "")
+        dealer_id  = _account_to_dealer.get(aid, "")
+        region     = _account_to_region.get(aid, "")
+        owner_name = _user_id_to_name.get(owner_id, owner_id or "—")
+
+        days_app   = days_since(last_app)
+        days_rpa   = days_since(last_rpa)
+
+        accounts.append({
+            "id":            aid,
+            "name":          name,
+            "owner_id":      owner_id,
+            "owner_name":    owner_name,
+            "dealer_id":     dealer_id,
+            "region":        region,
+            "last_app_date": last_app,
+            "days_since_app": days_app,
+            "last_rpa_date": last_rpa,
+            "days_since_rpa": days_rpa,
+        })
+
+    # Sort: null dates first (never touched), then oldest to newest by max staleness
+    def _sort_key(a):
+        da = a["days_since_app"] if a["days_since_app"] is not None else 99999
+        dr = a["days_since_rpa"] if a["days_since_rpa"] is not None else 99999
+        return -max(da, dr)
+
+    accounts.sort(key=_sort_key)
+
+    # Build managers list from ALL accounts (not filtered set) so dropdown is complete
+    mgrs: dict = {}
+    for aid in _account_index:
+        uid = _account_to_owner.get(aid, "")
+        if uid and uid not in mgrs:
+            mgrs[uid] = _user_id_to_name.get(uid, uid)
+
+    managers = sorted(
+        [{"id": k, "name": v} for k, v in mgrs.items()],
+        key=lambda x: x["name"]
+    )
+
+    return {
+        "accounts":  accounts,
+        "total":     len(accounts),
+        "managers":  managers,
+    }
 
 
 

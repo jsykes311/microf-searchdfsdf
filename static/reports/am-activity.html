@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AM Activity Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f6fa; color: #1a1a2e; font-size: 14px; }
+
+  header {
+    background: linear-gradient(135deg, #356ae6 0%, #1a3fa8 100%);
+    color: #fff; padding: 0 28px; display: flex; align-items: center; gap: 16px; height: 52px;
+    box-shadow: 0 2px 10px rgba(53,106,230,.3);
+  }
+  header h1 { font-size: 1rem; font-weight: 700; flex: 1; }
+  .apps-btn {
+    background: rgba(255,255,255,.12); color: rgba(255,255,255,.9); border: none;
+    border-radius: 6px; padding: 6px 14px; font-size: .8rem; font-weight: 600;
+    cursor: pointer; text-decoration: none; white-space: nowrap;
+  }
+  .apps-btn:hover { background: rgba(255,255,255,.22); color: #fff; }
+
+  .container { max-width: 1300px; margin: 24px auto; padding: 0 20px; }
+
+  /* ── Filters ── */
+  .filters {
+    background: #fff; border-radius: 10px; padding: 18px 20px;
+    display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end;
+    box-shadow: 0 1px 4px rgba(0,0,0,.07); margin-bottom: 20px;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 5px; }
+  .filter-group label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #6b7280; }
+  select, input[type=text] {
+    padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 6px;
+    font-size: .85rem; font-family: inherit; background: #fff; min-width: 180px;
+    color: #111827;
+  }
+  select:focus, input[type=text]:focus { outline: none; border-color: #356ae6; }
+  .btn-run {
+    padding: 8px 20px; background: #356ae6; color: #fff; border: none;
+    border-radius: 6px; font-size: .85rem; font-weight: 600; cursor: pointer;
+    font-family: inherit; align-self: flex-end;
+  }
+  .btn-run:hover { background: #2558d4; }
+  .btn-run:disabled { background: #93afd9; cursor: not-allowed; }
+
+  /* ── Stats row ── */
+  .stats { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat {
+    background: #fff; border-radius: 10px; padding: 14px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.07); min-width: 140px; flex: 1;
+  }
+  .stat-value { font-size: 1.75rem; font-weight: 700; color: #356ae6; line-height: 1; }
+  .stat-value.red   { color: #dc2626; }
+  .stat-value.amber { color: #d97706; }
+  .stat-label { font-size: .72rem; color: #6b7280; margin-top: 5px; font-weight: 500; }
+
+  /* ── Table ── */
+  .results { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.07); overflow: hidden; }
+  .results-header {
+    padding: 14px 18px; border-bottom: 1px solid #f0f0f0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .results-title { font-size: .85rem; font-weight: 700; color: #374151; }
+  .results-count { font-size: .8rem; color: #6b7280; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  th {
+    background: #f8f9fb; text-align: left; padding: 9px 14px;
+    font-size: .7rem; font-weight: 700; color: #6b7280; text-transform: uppercase;
+    letter-spacing: .5px; border-bottom: 1px solid #e8eaed;
+    white-space: nowrap; cursor: pointer; user-select: none;
+  }
+  th:hover { background: #f0f2f8; color: #356ae6; }
+  th.sorted-asc::after  { content: " ↑"; color: #356ae6; }
+  th.sorted-desc::after { content: " ↓"; color: #356ae6; }
+  td { padding: 9px 14px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr.row-red    td { background: #fff8f8; }
+  tr.row-red:hover td { background: #fff0f0; }
+  tr.row-amber  td { background: #fffdf4; }
+  tr.row-amber:hover td { background: #fffaeb; }
+  tr.row-green  td { background: #f7fdf9; }
+  tr.row-green:hover td { background: #effaf2; }
+  tr.row-none   td { background: #f8f8ff; }
+  tr.row-none:hover td { background: #f0f0ff; }
+
+  .acct-name { font-weight: 600; color: #111827; }
+  .acct-name a { color: #356ae6; text-decoration: none; }
+  .acct-name a:hover { text-decoration: underline; }
+
+  .badge-days {
+    display: inline-block; padding: 2px 8px; border-radius: 99px;
+    font-size: .75rem; font-weight: 700; white-space: nowrap;
+  }
+  .days-red   { background: #fee2e2; color: #b91c1c; }
+  .days-amber { background: #fef3c7; color: #92400e; }
+  .days-green { background: #d1fae5; color: #065f46; }
+  .days-none  { background: #ede9fe; color: #5b21b6; }
+  .days-na    { color: #9ca3af; font-size: .78rem; }
+
+  .tag-region { font-size: .72rem; color: #6b7280; }
+
+  /* ── Empty / loading ── */
+  .empty-state, .loading-state {
+    text-align: center; padding: 56px 24px; color: #9ca3af;
+  }
+  .loading-state .spin {
+    display: inline-block; width: 26px; height: 26px; margin-bottom: 12px;
+    border: 3px solid #e5e7eb; border-top-color: #356ae6;
+    border-radius: 50%; animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .export-btn {
+    padding: 6px 14px; background: #fff; color: #356ae6; border: 1px solid #356ae6;
+    border-radius: 6px; font-size: .8rem; font-weight: 600; cursor: pointer;
+    font-family: inherit;
+  }
+  .export-btn:hover { background: #eff5ff; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📊 AM Activity Dashboard</h1>
+  <a class="apps-btn" href="/">⬡ Apps</a>
+</header>
+
+<div class="container">
+
+  <!-- Filters -->
+  <div class="filters">
+    <div class="filter-group">
+      <label>Account Manager</label>
+      <select id="f-owner">
+        <option value="">— All AMs —</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Account Type</label>
+      <select id="f-type">
+        <option value="Contractor" selected>Contractor</option>
+        <option value="">All Types</option>
+        <option value="Dealer">Dealer</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Region</label>
+      <select id="f-region">
+        <option value="">— All Regions —</option>
+        <option>Mid-Atlantic</option>
+        <option>Mid-West</option>
+        <option>Southeast</option>
+        <option>West</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Sort By</label>
+      <select id="f-sort">
+        <option value="stale">Most Stale First</option>
+        <option value="app_asc">Last App ↑ (oldest first)</option>
+        <option value="app_desc">Last App ↓ (newest first)</option>
+        <option value="rpa_asc">Last RPA ↑ (oldest first)</option>
+        <option value="rpa_desc">Last RPA ↓ (newest first)</option>
+        <option value="name">Account Name A–Z</option>
+      </select>
+    </div>
+    <button class="btn-run" onclick="load()">Load</button>
+    <button class="export-btn" onclick="exportCsv()" style="align-self:flex-end;">⬇ CSV</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats" id="stats" style="display:none;">
+    <div class="stat">
+      <div class="stat-value" id="s-total">—</div>
+      <div class="stat-label">Total Accounts</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value red" id="s-stale">—</div>
+      <div class="stat-label">No App in 90+ Days</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value amber" id="s-no-app">—</div>
+      <div class="stat-label">Never Had App</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="s-avg">—</div>
+      <div class="stat-label">Avg Days Since App</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value red" id="s-stale-rpa">—</div>
+      <div class="stat-label">No RPA in 90+ Days</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value amber" id="s-no-rpa">—</div>
+      <div class="stat-label">Never Had RPA</div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results">
+    <div class="results-header">
+      <span class="results-title">Accounts</span>
+      <span class="results-count" id="result-count"></span>
+    </div>
+    <div id="table-wrap">
+      <div class="empty-state">Select an AM and click Load to view activity.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let _data = [];   // current filtered + sorted rows
+let _sortCol = null;
+let _sortAsc  = true;
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function load() {
+  const ownerEl   = document.getElementById('f-owner');
+  const typeEl    = document.getElementById('f-type');
+  const owner     = ownerEl.value;
+  const acctType  = typeEl.value;
+
+  const wrap  = document.getElementById('table-wrap');
+  const stats = document.getElementById('stats');
+  stats.style.display = 'none';
+  wrap.innerHTML = `<div class="loading-state"><div class="spin"></div><br>Loading…</div>`;
+
+  const params = new URLSearchParams();
+  if (owner)    params.set('owner', owner);
+  if (acctType) params.set('acct_type', acctType);
+
+  try {
+    const res  = await fetch(`/api/reports/am-activity?${params}`);
+    const data = await res.json();
+
+    // Populate AM dropdown from first load if empty
+    if (ownerEl.options.length <= 1 && data.managers?.length) {
+      data.managers.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m.id; o.textContent = m.name;
+        ownerEl.appendChild(o);
+      });
+    }
+
+    _data = data.accounts || [];
+    applyFiltersAndRender();
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty-state" style="color:#dc2626;">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Filter + Render ───────────────────────────────────────────────────────────
+function applyFiltersAndRender() {
+  const regionFilter = document.getElementById('f-region').value.toLowerCase();
+  const sortKey      = document.getElementById('f-sort').value;
+
+  let rows = _data.filter(a => {
+    if (regionFilter && (a.region || '').toLowerCase() !== regionFilter) return false;
+    return true;
+  });
+
+  // Sort
+  rows = sortRows(rows, sortKey);
+
+  renderStats(rows);
+  renderTable(rows);
+}
+
+function sortRows(rows, key) {
+  const BIG = 99999;
+  return [...rows].sort((a, b) => {
+    switch(key) {
+      case 'stale': {
+        const da = a.days_since_app ?? BIG, db = b.days_since_app ?? BIG;
+        const ra = a.days_since_rpa ?? BIG, rb = b.days_since_rpa ?? BIG;
+        return Math.max(db, rb) - Math.max(da, ra);  // higher days first
+      }
+      case 'app_asc':  return (a.days_since_app ?? BIG)  - (b.days_since_app ?? BIG);
+      case 'app_desc': return (b.days_since_app ?? -1)   - (a.days_since_app ?? -1);
+      case 'rpa_asc':  return (a.days_since_rpa ?? BIG)  - (b.days_since_rpa ?? BIG);
+      case 'rpa_desc': return (b.days_since_rpa ?? -1)   - (a.days_since_rpa ?? -1);
+      case 'name':     return (a.name || '').localeCompare(b.name || '');
+      default: return 0;
+    }
+  });
+}
+
+function renderStats(rows) {
+  const stats = document.getElementById('stats');
+  stats.style.display = 'flex';
+
+  const noApp      = rows.filter(r => !r.last_app_date).length;
+  const noRpa      = rows.filter(r => !r.last_rpa_date).length;
+  const staleApp   = rows.filter(r => r.days_since_app != null && r.days_since_app >= 90).length;
+  const staleRpa   = rows.filter(r => r.days_since_rpa != null && r.days_since_rpa >= 90).length;
+  const withApp    = rows.filter(r => r.days_since_app != null);
+  const avgApp     = withApp.length
+    ? Math.round(withApp.reduce((s, r) => s + r.days_since_app, 0) / withApp.length) : null;
+
+  document.getElementById('s-total').textContent    = rows.length;
+  document.getElementById('s-stale').textContent    = staleApp;
+  document.getElementById('s-no-app').textContent   = noApp;
+  document.getElementById('s-avg').textContent      = avgApp != null ? avgApp + 'd' : '—';
+  document.getElementById('s-stale-rpa').textContent = staleRpa;
+  document.getElementById('s-no-rpa').textContent   = noRpa;
+  document.getElementById('result-count').textContent = `${rows.length} accounts`;
+}
+
+function rowClass(a) {
+  const maxDays = Math.max(a.days_since_app ?? -1, a.days_since_rpa ?? -1);
+  if (maxDays < 0)  return 'row-none';  // no dates at all
+  if (maxDays >= 90) return 'row-red';
+  if (maxDays >= 30) return 'row-amber';
+  return 'row-green';
+}
+
+function daysBadge(days, hasDate) {
+  if (!hasDate) return `<span class="badge-days days-none">No date</span>`;
+  if (days == null) return `<span class="days-na">—</span>`;
+  if (days >= 90)  return `<span class="badge-days days-red">${days}d</span>`;
+  if (days >= 30)  return `<span class="badge-days days-amber">${days}d</span>`;
+  return `<span class="badge-days days-green">${days}d</span>`;
+}
+
+function renderTable(rows) {
+  const wrap  = document.getElementById('table-wrap');
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty-state">No accounts match the current filters.</div>`;
+    return;
+  }
+
+  const tbody = rows.map(a => {
+    const cls    = rowClass(a);
+    const acUrl  = `https://microf.activehosted.com/app/accounts/${a.id}`;
+    return `<tr class="${cls}">
+      <td class="acct-name"><a href="${acUrl}" target="_blank">${esc(a.name)}</a></td>
+      <td>${esc(a.owner_name || '—')}</td>
+      <td class="tag-region">${esc(a.region || '—')}</td>
+      <td>${esc(a.dealer_id || '—')}</td>
+      <td>${a.last_app_date ? esc(a.last_app_date) : '<span class="days-na">—</span>'}</td>
+      <td>${daysBadge(a.days_since_app, !!a.last_app_date)}</td>
+      <td>${a.last_rpa_date ? esc(a.last_rpa_date) : '<span class="days-na">—</span>'}</td>
+      <td>${daysBadge(a.days_since_rpa, !!a.last_rpa_date)}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<table>
+    <thead><tr>
+      <th onclick="colSort('name')">Account</th>
+      <th onclick="colSort('owner')">AM</th>
+      <th onclick="colSort('region')">Region</th>
+      <th onclick="colSort('dealer_id')">Dealer ID</th>
+      <th onclick="colSort('last_app_date')">Last App Date</th>
+      <th onclick="colSort('days_since_app')">Days Since App</th>
+      <th onclick="colSort('last_rpa_date')">Last RPA Date</th>
+      <th onclick="colSort('days_since_rpa')">Days Since RPA</th>
+    </tr></thead>
+    <tbody>${tbody}</tbody>
+  </table>`;
+
+  // Re-apply sort indicator
+  if (_sortCol) {
+    const ths = wrap.querySelectorAll('th');
+    const colMap = ['name','owner','region','dealer_id','last_app_date','days_since_app','last_rpa_date','days_since_rpa'];
+    const idx = colMap.indexOf(_sortCol);
+    if (idx >= 0) {
+      ths[idx].classList.add(_sortAsc ? 'sorted-asc' : 'sorted-desc');
+    }
+  }
+}
+
+// ── Column sort ───────────────────────────────────────────────────────────────
+function colSort(col) {
+  if (_sortCol === col) {
+    _sortAsc = !_sortAsc;
+  } else {
+    _sortCol = col;
+    _sortAsc = true;
+  }
+
+  const BIG = 99999;
+  const sorted = [..._data].sort((a, b) => {
+    let va, vb;
+    switch(col) {
+      case 'name':           va = (a.name||'').toLowerCase();      vb = (b.name||'').toLowerCase();      break;
+      case 'owner':          va = (a.owner_name||'').toLowerCase(); vb = (b.owner_name||'').toLowerCase(); break;
+      case 'region':         va = (a.region||'').toLowerCase();    vb = (b.region||'').toLowerCase();    break;
+      case 'dealer_id':      va = (a.dealer_id||'');               vb = (b.dealer_id||'');               break;
+      case 'last_app_date':  va = a.last_app_date||'0000-00-00';   vb = b.last_app_date||'0000-00-00';   break;
+      case 'days_since_app': va = a.days_since_app ?? BIG;         vb = b.days_since_app ?? BIG;         break;
+      case 'last_rpa_date':  va = a.last_rpa_date||'0000-00-00';   vb = b.last_rpa_date||'0000-00-00';   break;
+      case 'days_since_rpa': va = a.days_since_rpa ?? BIG;         vb = b.days_since_rpa ?? BIG;         break;
+      default: return 0;
+    }
+    if (va < vb) return _sortAsc ? -1 : 1;
+    if (va > vb) return _sortAsc ? 1 : -1;
+    return 0;
+  });
+
+  // Re-apply region filter
+  const regionFilter = document.getElementById('f-region').value.toLowerCase();
+  const filtered = regionFilter
+    ? sorted.filter(a => (a.region||'').toLowerCase() === regionFilter)
+    : sorted;
+
+  renderTable(filtered);
+  renderStats(filtered);
+}
+
+// ── CSV Export ────────────────────────────────────────────────────────────────
+function exportCsv() {
+  if (!_data.length) { alert('Load data first.'); return; }
+  const regionFilter = document.getElementById('f-region').value.toLowerCase();
+  const rows = regionFilter
+    ? _data.filter(a => (a.region||'').toLowerCase() === regionFilter)
+    : _data;
+
+  const headers = ['Account','Account ID','AM','Region','Dealer ID','Last App Date','Days Since App','Last RPA Date','Days Since RPA'];
+  const lines   = [headers.join(',')];
+  rows.forEach(a => {
+    lines.push([
+      `"${(a.name||'').replace(/"/g,'""')}"`,
+      a.id,
+      `"${(a.owner_name||'').replace(/"/g,'""')}"`,
+      `"${(a.region||'').replace(/"/g,'""')}"`,
+      a.dealer_id||'',
+      a.last_app_date||'',
+      a.days_since_app ?? '',
+      a.last_rpa_date||'',
+      a.days_since_rpa ?? '',
+    ].join(','));
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'am_activity.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+// Pre-populate AM dropdown on load
+(async () => {
+  try {
+    const res  = await fetch('/api/reports/am-activity?acct_type=Contractor');
+    const data = await res.json();
+    const sel  = document.getElementById('f-owner');
+    if (data.managers?.length) {
+      data.managers.forEach(m => {
+        const o = document.createElement('option');
+        o.value = m.id; o.textContent = m.name;
+        sel.appendChild(o);
+      });
+    }
+    _data = data.accounts || [];
+    applyFiltersAndRender();
+  } catch(e) {
+    console.warn('AM Activity init failed:', e);
+  }
+})();
+
+// ── Util ──────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Re-render on filter change (region + sort are client-side)
+document.getElementById('f-region').addEventListener('change', applyFiltersAndRender);
+document.getElementById('f-sort').addEventListener('change', applyFiltersAndRender);
+</script>
+</body>
+</html>
