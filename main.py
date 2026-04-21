@@ -428,6 +428,9 @@ _account_to_last_app: dict = {} # account_id (str) → last app date (customfiel
 _account_to_last_rpa: dict = {} # account_id (str) → last RPA date (customfield 38)
 _account_to_type: dict = {}     # account_id (str) → account type (customfield 76)
 _account_to_region: dict = {}   # account_id (str) → sales region (customfield 23)
+_account_to_dba: dict = {}      # account_id (str) → DBA Name (customfield 15)
+_account_to_status: dict = {}   # account_id (str) → Account Status (customfield 19)
+_account_to_tax_id: dict = {}   # account_id (str) → Vendor Tax-ID (customfield 40)
 _user_id_to_name: dict = {}     # AC user_id (str) → "First Last"
 _program_to_accounts: dict = {} # lowercase(dealer_program) → set of account_ids
 _dealer_index_ts:  float = 0.0
@@ -527,6 +530,9 @@ async def _build_dealer_id_index() -> None:
     LAST_RPA_CF_ID = 38    # customFieldId for "Last RPA Date"
     ACCT_TYPE_CF   = 76    # customFieldId for "Account Type"
     REGION_CF_ID   = 23    # customFieldId for "Sales Region"
+    DBA_NAME_CF    = 15    # customFieldId for "DBA Name"
+    ACCT_STATUS_CF = 19    # customFieldId for "Account Status"
+    VENDOR_TAX_CF  = 40    # customFieldId for "Vendor Tax-ID"
     CF_PAGE        = 1000  # 1000 records/page → ~190 pages instead of ~1900
     CONCURRENCY    = 8     # 8 concurrent requests → index builds in ~10s instead of ~5min
 
@@ -552,6 +558,9 @@ async def _build_dealer_id_index() -> None:
         acct_to_last_rpa:   dict = {}
         acct_to_type:       dict = {}
         acct_to_region:     dict = {}
+        acct_to_dba:        dict = {}
+        acct_to_status:     dict = {}
+        acct_to_tax_id:     dict = {}
 
         def _ingest(items: list) -> None:
             for item in items:
@@ -591,6 +600,12 @@ async def _build_dealer_id_index() -> None:
                     acct_to_type[aid]       = val
                 elif cf_id == REGION_CF_ID:
                     acct_to_region[aid]     = val
+                elif cf_id == DBA_NAME_CF:
+                    acct_to_dba[aid]        = val
+                elif cf_id == ACCT_STATUS_CF:
+                    acct_to_status[aid]     = val
+                elif cf_id == VENDOR_TAX_CF:
+                    acct_to_tax_id[aid]     = val
 
         _ingest(first_page.get("accountCustomFieldData", []))
 
@@ -655,6 +670,9 @@ async def _build_dealer_id_index() -> None:
         _account_to_last_rpa.clear();    _account_to_last_rpa.update(acct_to_last_rpa)
         _account_to_type.clear();        _account_to_type.update(acct_to_type)
         _account_to_region.clear();      _account_to_region.update(acct_to_region)
+        _account_to_dba.clear();         _account_to_dba.update(acct_to_dba)
+        _account_to_status.clear();      _account_to_status.update(acct_to_status)
+        _account_to_tax_id.clear();      _account_to_tax_id.update(acct_to_tax_id)
 
         # Reverse index: lowercase dealer program → set of account IDs
         new_prog: dict = {}
@@ -7200,12 +7218,7 @@ async def verdata_active_report(
     format: str = Query("json"),
     user=Depends(require_auth),
 ):
-    """Active accounts with SLP activation dates — Verdata feed."""
-    # Fetch custom fields on-demand
-    # CF2=Physical Address, CF4=City, CF5=State, CF6=Zip,
-    # CF15=DBA Name, CF19=Account Status, CF39=Website, CF40=Vendor Tax-ID
-    cf_map = await _fetch_acct_cf_map({"2", "4", "5", "6", "15", "19", "39", "40"})
-
+    """Active accounts with SLP activation dates — Verdata feed (fully in-memory)."""
     slp_records = await get_slp_cache()
 
     def _slp_field(slp, fid):
@@ -7245,20 +7258,19 @@ async def verdata_active_report(
                     custom_dates[aid] = act_str
 
     records = []
-    for account_id, cf_vals in cf_map.items():
-        status = cf_vals.get("19", "").strip()
-        if status.lower() != "active":
+    for account_id, status in _account_to_status.items():
+        if status.strip().lower() != "active":
             continue
 
         dealer_id = _account_to_dealer.get(account_id, "")
         acct_name = _account_to_name.get(account_id, "")
-        dba_name  = cf_vals.get("15", "")
-        tax_id    = cf_vals.get("40", "")
-        website   = cf_vals.get("39", "")
-        address   = cf_vals.get("2", "")
-        city      = cf_vals.get("4", "")
-        state     = cf_vals.get("5", "")
-        zip_code  = cf_vals.get("6", "")
+        dba_name  = _account_to_dba.get(account_id, "")
+        tax_id    = _account_to_tax_id.get(account_id, "")
+        website   = _account_to_website.get(account_id, "")
+        address   = _account_to_address.get(account_id, "")
+        city      = _account_to_city.get(account_id, "")
+        state     = _account_to_state_prov.get(account_id, "")
+        zip_code  = _account_to_zip.get(account_id, "")
 
         records.append({
             "Dealer ID":                  dealer_id,
