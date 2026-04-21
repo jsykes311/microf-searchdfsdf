@@ -99,6 +99,7 @@ _schedules: dict = {}   # job_id → schedule dict
 
 def _load_schedules_from_disk():
     """Load schedules from file, falling back to SCHEDULES_JSON env var (for Render deploys)."""
+    print(f"[scheduler] schedules file path: {_SCHEDULES_FILE} (exists={os.path.exists(_SCHEDULES_FILE)})")
     saved = None
     if os.path.exists(_SCHEDULES_FILE):
         try:
@@ -125,10 +126,12 @@ def _load_schedules_from_disk():
 def _save_schedules_to_disk_raw(data: list):
     """Write a schedule list to disk (used by both save paths)."""
     try:
+        os.makedirs(os.path.dirname(_SCHEDULES_FILE), exist_ok=True)
         with open(_SCHEDULES_FILE, "w") as f:
             json.dump(data, f, indent=2)
+        print(f"[scheduler] Saved {len(data)} schedule(s) to {_SCHEDULES_FILE}")
     except Exception as e:
-        print(f"[scheduler] Failed to write schedules to disk: {e}")
+        print(f"[scheduler] Failed to write schedules to disk ({_SCHEDULES_FILE}): {e}")
 
 def _save_schedules_to_disk():
     _save_schedules_to_disk_raw(list(_schedules.values()))
