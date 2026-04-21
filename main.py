@@ -7045,7 +7045,7 @@ async def am_activity_report(
             return None
 
     accounts = []
-    for aid, name in _account_index.items():
+    for aid, name in _account_to_name.items():
         # Account type filter
         typ = _account_to_type.get(aid, "")
         if acct_type and typ.lower() != acct_type.lower():
@@ -7087,7 +7087,7 @@ async def am_activity_report(
 
     # Build managers list from ALL accounts (not filtered set) so dropdown is complete
     mgrs: dict = {}
-    for aid in _account_index:
+    for aid in _account_to_name:
         uid = _account_to_owner.get(aid, "")
         if uid and uid not in mgrs:
             mgrs[uid] = _user_id_to_name.get(uid, uid)
