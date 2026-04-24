@@ -3841,7 +3841,12 @@ async def get_me(request: _Request):
 
 @app.get("/api/admin/schedules")
 async def list_schedules(admin=Depends(_require_admin)):
-    return {"schedules": list(_schedules.values())}
+    return {
+        "schedules":      list(_schedules.values()),
+        "_debug_file":    _SCHEDULES_FILE,
+        "_debug_exists":  os.path.exists(_SCHEDULES_FILE),
+        "_debug_writable": os.access(os.path.dirname(_SCHEDULES_FILE) or ".", os.W_OK),
+    }
 
 
 @app.post("/api/admin/schedules")
