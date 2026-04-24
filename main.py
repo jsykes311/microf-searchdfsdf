@@ -5834,6 +5834,108 @@ async def _job_not_activated(start_date=None, end_date=None,
     )
 
 
+# ── Verdata email jobs ────────────────────────────────────────────────────
+
+async def _job_verdata_active(start_date=None, end_date=None,
+                              preset=None, recipients: list = None):
+    """Email the Verdata Active report (Account Status = Active)."""
+    today = str(date.today())
+    print("[reports] Verdata Active")
+    records = []
+    slp_records = await get_slp_cache()
+    act_dates: dict = {}
+    for slp in slp_records:
+        fields = {fo["id"]: fo.get("value", "") for fo in slp.get("fields", [])}
+        did = fields.get("dealer-id", "")
+        ad  = str(fields.get("contractor-activated-date", "") or "")[:10]
+        if did and len(ad) == 10 and (did not in act_dates or ad < act_dates[did]):
+            act_dates[did] = ad
+    for account_id, status in _account_to_status.items():
+        if status.strip().lower() != "active":
+            continue
+        dealer_id = _account_to_dealer.get(account_id, "")
+        records.append({
+            "Dealer ID":           dealer_id,
+            "Account Name":        _account_to_name.get(account_id, ""),
+            "DBA Name":            _account_to_dba.get(account_id, ""),
+            "RTO Activation Date": act_dates.get(dealer_id, ""),
+            "Account Status":      status,
+            "Vendor Tax-ID":       _account_to_tax_id.get(account_id, ""),
+            "Website":             _account_to_website.get(account_id, ""),
+            "Physical Address":    _account_to_address.get(account_id, ""),
+            "Physical City":       _account_to_city.get(account_id, ""),
+            "Physical State":      _account_to_state_prov.get(account_id, ""),
+            "Physical Zip":        _account_to_zip.get(account_id, ""),
+        })
+    records.sort(key=lambda r: (r["Account Name"] or "").lower())
+    cols = [("Dealer ID","Dealer ID"), ("Account Name","Account Name"),
+            ("DBA Name","DBA Name"), ("RTO Activation Date","RTO Activation Date"),
+            ("Account Status","Account Status")]
+    html = _HTML_WRAPPER.format(
+        title="Verdata Active Report",
+        subtitle=f"{len(records)} active account{'s' if len(records) != 1 else ''} as of {today}",
+        table=_html_table(records, cols),
+        timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
+    )
+    await _send_email(
+        subject=f"Verdata Active Report — {today} ({len(records)} records)",
+        html=html,
+        csv_data=_csv_bytes(records),
+        csv_name=f"verdata_active_{today}.csv",
+        recipients=recipients,
+    )
+
+
+async def _job_verdata_inactive(start_date=None, end_date=None,
+                                preset=None, recipients: list = None):
+    """Email the Verdata Inactive report (Account Status = Deactivated)."""
+    today = str(date.today())
+    print("[reports] Verdata Inactive")
+    records = []
+    slp_records = await get_slp_cache()
+    act_dates: dict = {}
+    for slp in slp_records:
+        fields = {fo["id"]: fo.get("value", "") for fo in slp.get("fields", [])}
+        did = fields.get("dealer-id", "")
+        ad  = str(fields.get("contractor-activated-date", "") or "")[:10]
+        if did and len(ad) == 10 and (did not in act_dates or ad < act_dates[did]):
+            act_dates[did] = ad
+    for account_id, status in _account_to_status.items():
+        if status.strip().lower() != "deactivated":
+            continue
+        dealer_id = _account_to_dealer.get(account_id, "")
+        records.append({
+            "Dealer ID":           dealer_id,
+            "Account Name":        _account_to_name.get(account_id, ""),
+            "DBA Name":            _account_to_dba.get(account_id, ""),
+            "RTO Activation Date": act_dates.get(dealer_id, ""),
+            "Account Status":      status,
+            "Vendor Tax-ID":       _account_to_tax_id.get(account_id, ""),
+            "Website":             _account_to_website.get(account_id, ""),
+            "Physical Address":    _account_to_address.get(account_id, ""),
+            "Physical City":       _account_to_city.get(account_id, ""),
+            "Physical State":      _account_to_state_prov.get(account_id, ""),
+            "Physical Zip":        _account_to_zip.get(account_id, ""),
+        })
+    records.sort(key=lambda r: (r["Account Name"] or "").lower())
+    cols = [("Dealer ID","Dealer ID"), ("Account Name","Account Name"),
+            ("DBA Name","DBA Name"), ("RTO Activation Date","RTO Activation Date"),
+            ("Account Status","Account Status")]
+    html = _HTML_WRAPPER.format(
+        title="Verdata Inactive Report",
+        subtitle=f"{len(records)} deactivated account{'s' if len(records) != 1 else ''} as of {today}",
+        table=_html_table(records, cols),
+        timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
+    )
+    await _send_email(
+        subject=f"Verdata Inactive Report — {today} ({len(records)} records)",
+        html=html,
+        csv_data=_csv_bytes(records),
+        csv_name=f"verdata_inactive_{today}.csv",
+        recipients=recipients,
+    )
+
+
 # ── Manual / GitHub Actions trigger ──────────────────────────────────────
 
 _REPORT_JOBS = {
@@ -5851,6 +5953,8 @@ _REPORT_JOBS = {
     "last-app-date":        _job_last_app_date,
     "last-rpa-date":        _job_last_rpa_date,
     "not-activated":        _job_not_activated,
+    "verdata-active":       _job_verdata_active,
+    "verdata-inactive":     _job_verdata_inactive,
 }
 
 @app.get("/api/send-report/{report_type}")
