@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Welcome Email · Microf Reports</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+header {
+  background: linear-gradient(135deg, #356ae6 0%, #1a3fa8 100%);
+  color: white;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 56px;
+  box-shadow: 0 2px 12px rgba(53,106,230,0.3);
+}
+.logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; }
+.logo span { opacity: 0.7; font-weight: 400; }
+header nav { margin-left: auto; display: flex; gap: 8px; }
+header a {
+  color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.8rem;
+  padding: 6px 12px; border-radius: 6px; background: rgba(255,255,255,0.12);
+  white-space: nowrap; font-weight: 600;
+}
+header a:hover { background: rgba(255,255,255,0.22); color: white; }
+
+main {
+  max-width: 880px;
+  margin: 32px auto;
+  padding: 0 24px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: -0.3px;
+}
+.subtitle { font-size: 0.85rem; color: #6b7280; margin-bottom: 18px; }
+
+.form-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.form-row label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+}
+.form-row input,
+.form-row select {
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  font-size: 0.9rem;
+  background: white;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.form-row input:focus,
+.form-row select:focus {
+  border-color: #356ae6;
+  box-shadow: 0 0 0 3px rgba(53,106,230,0.12);
+}
+
+.btn-row { display: flex; gap: 10px; margin-top: 18px; }
+.btn {
+  padding: 10px 18px;
+  border-radius: 7px;
+  border: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.btn-primary {
+  background: #356ae6;
+  color: white;
+}
+.btn-primary:hover { background: #2858d4; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+.btn-secondary:hover { background: #d1d5db; }
+.btn-danger {
+  background: #dc2626;
+  color: white;
+}
+.btn-danger:hover { background: #b91c1c; }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.summary {
+  display: flex;
+  gap: 18px;
+  padding: 14px 16px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.summary-item { font-size: 0.85rem; }
+.summary-item b { display: block; font-size: 1.1rem; color: #111827; }
+.summary-item.green b   { color: #047857; }
+.summary-item.amber b   { color: #b45309; }
+.summary-item.red b     { color: #b91c1c; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.85rem; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #f3f4f6; }
+th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #6b7280;
+  font-weight: 600;
+}
+tbody tr:hover { background: #fafbff; }
+.tag-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: #e0e7ff;
+  color: #3730a3;
+}
+.tag-pill.skip   { background: #fef3c7; color: #92400e; }
+.tag-pill.error  { background: #fee2e2; color: #991b1b; }
+.tag-pill.tagged { background: #d1fae5; color: #065f46; }
+
+#status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  display: none;
+}
+#status.show     { display: block; }
+#status.info     { background: #e0e7ff; color: #312e81; }
+#status.success  { background: #d1fae5; color: #065f46; }
+#status.error    { background: #fee2e2; color: #991b1b; }
+
+.muted { color: #6b7280; font-size: 0.82rem; }
+.section-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #6b7280;
+  font-weight: 700;
+  margin: 18px 0 8px;
+}
+.divider { height: 1px; background: #e5e7eb; margin: 18px 0; }
+
+code {
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Microf Reports <span>· Welcome Email</span></div>
+  <nav>
+    <a href="/search">Search</a>
+    <a href="/logout">Logout</a>
+  </nav>
+</header>
+
+<main>
+  <div class="card">
+    <h1>Send Welcome Email</h1>
+    <div class="subtitle">
+      Admin-only · tags every eligible contact on the account so the AC automation for that Channel fires.
+    </div>
+
+    <div class="form-row">
+      <label for="account_id">Account ID</label>
+      <input id="account_id" type="text" placeholder="e.g. 141" autocomplete="off"/>
+    </div>
+
+    <div class="form-row">
+      <label for="channel">Channel</label>
+      <select id="channel">
+        <option value="">— pick a channel —</option>
+      </select>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="btn-preview">Preview eligible contacts</button>
+      <button class="btn btn-danger" id="btn-send" disabled>Send Welcome Email</button>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <div class="card" id="result-card" style="display:none;">
+    <div id="result-header">
+      <div class="section-title">Result</div>
+      <div id="result-account" class="muted"></div>
+      <div class="summary" id="result-summary"></div>
+    </div>
+
+    <div id="eligible-block">
+      <div class="section-title">Eligible (will / did receive)</div>
+      <table>
+        <thead><tr><th>Email</th><th>Name</th><th>Status</th></tr></thead>
+        <tbody id="eligible-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="skipped-block">
+      <div class="section-title">Skipped</div>
+      <table>
+        <thead><tr><th>Email</th><th>Name</th><th>Reason</th></tr></thead>
+        <tbody id="skipped-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+const $        = id => document.getElementById(id);
+const statusEl = $("status");
+
+function showStatus(kind, msg) {
+  statusEl.className   = "show " + kind;
+  statusEl.textContent = msg;
+}
+function clearStatus() {
+  statusEl.className   = "";
+  statusEl.textContent = "";
+}
+
+async function loadChannels() {
+  try {
+    const r = await fetch("/api/welcome/channels", { credentials: "include" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    const sel = $("channel");
+    for (const ch of data.channels) {
+      const opt = document.createElement("option");
+      opt.value = ch;
+      opt.textContent = ch;
+      sel.appendChild(opt);
+    }
+  } catch (e) {
+    showStatus("error", "Failed to load channels: " + e.message);
+  }
+}
+
+function renderResult(data, mode) {
+  $("result-card").style.display = "block";
+
+  $("result-account").innerHTML =
+    `<b>${data.account_name || "(unnamed)"}</b> · Account ID <code>${data.account_id}</code> · ` +
+    `Channel <code>${data.channel}</code> · Tag <code>${data.tag_applied || data.tag_to_apply}</code>`;
+
+  const tagged = mode === "send" ? (data.tagged ?? 0) : (data.eligible || []).length;
+  const errors = mode === "send" ? (data.errors ?? 0) : 0;
+  const skipped = mode === "send" ? data.skipped : (data.skipped || []).length;
+
+  $("result-summary").innerHTML = `
+    <div class="summary-item"><b>${data.total_contacts ?? 0}</b>contacts on account</div>
+    <div class="summary-item green"><b>${tagged}</b>${mode === "send" ? "tagged" : "eligible"}</div>
+    <div class="summary-item amber"><b>${skipped}</b>skipped</div>
+    ${mode === "send" ? `<div class="summary-item red"><b>${errors}</b>errors</div>` : ""}
+  `;
+
+  const eligibleRows = mode === "send"
+    ? (data.results || []).filter(r => r.status !== "error")
+    : (data.eligible || []);
+  $("eligible-tbody").innerHTML = eligibleRows.length === 0
+    ? `<tr><td colspan="3" class="muted">No eligible contacts.</td></tr>`
+    : eligibleRows.map(c => `
+        <tr>
+          <td>${c.email || "—"}</td>
+          <td>${c.name || ""}</td>
+          <td><span class="tag-pill ${mode === "send" ? (c.status === "error" ? "error" : "tagged") : ""}">${
+            mode === "send" ? (c.status || "tagged") : "eligible"
+          }</span></td>
+        </tr>`).join("");
+
+  const skippedRows = mode === "send" ? (data.skipped_detail || []) : (data.skipped || []);
+  $("skipped-tbody").innerHTML = skippedRows.length === 0
+    ? `<tr><td colspan="3" class="muted">None skipped.</td></tr>`
+    : skippedRows.map(c => `
+        <tr>
+          <td>${c.email || "—"}</td>
+          <td>${c.name || ""}</td>
+          <td><span class="tag-pill skip">${c.skip_reason || "—"}</span></td>
+        </tr>`).join("");
+}
+
+async function previewClick() {
+  clearStatus();
+  $("btn-send").disabled = true;
+  const account_id = $("account_id").value.trim();
+  const channel    = $("channel").value;
+  if (!account_id) { showStatus("error", "Account ID is required."); return; }
+  if (!channel)    { showStatus("error", "Pick a Channel."); return; }
+
+  showStatus("info", "Loading…");
+  try {
+    const r = await fetch(
+      `/api/welcome/preview/${encodeURIComponent(account_id)}?channel=${encodeURIComponent(channel)}`,
+      { credentials: "include" }
+    );
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    const data = await r.json();
+    renderResult(data, "preview");
+    const elig = (data.eligible || []).length;
+    if (elig === 0) {
+      showStatus("info", `No eligible contacts on this account for ${channel}.`);
+    } else {
+      showStatus("success", `${elig} contact(s) eligible. Click Send to fire the AC automation.`);
+      $("btn-send").disabled = false;
+    }
+  } catch (e) {
+    showStatus("error", "Preview failed: " + e.message);
+  }
+}
+
+async function sendClick() {
+  clearStatus();
+  const account_id = $("account_id").value.trim();
+  const channel    = $("channel").value;
+  if (!account_id || !channel) return;
+
+  if (!confirm(`Send welcome email for "${channel}" to all eligible contacts on account ${account_id}?`)) return;
+
+  $("btn-send").disabled = true;
+  $("btn-preview").disabled = true;
+  showStatus("info", "Sending…");
+
+  try {
+    const r = await fetch("/api/welcome/send", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ account_id, channel }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    const data = await r.json();
+    renderResult(data, "send");
+    if (data.errors > 0) {
+      showStatus("error", `Tagged ${data.tagged}, but ${data.errors} error(s). Check the table.`);
+    } else {
+      showStatus("success", `Done — tagged ${data.tagged} contact(s). AC automation will send the email.`);
+    }
+  } catch (e) {
+    showStatus("error", "Send failed: " + e.message);
+  } finally {
+    $("btn-preview").disabled = false;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadChannels();
+  $("btn-preview").addEventListener("click", previewClick);
+  $("btn-send").addEventListener("click", sendClick);
+  // Reset send button when the user changes inputs (must re-preview)
+  ["account_id", "channel"].forEach(id => {
+    $(id).addEventListener("input",  () => { $("btn-send").disabled = true; });
+    $(id).addEventListener("change", () => { $("btn-send").disabled = true; });
+  });
+});
+</script>
+</body>
+</html>

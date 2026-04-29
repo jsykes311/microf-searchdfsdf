@@ -7982,6 +7982,232 @@ async def data_integrity_report(user=Depends(require_auth)):
     }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Welcome Email — manual trigger (admin-only)
+#
+# Phase 1: applies a `welcome-{channel-slug}` tag to every eligible contact on
+# an account. AC tag-triggered automations send the actual email per channel.
+#
+# Setup required in AC before this works:
+#   1. Create one tag per channel:           welcome-optimus, welcome-360finance, ...
+#   2. Create one tag per channel marker:    welcomed-optimus, welcomed-360finance, ...
+#   3. Build one tag-triggered automation per channel that:
+#        - Trigger:  Tag added = welcome-{slug}
+#        - Action:   Send email  (the welcome template for that channel)
+#        - Action:   Add tag    welcomed-{slug}   (so we don't re-send)
+#        - Action:   Remove tag welcome-{slug}    (resets the trigger)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Channel values come from the SLP custom-object `channel` dropdown in AC.
+# Keep this list in sync with that schema.
+WELCOME_CHANNELS = [
+    "OPTIMUS",
+    "Optimus 2.0",
+    "360 Finance",
+    "LTO",
+    "Microf",
+    "Microf (LTO Only)",
+    "SpectrumAC",
+    "SpectrumAC (Wells Fargo)",
+    "ComfortConnect",
+    "GoodLeap",
+    "Rheem",
+    "Partner (No Lease Integration)",
+]
+
+
+def _channel_slug(channel: str) -> str:
+    """Convert a Channel value to its tag-slug form.
+    e.g. 'SpectrumAC (Wells Fargo)' → 'spectrumac-wf'.
+    Adjust here to match the tag names you create in AC."""
+    s = channel.lower()
+    s = s.replace("(wells fargo)", "wf")
+    s = s.replace("(lto only)", "lto-only")
+    s = s.replace("(no lease integration)", "no-lease")
+    s = _re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+    return s
+
+
+def _welcome_tag_name(channel: str) -> str:
+    return f"welcome-{_channel_slug(channel)}"
+
+
+def _welcomed_tag_name(channel: str) -> str:
+    return f"welcomed-{_channel_slug(channel)}"
+
+
+# Tag-name → tag-id cache (in-memory; refreshed on first lookup)
+_WELCOME_TAG_ID_CACHE: dict = {}
+
+
+async def _get_tag_id(tag_name: str) -> Optional[str]:
+    """Resolve an AC tag name to its numeric id. Caches in memory."""
+    if tag_name in _WELCOME_TAG_ID_CACHE:
+        return _WELCOME_TAG_ID_CACHE[tag_name]
+    resp = await ac_get("tags", {"search": tag_name, "limit": 100})
+    for t in resp.get("tags", []):
+        if (t.get("tag") or "").lower() == tag_name.lower():
+            tid = t.get("id")
+            _WELCOME_TAG_ID_CACHE[tag_name] = tid
+            return tid
+    return None
+
+
+@app.get("/welcome")
+async def welcome_page(_admin=Depends(_require_admin)):
+    return FileResponse("static/welcome.html")
+
+
+@app.get("/api/welcome/channels")
+async def welcome_channels(_admin=Depends(_require_admin)):
+    """Return the list of valid Channel values for the UI dropdown."""
+    return {"channels": WELCOME_CHANNELS}
+
+
+async def _eligible_welcome_contacts(account_id: str, channel: str) -> dict:
+    """Return the contacts on this account that should/shouldn't receive a welcome email."""
+    tag_welcomed = _welcomed_tag_name(channel)
+
+    acc_data, contacts_resp = await asyncio.gather(
+        ac_get(f"accounts/{account_id}"),
+        ac_get(f"accounts/{account_id}/contacts"),
+        return_exceptions=True,
+    )
+    if not isinstance(acc_data, dict) or not acc_data.get("account"):
+        raise HTTPException(404, f"Account {account_id} not found")
+    account_name = acc_data["account"].get("name", "")
+
+    contact_ids = []
+    if isinstance(contacts_resp, dict):
+        contact_ids = [
+            ac.get("contact")
+            for ac in contacts_resp.get("accountContacts", [])
+            if ac.get("contact")
+        ]
+
+    # Fetch each contact + their tags in parallel
+    detail_tasks = [
+        ac_get(f"contacts/{cid}", {"include": "contactTags.tag"})
+        for cid in contact_ids
+    ]
+    details = await asyncio.gather(*detail_tasks, return_exceptions=True)
+
+    eligible, skipped = [], []
+    for d in details:
+        if not isinstance(d, dict):
+            continue
+        c = d.get("contact", {})
+        cid = c.get("id")
+        email = (c.get("email") or "").strip()
+        first = c.get("firstName") or ""
+        last = c.get("lastName") or ""
+
+        # Tag names this contact already has
+        tag_names = set()
+        for t in d.get("tags", []):
+            if isinstance(t, dict) and t.get("tag"):
+                tag_names.add(t["tag"].lower())
+
+        reason = None
+        if not email:
+            reason = "no email"
+        elif str(c.get("status") or "") == "2":  # AC: 2 = unsubscribed
+            reason = "unsubscribed"
+        elif tag_welcomed.lower() in tag_names:
+            reason = "already welcomed"
+
+        row = {
+            "contact_id": cid,
+            "email":      email,
+            "name":       f"{first} {last}".strip(),
+        }
+        if reason:
+            row["skip_reason"] = reason
+            skipped.append(row)
+        else:
+            eligible.append(row)
+
+    return {
+        "account_id":            account_id,
+        "account_name":          account_name,
+        "channel":               channel,
+        "tag_to_apply":          _welcome_tag_name(channel),
+        "tag_marker_when_done":  tag_welcomed,
+        "total_contacts":        len(contact_ids),
+        "eligible":              eligible,
+        "skipped":               skipped,
+    }
+
+
+@app.get("/api/welcome/preview/{account_id}")
+async def welcome_preview(
+    account_id: str,
+    channel: str = Query(...),
+    _admin=Depends(_require_admin),
+):
+    """Show who would receive the welcome email for this Channel — does NOT send."""
+    if channel not in WELCOME_CHANNELS:
+        raise HTTPException(400, f"Unknown channel: {channel}")
+    return await _eligible_welcome_contacts(account_id, channel)
+
+
+class _WelcomeSendRequest(_BaseModel):
+    account_id: str
+    channel:    str
+
+
+@app.post("/api/welcome/send")
+async def welcome_send(
+    payload: _WelcomeSendRequest,
+    user=Depends(_require_admin),
+):
+    """Tag every eligible contact on the account so the AC welcome automation fires."""
+    if payload.channel not in WELCOME_CHANNELS:
+        raise HTTPException(400, f"Unknown channel: {payload.channel}")
+
+    preview = await _eligible_welcome_contacts(payload.account_id, payload.channel)
+    welcome_tag = _welcome_tag_name(payload.channel)
+    tag_id = await _get_tag_id(welcome_tag)
+    if not tag_id:
+        raise HTTPException(
+            500,
+            f"Tag '{welcome_tag}' does not exist in ActiveCampaign. "
+            "Create it first (Contacts → Manage Tags) and build the matching automation.",
+        )
+
+    results = []
+    for c in preview["eligible"]:
+        try:
+            await ac_post("contactTags", {"contactTag": {"contact": c["contact_id"], "tag": tag_id}})
+            results.append({"contact_id": c["contact_id"], "email": c["email"], "status": "tagged"})
+        except Exception as e:
+            results.append({
+                "contact_id": c["contact_id"],
+                "email":      c["email"],
+                "status":     "error",
+                "detail":     str(e)[:200],
+            })
+
+    tagged  = sum(1 for r in results if r["status"] == "tagged")
+    errors  = sum(1 for r in results if r["status"] == "error")
+    print(f"[welcome] {user} → account={payload.account_id} channel={payload.channel} "
+          f"tagged={tagged} errors={errors} skipped={len(preview['skipped'])}")
+
+    return {
+        "account_id":     payload.account_id,
+        "account_name":   preview["account_name"],
+        "channel":        payload.channel,
+        "tag_applied":    welcome_tag,
+        "total_contacts": preview["total_contacts"],
+        "tagged":         tagged,
+        "errors":         errors,
+        "skipped":        len(preview["skipped"]),
+        "skipped_detail": preview["skipped"],
+        "results":        results,
+        "by":             user,
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
