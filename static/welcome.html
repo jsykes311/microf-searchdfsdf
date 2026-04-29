@@ -107,12 +107,89 @@ h1 {
   color: #1f2937;
 }
 .btn-secondary:hover { background: #d1d5db; }
-.btn-danger {
-  background: #dc2626;
+.btn-success {
+  background: #16a34a;
   color: white;
 }
-.btn-danger:hover { background: #b91c1c; }
-.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-success:hover { background: #15803d; }
+.btn-success:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Account typeahead ── */
+.typeahead-wrap {
+  position: relative;
+}
+.typeahead-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 50;
+  display: none;
+}
+.typeahead-results.show { display: block; }
+.typeahead-item {
+  padding: 9px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.86rem;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.typeahead-item:last-child { border-bottom: none; }
+.typeahead-item:hover,
+.typeahead-item.active { background: #eef2ff; }
+.typeahead-item .dealer-id {
+  font-weight: 700;
+  color: #1a3fa8;
+  min-width: 70px;
+}
+.typeahead-item .account-name {
+  color: #1f2937;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.typeahead-item .ac-id {
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+.typeahead-empty {
+  padding: 12px;
+  color: #9ca3af;
+  font-size: 0.82rem;
+  text-align: center;
+}
+.picked-pill {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: 4px 10px 4px 12px;
+  font-size: 0.85rem;
+  color: #312e81;
+  font-weight: 600;
+}
+.picked-pill .clear-btn {
+  background: transparent;
+  border: none;
+  color: #4f46e5;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+.picked-pill .clear-btn:hover { color: #1e1b4b; }
 
 .summary {
   display: flex;
@@ -201,8 +278,16 @@ code {
     </div>
 
     <div class="form-row">
-      <label for="account_id">Account ID</label>
-      <input id="account_id" type="text" placeholder="e.g. 141" autocomplete="off"/>
+      <label for="account_search">Account</label>
+      <div class="typeahead-wrap">
+        <input id="account_search" type="text"
+               placeholder="Search by Dealer ID or Account Name…"
+               autocomplete="off"/>
+        <div id="account_results" class="typeahead-results"></div>
+        <div id="picked_wrap" style="margin-top:6px; display:none;">
+          <span class="picked-pill" id="picked_pill"></span>
+        </div>
+      </div>
     </div>
 
     <div class="form-row">
@@ -214,7 +299,7 @@ code {
 
     <div class="btn-row">
       <button class="btn btn-secondary" id="btn-preview">Preview eligible contacts</button>
-      <button class="btn btn-danger" id="btn-send" disabled>Send Welcome Email</button>
+      <button class="btn btn-success" id="btn-send" disabled>Send Welcome Email</button>
     </div>
 
     <div id="status"></div>
@@ -249,6 +334,9 @@ code {
 const $        = id => document.getElementById(id);
 const statusEl = $("status");
 
+// Selected account state — set when the user picks from the typeahead.
+let pickedAccount = null;   // { id, name, dealer_id }
+
 function showStatus(kind, msg) {
   statusEl.className   = "show " + kind;
   statusEl.textContent = msg;
@@ -257,6 +345,93 @@ function clearStatus() {
   statusEl.className   = "";
   statusEl.textContent = "";
 }
+
+// ── Account typeahead ─────────────────────────────────────────────────────
+let searchAbort = null;
+let searchTimer = null;
+
+function clearPicked() {
+  pickedAccount = null;
+  $("picked_wrap").style.display = "none";
+  $("picked_pill").innerHTML = "";
+  $("btn-send").disabled = true;
+}
+
+function setPicked(acct) {
+  pickedAccount = acct;
+  const dealer = acct.dealer_id ? `<b>${acct.dealer_id}</b> · ` : "";
+  $("picked_pill").innerHTML =
+    `${dealer}${acct.name || "(unnamed)"} ` +
+    `<span style="color:#6b7280;font-weight:400;">(AC ${acct.id})</span>` +
+    `<button class="clear-btn" onclick="clearPicked()" title="Clear">✕</button>`;
+  $("picked_wrap").style.display = "block";
+  $("account_search").value  = "";
+  $("account_results").classList.remove("show");
+  $("btn-send").disabled = true;   // require a fresh preview before send
+}
+
+function renderAccountResults(results) {
+  const box = $("account_results");
+  if (!results || results.length === 0) {
+    box.innerHTML = `<div class="typeahead-empty">No matches.</div>`;
+    box.classList.add("show");
+    return;
+  }
+  box.innerHTML = results.map(a => `
+    <div class="typeahead-item" data-id="${a.id}"
+         data-name="${(a.name || '').replace(/"/g,'&quot;')}"
+         data-dealer="${a.dealer_id || ''}">
+      <span class="dealer-id">${a.dealer_id || '—'}</span>
+      <span class="account-name">${a.name || '(unnamed)'}</span>
+      <span class="ac-id">AC ${a.id}</span>
+    </div>
+  `).join("");
+  // Click handlers
+  box.querySelectorAll(".typeahead-item").forEach(el => {
+    el.addEventListener("click", () => {
+      setPicked({
+        id:        el.dataset.id,
+        name:      el.dataset.name,
+        dealer_id: el.dataset.dealer,
+      });
+    });
+  });
+  box.classList.add("show");
+}
+
+async function runAccountSearch(q) {
+  if (searchAbort) searchAbort.abort();
+  searchAbort = new AbortController();
+  try {
+    const r = await fetch(
+      `/api/accounts/search?q=${encodeURIComponent(q)}&limit=15`,
+      { credentials: "include", signal: searchAbort.signal }
+    );
+    if (!r.ok) return;
+    const data = await r.json();
+    renderAccountResults(data.accounts || []);
+  } catch (e) {
+    if (e.name !== "AbortError") console.error(e);
+  }
+}
+
+function onSearchInput() {
+  const q = $("account_search").value.trim();
+  if (pickedAccount) clearPicked();
+  if (q.length < 2) {
+    $("account_results").classList.remove("show");
+    return;
+  }
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => runAccountSearch(q), 200);
+}
+
+// Hide dropdown on outside click
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".typeahead-wrap")) {
+    $("account_results").classList.remove("show");
+  }
+});
 
 async function loadChannels() {
   try {
@@ -321,9 +496,9 @@ function renderResult(data, mode) {
 async function previewClick() {
   clearStatus();
   $("btn-send").disabled = true;
-  const account_id = $("account_id").value.trim();
+  if (!pickedAccount) { showStatus("error", "Search and pick an account first."); return; }
+  const account_id = pickedAccount.id;
   const channel    = $("channel").value;
-  if (!account_id) { showStatus("error", "Account ID is required."); return; }
   if (!channel)    { showStatus("error", "Pick a Channel."); return; }
 
   showStatus("info", "Loading…");
@@ -352,11 +527,15 @@ async function previewClick() {
 
 async function sendClick() {
   clearStatus();
-  const account_id = $("account_id").value.trim();
+  if (!pickedAccount) return;
+  const account_id = pickedAccount.id;
   const channel    = $("channel").value;
-  if (!account_id || !channel) return;
+  if (!channel) return;
 
-  if (!confirm(`Send welcome email for "${channel}" to all eligible contacts on account ${account_id}?`)) return;
+  const label = pickedAccount.dealer_id
+    ? `${pickedAccount.dealer_id} — ${pickedAccount.name}`
+    : pickedAccount.name;
+  if (!confirm(`Send welcome email for "${channel}" to all eligible contacts on ${label}?`)) return;
 
   $("btn-send").disabled = true;
   $("btn-preview").disabled = true;
@@ -391,11 +570,9 @@ document.addEventListener("DOMContentLoaded", () => {
   loadChannels();
   $("btn-preview").addEventListener("click", previewClick);
   $("btn-send").addEventListener("click", sendClick);
-  // Reset send button when the user changes inputs (must re-preview)
-  ["account_id", "channel"].forEach(id => {
-    $(id).addEventListener("input",  () => { $("btn-send").disabled = true; });
-    $(id).addEventListener("change", () => { $("btn-send").disabled = true; });
-  });
+  $("account_search").addEventListener("input", onSearchInput);
+  // Reset send button when the user changes the channel (must re-preview)
+  $("channel").addEventListener("change", () => { $("btn-send").disabled = true; });
 });
 </script>
 </body>

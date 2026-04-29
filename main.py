@@ -7998,21 +7998,12 @@ async def data_integrity_report(user=Depends(require_auth)):
 #        - Action:   Remove tag welcome-{slug}    (resets the trigger)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Channel values come from the SLP custom-object `channel` dropdown in AC.
-# Keep this list in sync with that schema.
+# Channels we'll send welcome emails for.
+# Limited to Microf + OPTIMUS for the initial rollout — expand later as more
+# AC tag-triggered automations are built.
 WELCOME_CHANNELS = [
-    "OPTIMUS",
-    "Optimus 2.0",
-    "360 Finance",
-    "LTO",
     "Microf",
-    "Microf (LTO Only)",
-    "SpectrumAC",
-    "SpectrumAC (Wells Fargo)",
-    "ComfortConnect",
-    "GoodLeap",
-    "Rheem",
-    "Partner (No Lease Integration)",
+    "OPTIMUS",
 ]
 
 
