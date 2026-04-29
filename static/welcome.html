@@ -191,6 +191,90 @@ h1 {
 }
 .picked-pill .clear-btn:hover { color: #1e1b4b; }
 
+/* ── SLP panel ── */
+.slp-panel {
+  margin-top: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.slp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: #374151;
+}
+.slp-header .hint { font-weight: 400; color: #9ca3af; text-transform: none; letter-spacing: 0; font-size: 0.75rem; }
+.slp-row {
+  display: grid;
+  grid-template-columns: 24px 1.4fr 1.6fr 1.2fr 110px;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.85rem;
+}
+.slp-row:last-child { border-bottom: none; }
+.slp-row.unsupported { color: #9ca3af; background: #fafafa; }
+.slp-row.recommended { background: #fef9c3; }
+.slp-star { font-size: 1rem; color: #d97706; }
+.slp-platform { font-weight: 600; color: #1f2937; }
+.slp-row.unsupported .slp-platform { color: #6b7280; }
+.slp-status {
+  font-size: 0.78rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #374151;
+  display: inline-block;
+}
+.slp-status.activated  { background: #d1fae5; color: #065f46; }
+.slp-status.deactivated { background: #fee2e2; color: #991b1b; }
+.slp-status.pending     { background: #fef3c7; color: #92400e; }
+.slp-date { color: #6b7280; font-size: 0.82rem; }
+.slp-action {
+  text-align: right;
+}
+.slp-use-btn {
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.slp-use-btn:hover { background: #c7d2fe; }
+.slp-use-btn.selected { background: #3730a3; color: white; border-color: #3730a3; }
+.slp-noaction {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  font-style: italic;
+}
+.slp-empty {
+  padding: 14px;
+  font-size: 0.85rem;
+  color: #6b7280;
+  text-align: center;
+}
+.slp-warn {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  color: #92400e;
+}
+
 .summary {
   display: flex;
   gap: 18px;
@@ -286,6 +370,7 @@ code {
         <div id="account_results" class="typeahead-results"></div>
         <div id="picked_wrap" style="margin-top:6px; display:none;">
           <span class="picked-pill" id="picked_pill"></span>
+          <div id="slp_panel"></div>
         </div>
       </div>
     </div>
@@ -354,6 +439,7 @@ function clearPicked() {
   pickedAccount = null;
   $("picked_wrap").style.display = "none";
   $("picked_pill").innerHTML = "";
+  $("slp_panel").innerHTML   = "";
   $("btn-send").disabled = true;
 }
 
@@ -368,6 +454,106 @@ function setPicked(acct) {
   $("account_search").value  = "";
   $("account_results").classList.remove("show");
   $("btn-send").disabled = true;   // require a fresh preview before send
+
+  loadAccountSlps(acct.id);
+}
+
+// ── SLP suggestion panel ──────────────────────────────────────────────────
+function statusClass(status) {
+  const s = (status || "").toLowerCase();
+  if (s === "contractor activated") return "activated";
+  if (s.includes("deactivated"))     return "deactivated";
+  if (s.includes("pending") || s.includes("hold") || s.includes("progress")) return "pending";
+  return "";
+}
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[2]}/${m[3]}/${m[1].slice(2)}` : iso;
+}
+
+async function loadAccountSlps(accountId) {
+  const panel = $("slp_panel");
+  panel.innerHTML = `<div class="slp-panel"><div class="slp-empty">Loading SLPs…</div></div>`;
+  try {
+    const r = await fetch(
+      `/api/welcome/account-slps/${encodeURIComponent(accountId)}`,
+      { credentials: "include" }
+    );
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    renderSlpPanel(data);
+  } catch (e) {
+    panel.innerHTML = `<div class="slp-panel"><div class="slp-empty">Couldn't load SLPs: ${e.message}</div></div>`;
+  }
+}
+
+function renderSlpPanel(data) {
+  const panel = $("slp_panel");
+  const slps  = data.slps || [];
+  if (slps.length === 0) {
+    panel.innerHTML = `
+      <div class="slp-panel">
+        <div class="slp-header">SLPs on this account</div>
+        <div class="slp-empty">No SLP records linked to this account.</div>
+      </div>`;
+    return;
+  }
+  const rowsHtml = slps.map(s => {
+    const cls = [
+      "slp-row",
+      s.recommended ? "recommended" : "",
+      s.supported   ? ""            : "unsupported",
+    ].filter(Boolean).join(" ");
+    const star = s.recommended ? `<span class="slp-star" title="Recommended">★</span>` : "";
+    const action = s.supported
+      ? `<button class="slp-use-btn" data-channel="${s.channel}">Use this</button>`
+      : `<span class="slp-noaction">no automation</span>`;
+    return `
+      <div class="${cls}">
+        <span>${star}</span>
+        <span class="slp-platform">${s.platform}</span>
+        <span><span class="slp-status ${statusClass(s.status)}">${s.status || '—'}</span></span>
+        <span class="slp-date">${fmtDate(s.activated)}</span>
+        <span class="slp-action">${action}</span>
+      </div>`;
+  }).join("");
+
+  const warn = data.any_supported ? "" : `
+    <div class="slp-warn">
+      No Microf or OPTIMUS SLPs on this account — pick a Channel manually if you still want to send.
+    </div>`;
+
+  panel.innerHTML = `
+    <div class="slp-panel">
+      <div class="slp-header">
+        <span>SLPs on this account</span>
+        <span class="hint">★ recommended pick · click "Use this" to set the Channel</span>
+      </div>
+      ${rowsHtml}
+    </div>
+    ${warn}`;
+
+  // Wire "Use this" buttons → set channel dropdown
+  panel.querySelectorAll(".slp-use-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const ch = btn.dataset.channel;
+      $("channel").value = ch;
+      // Visual highlight on the picked row
+      panel.querySelectorAll(".slp-use-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      $("btn-send").disabled = true;   // still require Preview before Send
+      clearStatus();
+    });
+  });
+
+  // If there's exactly one supported recommended row, pre-select the channel
+  const rec = slps.find(s => s.recommended && s.supported);
+  if (rec) {
+    $("channel").value = rec.channel;
+    const recBtn = panel.querySelector(`.slp-use-btn[data-channel="${rec.channel}"]`);
+    if (recBtn) recBtn.classList.add("selected");
+  }
 }
 
 function renderAccountResults(results) {

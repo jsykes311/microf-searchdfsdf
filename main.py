@@ -8006,6 +8006,16 @@ WELCOME_CHANNELS = [
     "OPTIMUS",
 ]
 
+# Map SLP `platform` values → the Channel we'd send a welcome for.
+# Fuzzier than exact match so e.g. "Microf (LTO Only)" still maps to "Microf".
+PLATFORM_TO_CHANNEL = {
+    "Microf":             "Microf",
+    "Microf (LTO Only)":  "Microf",
+    "LTO":                "Microf",
+    "OPTIMUS":            "OPTIMUS",
+    "Optimus 2.0":        "OPTIMUS",
+}
+
 
 def _channel_slug(channel: str) -> str:
     """Convert a Channel value to its tag-slug form.
@@ -8127,6 +8137,58 @@ async def _eligible_welcome_contacts(account_id: str, channel: str) -> dict:
         "total_contacts":        len(contact_ids),
         "eligible":              eligible,
         "skipped":               skipped,
+    }
+
+
+@app.get("/api/welcome/account-slps/{account_id}")
+async def welcome_account_slps(account_id: str, _admin=Depends(_require_admin)):
+    """Return the SLP rows on this account so the admin can see which Channel(s)
+    apply, with one flagged as the recommended pick (most recently activated
+    SLP that maps to a supported Channel)."""
+    resp = await ac_get(
+        f"customObjects/records/{SLP_SCHEMA_ID}",
+        {"filters[relationships.account]": account_id, "limit": 100},
+    )
+    rows = []
+    for r in resp.get("records", []):
+        f = {x.get("id") or x.get("field"): x.get("value", "") for x in r.get("fields", [])}
+        platform = (f.get("platform") or "").strip()
+        if not platform:
+            continue
+        suggested = PLATFORM_TO_CHANNEL.get(platform)
+        rows.append({
+            "record_id":    r.get("id"),
+            "platform":     platform,
+            "status":       (f.get("slp-status-detail") or "").strip(),
+            "activated":    (f.get("contractor-activated-date") or "").strip(),
+            "dealer_id":    (f.get("dealer-id") or "").strip(),
+            "supported":    bool(suggested),
+            "channel":      suggested,   # which Channel to pick if "Use this" clicked
+        })
+
+    # Sort by activated desc (ISO strings sort correctly), then by platform
+    rows.sort(key=lambda r: (r["activated"] or "", r["platform"]), reverse=True)
+
+    # Recommended: most recently activated supported row that's Contractor Activated;
+    # fall back to most recently activated supported row of any status.
+    recommended_id = None
+    for row in rows:
+        if row["supported"] and row["activated"] and row["status"] == "Contractor Activated":
+            recommended_id = row["record_id"]
+            break
+    if not recommended_id:
+        for row in rows:
+            if row["supported"] and row["activated"]:
+                recommended_id = row["record_id"]
+                break
+
+    for row in rows:
+        row["recommended"] = (row["record_id"] == recommended_id)
+
+    return {
+        "account_id": account_id,
+        "slps":       rows,
+        "any_supported": any(r["supported"] for r in rows),
     }
 
 
