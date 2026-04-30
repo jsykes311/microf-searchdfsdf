@@ -427,8 +427,8 @@ _account_to_state_prov: dict = {}  # account_id (str) → state/province (custom
 _account_to_phone: dict = {}    # account_id (str) → phone number (customfield 11)
 _account_to_website: dict = {}  # account_id (str) → website (customfield 39)
 _account_to_address: dict = {}  # account_id (str) → address 1 (customfield 2)
-_account_to_last_app: dict = {} # account_id (str) → last app date (customfield 37)
-_account_to_last_rpa: dict = {} # account_id (str) → last RPA date (customfield 38)
+_account_to_last_app: dict = {} # account_id (str) → last app date (SLP last-app-date; CF140 fallback)
+_account_to_last_rpa: dict = {} # account_id (str) → last RPA date (SLP last-rpa-date; CF38 fallback)
 _account_to_type: dict = {}     # account_id (str) → account type (customfield 76)
 _account_to_region: dict = {}   # account_id (str) → sales region (customfield 23)
 _account_to_dba: dict = {}      # account_id (str) → DBA Name (customfield 15)
@@ -529,8 +529,8 @@ async def _build_dealer_id_index() -> None:
     PHONE_CF_ID    = 11    # customFieldId for "Phone Number"
     WEBSITE_CF_ID  = 39    # customFieldId for "Website"
     ADDRESS_CF_ID  = 2     # customFieldId for "Address 1"
-    LAST_APP_CF_ID = 37    # customFieldId for "Last Application Date" (CF140 is unpopulated)
-    LAST_RPA_CF_ID = 38    # customFieldId for "Last RPA Date"
+    LAST_APP_CF_ID = 140   # customFieldId for "Last App Date" (CF37 "Last Application Date" deleted post-weekend-sync)
+    LAST_RPA_CF_ID = 38    # customFieldId for "Last RPA Date" (stays in PROD)
     ACCT_TYPE_CF   = 76    # customFieldId for "Account Type"
     REGION_CF_ID   = 23    # customFieldId for "Sales Region"
     DBA_NAME_CF    = 15    # customFieldId for "DBA Name"
@@ -648,6 +648,38 @@ async def _build_dealer_id_index() -> None:
             print(f"[dealer-index] {len(new_user_map)} AC users loaded")
         except Exception as _ue:
             print(f"[dealer-index] user fetch failed: {_ue}")
+
+        # ── Phase 4: supplement last-app/rpa dates from SLP records ──────────
+        # SLP fields last-app-date and last-rpa-date are the source of truth;
+        # take the most-recent date across all SLPs for each account (max per account).
+        # Falls back to CF140 / CF38 values already loaded above if SLP cache is empty.
+        try:
+            slp_recs_for_dates = _slp_cache_records if _slp_cache_records else []
+
+            def _slp_fv(slp_rec, fid):
+                for _f in slp_rec.get("fields", []):
+                    if _f.get("id") == fid:
+                        _v = (_f.get("value") or "").strip()
+                        return _v[:10] if len(_v) >= 10 else ""
+                return ""
+
+            slp_app_n = slp_rpa_n = 0
+            for slp_rec in slp_recs_for_dates:
+                for acct_id in slp_rec.get("relationships", {}).get("account", []):
+                    _aid = str(acct_id)
+                    app_v = _slp_fv(slp_rec, "last-app-date")
+                    if app_v:
+                        if not acct_to_last_app.get(_aid) or app_v > acct_to_last_app[_aid]:
+                            acct_to_last_app[_aid] = app_v
+                            slp_app_n += 1
+                    rpa_v = _slp_fv(slp_rec, "last-rpa-date")
+                    if rpa_v:
+                        if not acct_to_last_rpa.get(_aid) or rpa_v > acct_to_last_rpa[_aid]:
+                            acct_to_last_rpa[_aid] = rpa_v
+                            slp_rpa_n += 1
+            print(f"[dealer-index] SLP supplement: {slp_app_n} last-app, {slp_rpa_n} last-rpa from {len(slp_recs_for_dates)} SLPs")
+        except Exception as _slp_date_exc:
+            print(f"[dealer-index] SLP last-app/rpa supplement failed (non-fatal): {_slp_date_exc}")
 
         # ── Publish index from bulk scan immediately so app is usable ─────
         new_did: dict = {}
@@ -2020,7 +2052,7 @@ async def activations_report(
         if fields.get("slp-status-detail") != "Contractor Activated":
             continue
 
-        plat      = str(fields.get("platform", "")).strip()
+        plat      = str(fields.get("channel", "")).strip()
         plat_norm = _normalize_platform(plat)
         if platform and plat_norm != _normalize_platform(platform):
             continue
@@ -2084,7 +2116,7 @@ async def activations_report(
             "account_name":              acc["name"],
             "dba_name":                  cfs.get(ACCT_FIELD["dba_name"], ""),
             "dealer_id":                 f.get("dealer-id", ""),
-            "dealer_program":            _normalize_platform(f.get("platform", "")),
+            "dealer_program":            _normalize_platform(f.get("channel", "")),
             "platforms":                 f.get("platforms", ""),
             "slp_status":                f.get("slp-status-detail", ""),
             "contractor_activated_date": f.get("contractor-activated-date", ""),
@@ -2147,7 +2179,7 @@ async def not_activated_report(
         if status and status_val != status:
             continue
 
-        plat      = str(fields.get("platform", "")).strip()
+        plat      = str(fields.get("channel", "")).strip()
         plat_norm = _normalize_platform(plat)
         if platform and plat_norm != _normalize_platform(platform):
             continue
@@ -2204,7 +2236,7 @@ async def not_activated_report(
         results.append({
             "account_name":  acct_cache.get(aid, ""),
             "account_id":    aid or "",
-            "platform":      f.get("platform", ""),
+            "channel":       f.get("channel", ""),
             "dealer_id":     f.get("dealer-id", ""),
             "slp_status":    f.get("slp-status-detail", "") or "Not Started",
             "assigned_bdr":  c["eff_bdr"],
@@ -2347,7 +2379,7 @@ async def bdr_summary_report(
                                            "platforms": defaultdict(int), "accounts": set()})
     for r in slp_records:
         fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
-        plat   = str(fields.get("platform", "")).strip()
+        plat   = str(fields.get("channel", "")).strip()
         if platform and plat != platform:
             continue
         bdr    = str(fields.get("assigned-bdr", "")).strip() or "Unassigned"
@@ -2369,7 +2401,6 @@ async def bdr_summary_report(
             if in_range:
                 bdr_data[bdr]["activated"] += 1
 
-        plat = str(fields.get("platform", "")).strip()
         if plat:
             bdr_data[bdr]["platforms"][plat] += 1
 
@@ -2887,7 +2918,7 @@ async def _get_qualifying_microf_accounts() -> set:
         fields = {f.get("field") or f.get("id"): f.get("value") for f in r.get("fields", [])}
         if str(fields.get("slp-status-detail", "")).strip() != "Contractor Activated":
             continue
-        if str(fields.get("platform", "")).strip().lower() not in _MICROF_PROGRAMS:
+        if str(fields.get("channel", "")).strip().lower() not in _MICROF_PROGRAMS:
             continue
         rel    = r.get("relationships", {}).get("account", [])
         a0     = rel[0] if rel else None
@@ -4142,11 +4173,11 @@ async def report_stale_untrained(
     for r in slp_records:
         fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
         if fields.get("slp-status-detail") != "Contractor Activated": continue
-        slp_plat = str(fields.get("platform", "")).strip()
+        slp_plat = str(fields.get("channel", "")).strip()
         slp_bdr  = str(fields.get("assigned-bdr", "")).strip()
         rel      = r.get("relationships", {}).get("account", [])
         acc_id   = str(rel[0]) if rel else None
-        eff_plat = slp_plat or _account_to_platform.get(acc_id or "", "")
+        eff_plat = slp_plat
         eff_bdr  = slp_bdr  or _account_to_bdr.get(acc_id or "", "")
         if platform and eff_plat != platform: continue
         if bdr      and eff_bdr  != bdr:      continue
@@ -4231,8 +4262,7 @@ async def report_platform_breakdown(
         fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
         rel    = r.get("relationships", {}).get("account", [])
         acc_id = str(rel[0]) if rel else None
-        plat   = (str(fields.get("platform", "")).strip()
-                  or _account_to_platform.get(acc_id or "", "") or "Unknown")
+        plat   = str(fields.get("channel", "")).strip() or "Unknown"
         bdr    = (str(fields.get("assigned-bdr", "")).strip()
                   or _account_to_bdr.get(acc_id or "", "") or "Unassigned")
         plat_data[plat]["total_slps"] += 1
@@ -4258,7 +4288,7 @@ async def report_platform_breakdown(
     for plat, d in sorted(plat_data.items()):
         top_bdr = max(d["bdrs"], key=d["bdrs"].get) if d["bdrs"] else ""
         results.append({
-            "platform":        plat,
+            "channel":         plat,
             "new_activations": d["new_activations"],
             "active_slps":     d["active_slps"],
             "total_slps":      d["total_slps"],
@@ -4266,7 +4296,7 @@ async def report_platform_breakdown(
         })
     results.sort(key=lambda x: x["new_activations"], reverse=True)
     if format == "csv":
-        return _csv_response(results, f"platform_breakdown_{datetime.now().strftime('%Y%m%d')}.csv")
+        return _csv_response(results, f"channel_breakdown_{datetime.now().strftime('%Y%m%d')}.csv")
     return {"count": len(results), "records": results}
 
 
@@ -4323,9 +4353,9 @@ async def report_oracle_missing(
         rel      = r.get("relationships", {}).get("account", [])
         acc_id   = str(rel[0]) if rel else None
         if cf_map.get(acc_id or "", {}).get("118"): continue
-        slp_plat = str(fields.get("platform", "")).strip()
+        slp_plat = str(fields.get("channel", "")).strip()
         slp_bdr  = str(fields.get("assigned-bdr", "")).strip()
-        eff_plat = slp_plat or _account_to_platform.get(acc_id or "", "")
+        eff_plat = slp_plat
         eff_bdr  = slp_bdr  or _account_to_bdr.get(acc_id or "", "")
         if platform and eff_plat != platform: continue
         if bdr      and eff_bdr  != bdr:      continue
@@ -4380,7 +4410,7 @@ async def report_account_program_search(
     slp_by_account: dict = {}
     for r in slp_records:
         fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
-        slp_plat = str(fields.get("platform", "")).strip()
+        slp_plat = str(fields.get("channel", "")).strip()
         if program and slp_plat.lower() != program.lower():
             continue
         rel    = r.get("relationships", {}).get("account", [])
@@ -4391,7 +4421,7 @@ async def report_account_program_search(
             slp_by_account[acc_id] = []
         slp_by_account[acc_id].append({
             "dealer_id":        fields.get("dealer-id", ""),
-            "platform":         slp_plat,
+            "channel":          slp_plat,
             "slp_status":       fields.get("slp-status-detail", ""),
             "activated_date":   str(fields.get("contractor-activated-date", ""))[:10],
             "program_name":     fields.get("program-name-1", ""),
@@ -4853,7 +4883,7 @@ async def _job_bdr_summary(start_date: Optional[date] = None, end_date: Optional
     for r in slp_records:
         fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
         bdr    = str(fields.get("assigned-bdr", "")).strip()
-        plat   = str(fields.get("platform", "")).strip()
+        plat   = str(fields.get("channel", "")).strip()
         rel    = r.get("relationships", {}).get("account", [])
         acc_id = str(rel[0]) if rel else None
         if (not bdr or not plat) and acc_id:
@@ -5173,8 +5203,7 @@ async def _job_platform_breakdown(start_date: Optional[date] = None, end_date: O
         fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
         rel    = r.get("relationships", {}).get("account", [])
         acc_id = str(rel[0]) if rel else None
-        plat   = (str(fields.get("platform", "")).strip()
-                  or _account_to_platform.get(acc_id or "", "") or "Unknown")
+        plat   = str(fields.get("channel", "")).strip() or "Unknown"
         bdr    = (str(fields.get("assigned-bdr", "")).strip()
                   or _account_to_bdr.get(acc_id or "", "") or "Unassigned")
         plat_data[plat]["total_slps"] += 1
@@ -5554,7 +5583,7 @@ async def report_last_app_date(
     format:    str            = Query("json"),
     _: None    = Depends(require_auth),
 ):
-    """Accounts where CF140 (Last App Date) falls within the given window (default: last 18 months)."""
+    """Accounts where last-app-date (from SLP records, via dealer index) falls within the given window."""
     today    = date.today()
     _start, _end = _resolve_date_range(from_date, to_date, preset,
                                        default_start=today - timedelta(days=548),
@@ -5563,29 +5592,22 @@ async def report_last_app_date(
     if _end   is None: _end   = today
     date_label = f"{_start} to {_end}"
 
-    cf_map       = await _fetch_acct_cf_map({"140", "18", "23", "76"})
-    all_accounts = await ac_get_all("accounts", "accounts", {})
-    acct_by_id   = {str(a.get("id", "")): a for a in all_accounts}
-
     records = []
-    for aid, cfs in cf_map.items():
-        val = cfs.get("140", "")
-        if not val:
+    for aid, date_str in _account_to_last_app.items():
+        if not date_str:
             continue
-        date_str = str(val)[:10]
         try:
-            d = date.fromisoformat(date_str)
+            d = date.fromisoformat(date_str[:10])
             if d < _start or d > _end:
                 continue
         except Exception:
             continue
-        a = acct_by_id.get(aid, {})
         records.append({
-            "Account":       a.get("name", ""),
-            "Dealer ID":     cfs.get("18", "") or _account_to_dealer.get(aid, ""),
-            "Region":        cfs.get("23", ""),
-            "Account Type":  cfs.get("76", ""),
-            "Last App Date": date_str,
+            "Account":       _account_to_name.get(aid, ""),
+            "Dealer ID":     _account_to_dealer.get(aid, ""),
+            "Region":        _account_to_region.get(aid, ""),
+            "Account Type":  _account_to_type.get(aid, ""),
+            "Last App Date": date_str[:10],
         })
     records.sort(key=lambda x: x["Last App Date"], reverse=True)
 
@@ -5611,31 +5633,24 @@ async def _job_last_app_date(start_date: Optional[date] = None, end_date: Option
     date_label = f"{_start} to {_end}"
     print(f"[reports] Last App Date {date_label}")
 
-    cf_map       = await _fetch_acct_cf_map({"140", "18", "23", "76"})
-    all_accounts = await ac_get_all("accounts", "accounts", {})
-    acct_by_id   = {str(a.get("id", "")): a for a in all_accounts}
-
     records = []
-    for aid, cfs in cf_map.items():
-        val = cfs.get("140", "")
-        if not val:
+    for aid, date_str in _account_to_last_app.items():
+        if not date_str:
             continue
-        date_str = str(val)[:10]
         try:
-            d = date.fromisoformat(date_str)
+            d = date.fromisoformat(date_str[:10])
             if d < _start or d > _end:
                 continue
         except Exception:
             continue
-        a   = acct_by_id.get(aid, {})
         rec = {
-            "Account":       a.get("name", ""),
-            "Dealer ID":     cfs.get("18", "") or _account_to_dealer.get(aid, ""),
+            "Account":       _account_to_name.get(aid, ""),
+            "Dealer ID":     _account_to_dealer.get(aid, ""),
             "Platform":      _account_to_platform.get(aid, ""),
             "BDR":           _account_to_bdr.get(aid, ""),
-            "Region":        cfs.get("23", ""),
-            "Account Type":  cfs.get("76", ""),
-            "Last App Date": date_str,
+            "Region":        _account_to_region.get(aid, ""),
+            "Account Type":  _account_to_type.get(aid, ""),
+            "Last App Date": date_str[:10],
         }
         _enrich_record(rec, aid)
         records.append(rec)
@@ -5668,7 +5683,7 @@ async def report_last_rpa_date(
     format:    str            = Query("json"),
     _: None    = Depends(require_auth),
 ):
-    """Accounts where CF38 (Last RPA Date) falls within the given window (default: last 18 months)."""
+    """Accounts where last-rpa-date (from SLP records + CF38, via dealer index) falls within the given window."""
     today    = date.today()
     _start, _end = _resolve_date_range(from_date, to_date, preset,
                                        default_start=today - timedelta(days=548),
@@ -5677,29 +5692,22 @@ async def report_last_rpa_date(
     if _end   is None: _end   = today
     date_label = f"{_start} to {_end}"
 
-    cf_map       = await _fetch_acct_cf_map({"38", "18", "23", "76"})
-    all_accounts = await ac_get_all("accounts", "accounts", {})
-    acct_by_id   = {str(a.get("id", "")): a for a in all_accounts}
-
     records = []
-    for aid, cfs in cf_map.items():
-        val = cfs.get("38", "")
-        if not val:
+    for aid, date_str in _account_to_last_rpa.items():
+        if not date_str:
             continue
-        date_str = str(val)[:10]
         try:
-            d = date.fromisoformat(date_str)
+            d = date.fromisoformat(date_str[:10])
             if d < _start or d > _end:
                 continue
         except Exception:
             continue
-        a = acct_by_id.get(aid, {})
         records.append({
-            "Account":       a.get("name", ""),
-            "Dealer ID":     cfs.get("18", "") or _account_to_dealer.get(aid, ""),
-            "Region":        cfs.get("23", ""),
-            "Account Type":  cfs.get("76", ""),
-            "Last RPA Date": date_str,
+            "Account":       _account_to_name.get(aid, ""),
+            "Dealer ID":     _account_to_dealer.get(aid, ""),
+            "Region":        _account_to_region.get(aid, ""),
+            "Account Type":  _account_to_type.get(aid, ""),
+            "Last RPA Date": date_str[:10],
         })
     records.sort(key=lambda x: x["Last RPA Date"], reverse=True)
 
@@ -5725,31 +5733,24 @@ async def _job_last_rpa_date(start_date: Optional[date] = None, end_date: Option
     date_label = f"{_start} to {_end}"
     print(f"[reports] Last RPA Date {date_label}")
 
-    cf_map       = await _fetch_acct_cf_map({"38", "18", "23", "76"})
-    all_accounts = await ac_get_all("accounts", "accounts", {})
-    acct_by_id   = {str(a.get("id", "")): a for a in all_accounts}
-
     records = []
-    for aid, cfs in cf_map.items():
-        val = cfs.get("38", "")
-        if not val:
+    for aid, date_str in _account_to_last_rpa.items():
+        if not date_str:
             continue
-        date_str = str(val)[:10]
         try:
-            d = date.fromisoformat(date_str)
+            d = date.fromisoformat(date_str[:10])
             if d < _start or d > _end:
                 continue
         except Exception:
             continue
-        a   = acct_by_id.get(aid, {})
         rec = {
-            "Account":       a.get("name", ""),
-            "Dealer ID":     cfs.get("18", "") or _account_to_dealer.get(aid, ""),
+            "Account":       _account_to_name.get(aid, ""),
+            "Dealer ID":     _account_to_dealer.get(aid, ""),
             "Platform":      _account_to_platform.get(aid, ""),
             "BDR":           _account_to_bdr.get(aid, ""),
-            "Region":        cfs.get("23", ""),
-            "Account Type":  cfs.get("76", ""),
-            "Last RPA Date": date_str,
+            "Region":        _account_to_region.get(aid, ""),
+            "Account Type":  _account_to_type.get(aid, ""),
+            "Last RPA Date": date_str[:10],
         }
         _enrich_record(rec, aid)
         records.append(rec)
