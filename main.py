@@ -2116,8 +2116,7 @@ async def activations_report(
             "account_name":              acc["name"],
             "dba_name":                  cfs.get(ACCT_FIELD["dba_name"], ""),
             "dealer_id":                 f.get("dealer-id", ""),
-            "dealer_program":            _normalize_platform(f.get("channel", "")),
-            "platforms":                 f.get("platforms", ""),
+            "channel":                   _normalize_platform(f.get("channel", "")),
             "slp_status":                f.get("slp-status-detail", ""),
             "contractor_activated_date": f.get("contractor-activated-date", ""),
             "original_owner":            f.get("original-owner", ""),
@@ -2376,7 +2375,7 @@ async def bdr_summary_report(
         return JSONResponse(status_code=500, content={"detail": str(_e), "type": type(_e).__name__})
 
     bdr_data: dict = defaultdict(lambda: {"total_slps": 0, "activated": 0,
-                                           "platforms": defaultdict(int), "accounts": set()})
+                                           "channels": defaultdict(int), "accounts": set()})
     for r in slp_records:
         fields = {fo["id"]: fo.get("value", "") for fo in r.get("fields", [])}
         plat   = str(fields.get("channel", "")).strip()
@@ -2402,7 +2401,7 @@ async def bdr_summary_report(
                 bdr_data[bdr]["activated"] += 1
 
         if plat:
-            bdr_data[bdr]["platforms"][plat] += 1
+            bdr_data[bdr]["channels"][plat] += 1
 
         rel = r.get("relationships", {}).get("account", [])
         if rel:
@@ -2411,7 +2410,7 @@ async def bdr_summary_report(
     results = [
         {"bdr": bdr, "total_slps": d["total_slps"], "activated": d["activated"],
          "account_count": len(d["accounts"]),
-         "platforms": ", ".join(f"{k}:{v}" for k, v in sorted(d["platforms"].items()))}
+         "channels": ", ".join(f"{k}:{v}" for k, v in sorted(d["channels"].items()))}
         for bdr, d in sorted(bdr_data.items())
     ]
     results.sort(key=lambda x: x["activated"], reverse=True)
@@ -2493,7 +2492,7 @@ async def training_summary_report(
             "account_id":       c["account_id"],
             "account_name":     acc["name"],
             "dealer_id":        acc["cfs"].get(ACCT_FIELD["dealer_id"], ""),
-            "dealer_program":   acc["cfs"].get(ACCT_FIELD["dealer_program"], ""),
+            "channel":          acc["cfs"].get(ACCT_FIELD["dealer_program"], ""),
             "training_type":    f.get("training-type", ""),
             "training_agenda":  f.get("training-agenda", ""),
             "date_of_training": f.get("date-of-training", ""),
@@ -3725,7 +3724,7 @@ async def global_search_export(q: str = Query(default=" "),
                     "account_name":   acct_name,
                     "account_id":     aid,
                     "dealer_id":      s.get("dealer_id", ""),
-                    "dealer_program": s.get("platform", ""),
+                    "channel":        s.get("channel", ""),
                     "slp_status":     s.get("slp_status", ""),
                     "activated_date": str(s.get("activated_date", ""))[:10],
                     "oracle_ids":     s.get("oracle_ids", ""),
@@ -4456,7 +4455,7 @@ async def report_account_program_search(
                 "account_name":    acct_name,
                 "account_id":      acc_id,
                 "dealer_id":       slp["dealer_id"],
-                "dealer_program":  slp["platform"],
+                "channel":         slp["channel"],
                 "slp_status":      slp["slp_status"],
                 "activated_date":  slp["activated_date"],
                 "program_name":    slp["program_name"],
@@ -4464,7 +4463,7 @@ async def report_account_program_search(
                 "assigned_bdr":    slp["assigned_bdr"],
             })
 
-    results.sort(key=lambda x: (x["account_name"].lower(), x["platform"]))
+    results.sort(key=lambda x: (x["account_name"].lower(), x["channel"]))
     if format == "csv":
         return _csv_response(results, f"account_program_search_{datetime.now().strftime('%Y%m%d')}.csv")
     return {"count": len(results), "records": results}
@@ -4731,7 +4730,7 @@ async def _job_activations(start_date: Optional[date] = None, end_date: Optional
         rec  = {
             "Account":                   acct.get("name") or f.get("name", ""),
             "Dealer ID":                 f.get("dealer-id") or acct.get("dealer_id", ""),
-            "Platform":                  f.get("platform") or acct.get("platform", ""),
+            "Channel":                   f.get("channel") or acct.get("channel", ""),
             "BDR":                       f.get("assigned-bdr") or acct.get("bdr", ""),
             "Activated":                 str(f.get("contractor-activated-date", "") or "")[:10],
             "SLP Status":                f.get("slp-status-detail", ""),
@@ -4905,7 +4904,7 @@ async def _job_bdr_summary(start_date: Optional[date] = None, end_date: Optional
 
     # Pass 2 – process with fallbacks
     bdr_data: dict = defaultdict(lambda: {"activated_week": 0, "total_slps": 0,
-                                           "platforms": defaultdict(int), "accounts": set()})
+                                           "channels": defaultdict(int), "accounts": set()})
     for rd in raw_slps:
         fields   = rd["fields"]
         acc_id   = rd["acc_id"]
@@ -4922,9 +4921,9 @@ async def _job_bdr_summary(start_date: Optional[date] = None, end_date: Optional
                         bdr_data[bdr]["activated_week"] += 1
                 except Exception:
                     pass
-        plat = rd["plat"] or fallback.get("platform", "")
+        plat = rd["plat"]
         if plat:
-            bdr_data[bdr]["platforms"][plat] += 1
+            bdr_data[bdr]["channels"][plat] += 1
         if acc_id:
             bdr_data[bdr]["accounts"].add(acc_id)
 
@@ -4933,13 +4932,13 @@ async def _job_bdr_summary(start_date: Optional[date] = None, end_date: Optional
          "Activations (week)": d["activated_week"],
          "Total SLPs": d["total_slps"],
          "Accounts": len(d["accounts"]),
-         "Platforms": ", ".join(f"{k}:{v}" for k, v in sorted(d["platforms"].items()))}
+         "Channels": ", ".join(f"{k}:{v}" for k, v in sorted(d["channels"].items()))}
         for bdr, d in sorted(bdr_data.items())
     ]
     records.sort(key=lambda x: x["Activations (week)"], reverse=True)
 
     cols = [("BDR","BDR"), ("Activations (week)","Activations (week)"),
-            ("Total SLPs","Total SLPs"), ("Accounts","Accounts"), ("Platforms","Platforms")]
+            ("Total SLPs","Total SLPs"), ("Accounts","Accounts"), ("Channels","Channels")]
     html = _HTML_WRAPPER.format(
         title=f"BDR Summary — Week of {week_start}",
         subtitle=f"{week_start} through {week_end}",
@@ -5812,7 +5811,7 @@ async def _job_not_activated(start_date=None, end_date=None,
         rec = {
             "Account":                  name_map.get(aid, ""),
             "Dealer ID":                f.get("dealer-id", ""),
-            "Platform":                 f.get("platform", ""),
+            "Channel":                  f.get("channel", ""),
             "Status":                   f.get("slp-status-detail", "") or "Not Started",
             "BDR":                      c["eff_bdr"],
             "Doing Business In States": f.get("doing-business-in-states", ""),
