@@ -731,7 +731,7 @@ select, input { font-family: inherit; }
                oninput="abSearch(this.value)" autocomplete="off"/>
         <select id="ab-program" onchange="abLoad(document.getElementById('ab-search').value.trim())"
                 style="margin-top:6px;width:100%;padding:5px 8px;font-size:0.76rem;border:1px solid var(--ms-g40);border-radius:2px;background:var(--ms-g10);font-family:inherit;">
-          <option value="">— all dealer programs —</option>
+          <option value="">— all channels —</option>
           <option>OPTIMUS</option>
           <option>Optimus 2.0</option>
           <option>360 Finance</option>
@@ -808,6 +808,11 @@ select, input { font-family: inherit; }
         <div class="ac-icon">🔀</div>
         <div class="ac-title">Move Records</div>
         <div class="ac-desc">Move a Deal, Contact, or SLP to a different account.</div>
+      </button>
+      <button class="admin-card" id="admin-card-moogle" onclick="window.open('/search','_blank')">
+        <div class="ac-icon">🔍</div>
+        <div class="ac-title">Account Search</div>
+        <div class="ac-desc">Fast account lookup by name, dealer ID, or email.</div>
       </button>
       <button class="admin-card" id="admin-card-weather" onclick="showMicrofMap()">
         <div class="ac-icon">🌡</div>
@@ -1060,7 +1065,7 @@ select, input { font-family: inherit; }
     <div class="report-card">
       <span class="badge-icon">🚀</span>
       <h3>Partner Activations</h3>
-      <p>SLP records with "Contractor Activated" status, joined to account data. Filter by date range, platform, or BDR.</p>
+      <p>SLP records with "Contractor Activated" status, joined to account data. Filter by date range, channel, or BDR.</p>
       <div class="period-row">
         <span class="period-label">Period</span>
         <button class="period-btn" onclick="applyPeriod('yesterday','act-from','act-to',this)">Yesterday</button>
@@ -1083,9 +1088,9 @@ select, input { font-family: inherit; }
         <input type="date" id="act-to"/>
       </div>
       <div class="form-row">
-        <label>Platform (optional)</label>
+        <label>Channel (optional)</label>
         <select id="act-platform">
-          <option value="">— all platforms —</option>
+          <option value="">— all channels —</option>
           <option>OPTIMUS</option>
           <option>Optimus 2.0</option>
           <option>360 Finance</option>
@@ -1121,7 +1126,7 @@ select, input { font-family: inherit; }
         </select>
       </div>
       <div class="form-row">
-        <label>Exclude Platforms (comma-separated)</label>
+        <label>Exclude Channels (comma-separated)</label>
         <input type="text" id="act-exclude" placeholder="e.g. LTO, Microf"/>
       </div>
       <div class="btn-row">
@@ -1240,9 +1245,9 @@ select, input { font-family: inherit; }
         <input type="date" id="na-to"/>
       </div>
       <div class="form-row">
-        <label>Platform (optional)</label>
+        <label>Channel (optional)</label>
         <select id="na-platform">
-          <option value="">— all platforms —</option>
+          <option value="">— all channels —</option>
           <option>OPTIMUS</option>
           <option>Optimus 2.0</option>
           <option>360 Finance</option>
@@ -1288,7 +1293,7 @@ select, input { font-family: inherit; }
         </select>
       </div>
       <div class="form-row">
-        <label>Exclude Platforms (comma-separated)</label>
+        <label>Exclude Channels (comma-separated)</label>
         <input type="text" id="na-exclude" placeholder="e.g. LTO, Microf"/>
       </div>
       <div class="btn-row" style="margin-top:auto;">
@@ -1393,9 +1398,9 @@ select, input { font-family: inherit; }
         <input type="date" id="bdr-to"/>
       </div>
       <div class="form-row">
-        <label>Platform (optional)</label>
+        <label>Channel (optional)</label>
         <select id="bdr-platform">
-          <option value="">— all platforms —</option>
+          <option value="">— all channels —</option>
           <option>OPTIMUS</option>
           <option>Optimus 2.0</option>
           <option>360 Finance</option>
@@ -1539,14 +1544,14 @@ select, input { font-family: inherit; }
     <!-- Account + Program Search -->
     <div class="report-card">
       <span class="badge-icon">🔎</span>
-      <h3>Account Dealer Program Search</h3>
-      <p>Find accounts by name (fuzzy) and dealer program from their SLPs. Search "ARS" with OPTIMUS to get all ARS accounts on OPTIMUS.</p>
+      <h3>Account Channel Search</h3>
+      <p>Find accounts by name (fuzzy) and channel from their SLPs. Search "ARS" with OPTIMUS to get all ARS accounts on OPTIMUS.</p>
       <div class="form-row">
         <label>Account Name</label>
         <input type="text" id="aps-name" placeholder="e.g. ARS, American Residential"/>
       </div>
       <div class="form-row">
-        <label>Dealer Program (optional)</label>
+        <label>Channel (optional)</label>
         <select id="aps-program">
           <option value="">— all programs —</option>
           <option>OPTIMUS</option>
@@ -1660,9 +1665,9 @@ select, input { font-family: inherit; }
         <input type="date" id="su-to"/>
       </div>
       <div class="form-row">
-        <label>Platform (optional)</label>
+        <label>Channel (optional)</label>
         <select id="su-platform">
-          <option value="">— all platforms —</option>
+          <option value="">— all channels —</option>
           <option>OPTIMUS</option>
           <option>Optimus 2.0</option>
           <option>360 Finance</option>
@@ -1704,8 +1709,8 @@ select, input { font-family: inherit; }
     <div class="report-card email-report-card">
       <span class="schedule-badge">Weekly Mon</span>
       <span class="badge-icon">📊</span>
-      <h3>Platform Breakdown</h3>
-      <p>New activations and total SLP counts grouped by platform / dealer program for the date window.</p>
+      <h3>Channel Breakdown</h3>
+      <p>New activations and total SLP counts grouped by channel for the date window.</p>
       <div class="period-row">
         <span class="period-label">Period</span>
         <button class="period-btn" onclick="applyPeriod('last_week','pb-from','pb-to',this)">Last Week</button>
@@ -1773,9 +1778,9 @@ select, input { font-family: inherit; }
         <input type="date" id="om-to"/>
       </div>
       <div class="form-row">
-        <label>Platform (optional)</label>
+        <label>Channel (optional)</label>
         <select id="om-platform">
-          <option value="">— all platforms —</option>
+          <option value="">— all channels —</option>
           <option>OPTIMUS</option>
           <option>Optimus 2.0</option>
           <option>360 Finance</option>
@@ -1915,7 +1920,7 @@ select, input { font-family: inherit; }
           <option value="training-activity">Training Activity</option>
           <option value="team-activity">Team Activity</option>
           <option value="account-status">Account Status</option>
-          <option value="platform-breakdown">Platform Breakdown</option>
+          <option value="platform-breakdown">Channel Breakdown</option>
           <option value="partner-activation">Partner Activation</option>
           <option value="oracle-missing">Oracle Missing</option>
           <option value="stale-untrained">Stale Untrained</option>
@@ -3658,8 +3663,8 @@ function abRenderDetail(d) {
   }).join('');
 
   // ── SLPs table ────────────────────────────────────────────────
-  const slpCols = ['dealer-id','name','platform','slp-status-detail','contractor-activated-date','dealerkey'];
-  const slpColLabels = {'dealer-id':'dealer id','name':'name','platform':'dealer program','slp-status-detail':'status','contractor-activated-date':'activation date','dealerkey':'dealer key'};
+  const slpCols = ['dealer-id','name','channel','slp-status-detail','contractor-activated-date','dealerkey'];
+  const slpColLabels = {'dealer-id':'dealer id','name':'name','channel':'channel','slp-status-detail':'status','contractor-activated-date':'activation date','dealerkey':'dealer key'};
 
   function slpStatusBadge(status) {
     if (!status) return '';
@@ -3710,10 +3715,10 @@ function abRenderDetail(d) {
     </div>`;
 
   // ── Right sidebar ─────────────────────────────────────────────
-  const uniquePrograms = [...new Set(d.slps.map(s => s.platform).filter(Boolean))];
+  const uniquePrograms = [...new Set(d.slps.map(s => s.channel).filter(Boolean))];
   const dealerProgramsPanel = uniquePrograms.length ? `
     <div class="acui-panel">
-      <div class="acui-panel-header"><h4>Dealer Programs</h4></div>
+      <div class="acui-panel-header"><h4>Channels</h4></div>
       <div class="acui-panel-body">
         ${uniquePrograms.map(p => `<div style="padding:3px 0;font-size:0.82rem;font-weight:500;">${esc(p)}</div>`).join('')}
       </div>
