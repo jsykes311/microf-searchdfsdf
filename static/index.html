@@ -1885,7 +1885,7 @@ select, input { font-family: inherit; }
   <div class="card" style="max-width:860px;">
     <div class="card-title">🌐 Global Search — Find Any Value Across AC</div>
     <p style="font-size:0.83rem; color:#6b7280; margin-bottom:16px; line-height:1.5;">
-      Search across SLP records, accounts, and contacts. Works with dealer IDs, names, emails, platform values, oracle IDs, and more.
+      Search across SLP records, accounts, and contacts. Works with dealer IDs, names, emails, channel values, oracle IDs, and more.
     </p>
     <div class="gs-box">
       <input id="gs-input" class="gs-input" placeholder="e.g. 12345  or  john@example.com  or  OPTIMUS"
@@ -3288,7 +3288,7 @@ async function runGlobalSearch() {
 
     const sections = [
       { key: 'slps',     icon: '📋', label: 'SLP Records',
-        cols: ['record_id','dealer_id','platform','account_id','status','matched_on'] },
+        cols: ['record_id','dealer_id','channel','account_id','status','matched_on'] },
       { key: 'accounts', icon: '🏢', label: 'Accounts',
         cols: ['id','name','matched_on'] },
       { key: 'contacts', icon: '👤', label: 'Contacts',
@@ -3617,7 +3617,7 @@ function abRenderDetail(d) {
 
   // ── Field groups for "About" — AC labels, grouped by category ─
   const FIELD_GROUPS = [
-    { label: 'General',    keys: ['Parent Dealer ID','Account Status','DBA Name','Dealer Status','Contractor Status','Sales Region','Doing Business in States','Dealer Program','Account Type','Account Segment'] },
+    { label: 'General',    keys: ['Parent Dealer ID','Account Status','DBA Name','Dealer Status','Contractor Status','Sales Region','Doing Business in States','Channel','Account Type','Account Segment'] },
     { label: 'Enrollment', keys: ['Partner Activation Date','Reactivation Date','Dealer Activation Timestamp','Original Owner','Oracle Producer ID','Assigned BDR','Account Source','Account Source – Secondary'] },
     { label: 'Contact',    keys: ['Phone Number','Primary Contact First Name','Primary Contact Last Name','Primary Contact Email','Primary Contract Phone','Primary Contact Phone'] },
     { label: 'Business',   keys: ['Years In Business','Number of Employees','Annual Revenue','Industry/Vertical','Primary Brand','Primary Distributor','Vendor Tax–ID','Platforms','Strategic Partners','Financing Partners'] },

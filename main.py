@@ -3547,7 +3547,7 @@ async def global_search(q: str = Query(..., min_length=1),
         matched_slps.append({
             "record_id":      r.get("id"),
             "dealer_id":      fmap.get("dealer-id", ""),
-            "platform":       fmap.get("platform", ""),
+            "channel":        fmap.get("channel", ""),
             "account_id":     account_id,
             "account_url":    ac_account_url(account_id),
             "slp_status":     fmap.get("slp-status-detail", ""),
@@ -4208,7 +4208,7 @@ async def report_stale_untrained(
         results.append({
             "account":         acct_cache.get(aid, ""),
             "dealer_id":       f.get("dealer-id")    or _account_to_dealer.get(aid, ""),
-            "platform":        f.get("platform")     or _account_to_platform.get(aid, ""),
+            "channel":         f.get("channel", ""),
             "bdr":             f.get("assigned-bdr") or _account_to_bdr.get(aid, ""),
             "activation_date": c["act_date"],
             "training_count":  c["training_count"],
@@ -4380,11 +4380,11 @@ async def report_oracle_missing(
         results.append({
             "account":         acct_cache.get(aid, ""),
             "dealer_id":       f.get("dealer-id")    or _account_to_dealer.get(aid, ""),
-            "platform":        f.get("platform")     or _account_to_platform.get(aid, ""),
+            "channel":         f.get("channel", ""),
             "bdr":             f.get("assigned-bdr") or _account_to_bdr.get(aid, ""),
             "activation_date": c["act_date"],
         })
-    results.sort(key=lambda x: (x["platform"], x["bdr"], x["account"]))
+    results.sort(key=lambda x: (x["channel"], x["bdr"], x["account"]))
     if format == "csv":
         return _csv_response(results, f"oracle_missing_{datetime.now().strftime('%Y%m%d')}.csv")
     return {"count": len(results), "records": results}
@@ -4745,7 +4745,7 @@ async def _job_activations(start_date: Optional[date] = None, end_date: Optional
     records.sort(key=lambda x: x["Activated"], reverse=True)
 
     cols = [("Account","Account"), ("Dealer ID","Dealer ID"),
-            ("Platform","Platform"), ("BDR","BDR"), ("Activated","Activated")]
+            ("Channel","Channel"), ("BDR","BDR"), ("Activated","Activated")]
     html = _HTML_WRAPPER.format(
         title=f"Activations — {date_label}",
         subtitle=f"{len(records)} new activation{'s' if len(records) != 1 else ''}",
@@ -4829,7 +4829,7 @@ async def _job_license_expiration(start_date: Optional[date] = None, end_date: O
             "License Type": f.get("license-type", f.get("license_type", "")),
             "State":        f.get("state", f.get("license-state", "")),
             "Dealer ID":    _account_to_dealer.get(aid, ""),
-            "Platform":     _account_to_platform.get(aid, ""),
+            "Channel":      _account_to_platform.get(aid, ""),
             "BDR":          _account_to_bdr.get(aid, ""),
         }
         _enrich_record(rec, aid)
@@ -5008,7 +5008,7 @@ async def _job_training_activity(start_date: Optional[date] = None, end_date: Op
         rec = {
             "Account":       acct_cache.get(aid, ""),
             "Dealer ID":     _account_to_dealer.get(aid, ""),
-            "Platform":      _account_to_platform.get(aid, ""),
+            "Channel":       _account_to_platform.get(aid, ""),
             "BDR":           _account_to_bdr.get(aid, ""),
             "Trained By":    f.get("trained-by", ""),
             "Training Type": f.get("training-type", ""),
@@ -5102,7 +5102,7 @@ async def _job_stale_untrained(start_date: Optional[date] = None, end_date: Opti
         rec = {
             "Account":         acct_cache.get(aid, ""),
             "Dealer ID":       f.get("dealer-id")    or _account_to_dealer.get(aid, ""),
-            "Platform":        f.get("platform")     or _account_to_platform.get(aid, ""),
+            "Channel":         f.get("channel", ""),
             "BDR":             f.get("assigned-bdr") or _account_to_bdr.get(aid, ""),
             "Activation Date": c["act_date"],
             "# Trainings":     c["training_count"],
@@ -5114,7 +5114,7 @@ async def _job_stale_untrained(start_date: Optional[date] = None, end_date: Opti
         _enrich_record(rec, aid)
         records.append(rec)
 
-    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Platform","Platform"),
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Channel","Channel"),
             ("BDR","BDR"), ("Activation Date","Activation Date"),
             ("# Trainings","# Trainings"), ("Last Training","Last Training"),
             ("Days Stale","Days Stale")]
@@ -5151,7 +5151,7 @@ async def _job_account_status(start_date: Optional[date] = None, end_date: Optio
         rec  = {
             "Account":      a.get("name", ""),
             "Dealer ID":    _account_to_dealer.get(aid, ""),
-            "Platform":     _account_to_platform.get(aid, ""),
+            "Channel":      _account_to_platform.get(aid, ""),
             "BDR":          _account_to_bdr.get(aid, ""),
             "Status":       cfs.get("19", ""),
             "Sales Region": cfs.get("23", ""),
@@ -5160,7 +5160,7 @@ async def _job_account_status(start_date: Optional[date] = None, end_date: Optio
         records.append(rec)
     records.sort(key=lambda x: (x["Status"], x["Sales Region"], x["Account"]))
 
-    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Platform","Platform"),
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Channel","Channel"),
             ("BDR","BDR"), ("Status","Status"), ("Sales Region","Sales Region")]
     html = _HTML_WRAPPER.format(
         title="Account Status Summary",
@@ -5177,11 +5177,11 @@ async def _job_account_status(start_date: Optional[date] = None, end_date: Optio
     )
 
 
-# ── Platform / Dealer Program Breakdown (weekly Monday) ──────────────────
+# ── Channel Breakdown (weekly Monday) ────────────────────────────────────
 
 async def _job_platform_breakdown(start_date: Optional[date] = None, end_date: Optional[date] = None,
                                    preset: Optional[str] = None, recipients: list = None):
-    """Email new activations and total SLP counts grouped by platform."""
+    """Email new activations and total SLP counts grouped by channel."""
     from datetime import timezone
     tz_utc = timezone.utc
     today  = date.today()
@@ -5223,7 +5223,7 @@ async def _job_platform_breakdown(start_date: Optional[date] = None, end_date: O
     for plat, d in sorted(plat_data.items()):
         top_bdr = max(d["bdrs"], key=d["bdrs"].get) if d["bdrs"] else ""
         records.append({
-            "Platform":        plat,
+            "Channel":         plat,
             "New Activations": d["new_activations"],
             "Active SLPs":     d["active_slps"],
             "Total SLPs":      d["total_slps"],
@@ -5232,20 +5232,20 @@ async def _job_platform_breakdown(start_date: Optional[date] = None, end_date: O
     records.sort(key=lambda x: x["New Activations"], reverse=True)
 
     total_new = sum(r["New Activations"] for r in records)
-    cols = [("Platform","Platform"), ("New Activations","New Activations"),
+    cols = [("Channel","Channel"), ("New Activations","New Activations"),
             ("Active SLPs","Active SLPs"), ("Total SLPs","Total SLPs"), ("Top BDR","Top BDR")]
     html = _HTML_WRAPPER.format(
-        title=f"Platform Breakdown — {date_label}",
-        subtitle=f"{total_new} new activation{'s' if total_new != 1 else ''} across {len(records)} platform{'s' if len(records) != 1 else ''}",
+        title=f"Channel Breakdown — {date_label}",
+        subtitle=f"{total_new} new activation{'s' if total_new != 1 else ''} across {len(records)} channel{'s' if len(records) != 1 else ''}",
         table=_html_table(records, cols),
         timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
     )
     csv_label = str(_start) if _start == _end else f"{_start}_{_end}"
     await _send_email(
-        subject=f"Platform Breakdown — {date_label} ({total_new} new activations)",
+        subject=f"Channel Breakdown — {date_label} ({total_new} new activations)",
         html=html,
         csv_data=_csv_bytes(records),
-        csv_name=f"platform_breakdown_{csv_label}.csv",
+        csv_name=f"channel_breakdown_{csv_label}.csv",
         recipients=recipients,
     )
 
@@ -5286,7 +5286,7 @@ async def _job_partner_activation(start_date: Optional[date] = None, end_date: O
         rec = {
             "Account":            a.get("name", ""),
             "Dealer ID":          _account_to_dealer.get(aid, ""),
-            "Platform":           _account_to_platform.get(aid, ""),
+            "Channel":            _account_to_platform.get(aid, ""),
             "BDR":                _account_to_bdr.get(aid, ""),
             "Partner Activation": pa_str,
         }
@@ -5294,7 +5294,7 @@ async def _job_partner_activation(start_date: Optional[date] = None, end_date: O
         records.append(rec)
     records.sort(key=lambda x: x["Partner Activation"], reverse=True)
 
-    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Platform","Platform"),
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Channel","Channel"),
             ("BDR","BDR"), ("Partner Activation","Partner Activation")]
     html = _HTML_WRAPPER.format(
         title=f"Partner Activations — {date_label}",
@@ -5360,7 +5360,7 @@ async def _job_oracle_missing(start_date: Optional[date] = None, end_date: Optio
         rec = {
             "Account":                  acct_cache.get(aid, ""),
             "Dealer ID":                f.get("dealer-id")    or _account_to_dealer.get(aid, ""),
-            "Platform":                 f.get("platform")     or _account_to_platform.get(aid, ""),
+            "Channel":                  f.get("channel", ""),
             "BDR":                      f.get("assigned-bdr") or _account_to_bdr.get(aid, ""),
             "Activation Date":          c["act_date"],
             "SLP Status":               f.get("slp-status-detail", ""),
@@ -5369,9 +5369,9 @@ async def _job_oracle_missing(start_date: Optional[date] = None, end_date: Optio
         }
         _enrich_record(rec, aid)
         records.append(rec)
-    records.sort(key=lambda x: (x["Platform"], x["BDR"], x["Account"]))
+    records.sort(key=lambda x: (x["Channel"], x["BDR"], x["Account"]))
 
-    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Platform","Platform"),
+    cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Channel","Channel"),
             ("BDR","BDR"), ("Activation Date","Activation Date")]
     html = _HTML_WRAPPER.format(
         title="Oracle Producer ID Missing",
@@ -5457,7 +5457,7 @@ async def _job_account_activity(start_date=None, end_date=None, preset=None, rec
             "Account":        acc.get("name", ""),
             "Account ID":     aid,
             "Dealer ID":      _account_to_dealer.get(aid, ""),
-            "Platform":       _account_to_platform.get(aid, ""),
+            "Channel":        _account_to_platform.get(aid, ""),
             "BDR":            _account_to_bdr.get(aid, ""),
             "Contacts":       len(contacts_by_account.get(aid, [])),
             "Notes":          len(acct_notes),
@@ -5645,7 +5645,7 @@ async def _job_last_app_date(start_date: Optional[date] = None, end_date: Option
         rec = {
             "Account":       _account_to_name.get(aid, ""),
             "Dealer ID":     _account_to_dealer.get(aid, ""),
-            "Platform":      _account_to_platform.get(aid, ""),
+            "Channel":       _account_to_platform.get(aid, ""),
             "BDR":           _account_to_bdr.get(aid, ""),
             "Region":        _account_to_region.get(aid, ""),
             "Account Type":  _account_to_type.get(aid, ""),
@@ -5745,7 +5745,7 @@ async def _job_last_rpa_date(start_date: Optional[date] = None, end_date: Option
         rec = {
             "Account":       _account_to_name.get(aid, ""),
             "Dealer ID":     _account_to_dealer.get(aid, ""),
-            "Platform":      _account_to_platform.get(aid, ""),
+            "Channel":       _account_to_platform.get(aid, ""),
             "BDR":           _account_to_bdr.get(aid, ""),
             "Region":        _account_to_region.get(aid, ""),
             "Account Type":  _account_to_type.get(aid, ""),
@@ -5823,7 +5823,7 @@ async def _job_not_activated(start_date=None, end_date=None,
     records.sort(key=lambda x: (x.get("Status", ""), x.get("Account", "")))
 
     cols = [("Account","Account"), ("Dealer ID","Dealer ID"),
-            ("Platform","Platform"), ("Status","Status"), ("BDR","BDR")]
+            ("Channel","Channel"), ("Status","Status"), ("BDR","BDR")]
     html = _HTML_WRAPPER.format(
         title="Not Activated SLPs",
         subtitle=f"{len(records)} record{'s' if len(records) != 1 else ''} not yet Contractor Activated",
