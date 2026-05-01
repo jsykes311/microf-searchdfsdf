@@ -2116,7 +2116,7 @@ async def activations_report(
             "account_name":              acc["name"],
             "dba_name":                  cfs.get(ACCT_FIELD["dba_name"], ""),
             "dealer_id":                 f.get("dealer-id", ""),
-            "channel":                   _normalize_platform(f.get("channel", "")),
+            "channel":                   f.get("channel", ""),
             "slp_status":                f.get("slp-status-detail", ""),
             "contractor_activated_date": f.get("contractor-activated-date", ""),
             "original_owner":            f.get("original-owner", ""),
