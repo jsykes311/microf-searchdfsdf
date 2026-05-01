@@ -1,7 +1,9 @@
 name: Weekly Reports
 
 on:
-  workflow_dispatch:   # manual trigger only — run from GitHub Actions tab
+  schedule:
+    - cron: '5 12 * * 1'     # Monday 7:05am ET (12:05 UTC)
+  workflow_dispatch:
 
 jobs:
   license-expiration:
