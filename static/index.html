@@ -3715,12 +3715,60 @@ function abRenderDetail(d) {
     </div>`;
 
   // ── Right sidebar ─────────────────────────────────────────────
-  const uniquePrograms = [...new Set(d.slps.map(s => s.channel).filter(Boolean))];
-  const dealerProgramsPanel = uniquePrograms.length ? `
+  // Group channels by SLP status
+  const statusOrder = [
+    'Contractor Activated',
+    'Account on Hold (Suspended)',
+    'On Indefinite Hold - Agreement/Docs Not Signed',
+    'Pending - Training Not Completed',
+    'Pending - Waiting on Online Reviews',
+    'Waiting_on_BDR_Approval',
+    'In Progress – Other',
+    'In Progress – Signed Contract Needed',
+    'Not Started',
+    'Not Active',
+    'Deactivated',
+    'Deactivated for Dormancy',
+    'Declined by Onboarding',
+  ];
+  const channelsByStatus = {};
+  for (const slp of d.slps) {
+    const ch  = slp['channel'] || '';
+    const st  = slp['slp-status-detail'] || 'Unknown';
+    if (!ch) continue;
+    if (!channelsByStatus[st]) channelsByStatus[st] = new Set();
+    channelsByStatus[st].add(ch);
+  }
+  // Sort status groups: known order first, then any extras
+  const sortedStatuses = [
+    ...statusOrder.filter(s => channelsByStatus[s]),
+    ...Object.keys(channelsByStatus).filter(s => !statusOrder.includes(s)),
+  ];
+
+  function statusGroupColor(st) {
+    const s = st.toLowerCase();
+    if (s.includes('contractor activated'))                return { bg: '#dcfce7', color: '#166534' };
+    if (s.includes('deactivated') || s.includes('declined') || s === 'not active')
+                                                           return { bg: '#fee2e2', color: '#991b1b' };
+    if (s.includes('on hold') || s.includes('indefinite')) return { bg: '#fef9c3', color: '#854d0e' };
+    if (s.includes('in progress'))                         return { bg: '#dbeafe', color: '#1e40af' };
+    if (s.includes('pending') || s.includes('waiting') || s.includes('bdr'))
+                                                           return { bg: '#ffedd5', color: '#9a3412' };
+    return { bg: '#f1f5f9', color: '#475569' };
+  }
+
+  const dealerProgramsPanel = sortedStatuses.length ? `
     <div class="acui-panel">
       <div class="acui-panel-header"><h4>Channels</h4></div>
-      <div class="acui-panel-body">
-        ${uniquePrograms.map(p => `<div style="padding:3px 0;font-size:0.82rem;font-weight:500;">${esc(p)}</div>`).join('')}
+      <div class="acui-panel-body" style="padding:0;">
+        ${sortedStatuses.map(st => {
+          const { bg, color } = statusGroupColor(st);
+          const channels = [...channelsByStatus[st]].sort();
+          return `<div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;">
+            <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:${color};background:${bg};padding:2px 7px;border-radius:999px;display:inline-block;margin-bottom:5px;">${esc(st)}</div>
+            ${channels.map(ch => `<div style="font-size:0.82rem;font-weight:500;padding:1px 0 1px 4px;border-left:2px solid ${color}40;">${esc(ch)}</div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>
     </div>` : '';
 
