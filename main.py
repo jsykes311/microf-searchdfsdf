@@ -529,8 +529,8 @@ async def _build_dealer_id_index() -> None:
     PHONE_CF_ID    = 11    # customFieldId for "Phone Number"
     WEBSITE_CF_ID  = 39    # customFieldId for "Website"
     ADDRESS_CF_ID  = 2     # customFieldId for "Address 1"
-    LAST_APP_CF_ID = 140   # customFieldId for "Last App Date" (CF37 "Last Application Date" deleted post-weekend-sync)
     LAST_RPA_CF_ID = 38    # customFieldId for "Last RPA Date" (stays in PROD)
+    # NOTE: Last App Date lives only on SLP records (last-app-date field), NOT on accounts
     ACCT_TYPE_CF   = 76    # customFieldId for "Account Type"
     REGION_CF_ID   = 23    # customFieldId for "Sales Region"
     DBA_NAME_CF    = 15    # customFieldId for "DBA Name"
@@ -595,8 +595,6 @@ async def _build_dealer_id_index() -> None:
                     acct_to_website[aid]    = val
                 elif cf_id == ADDRESS_CF_ID:
                     acct_to_address[aid]    = val
-                elif cf_id == LAST_APP_CF_ID:
-                    acct_to_last_app[aid]   = val[:10] if val else ""
                 elif cf_id == LAST_RPA_CF_ID:
                     acct_to_last_rpa[aid]   = val[:10] if val else ""
                 elif cf_id == ACCT_TYPE_CF:
@@ -649,10 +647,10 @@ async def _build_dealer_id_index() -> None:
         except Exception as _ue:
             print(f"[dealer-index] user fetch failed: {_ue}")
 
-        # ── Phase 4: supplement last-app/rpa dates from SLP records ──────────
-        # SLP fields last-app-date and last-rpa-date are the source of truth;
-        # take the most-recent date across all SLPs for each account (max per account).
-        # Falls back to CF140 / CF38 values already loaded above if SLP cache is empty.
+        # ── Phase 4: last-app/rpa dates from SLP records ─────────────────────
+        # SLP fields last-app-date and last-rpa-date are the sole source of truth.
+        # last-app-date exists only on SLP, not on accounts. last-rpa-date (CF38)
+        # is also supplemented here — SLP value wins if more recent.
         try:
             slp_recs_for_dates = _slp_cache_records if _slp_cache_records else []
 
