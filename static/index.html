@@ -729,6 +729,7 @@ select, input { font-family: inherit; }
   display: flex; flex-direction: column; align-items: center; gap: 11px;
   border-radius: 12px;
   transition: opacity 0.12s;
+  text-decoration: none; color: inherit;
 }
 .admin-card:hover { opacity: 0.72; }
 .admin-card:hover .ac-icon { transform: scale(1.06); }
@@ -855,17 +856,30 @@ select, input { font-family: inherit; }
         <select id="ab-program" onchange="abLoad(document.getElementById('ab-search').value.trim())"
                 style="margin-top:6px;width:100%;padding:5px 8px;font-size:0.76rem;border:1px solid var(--ms-g40);border-radius:2px;background:var(--ms-g10);font-family:inherit;">
           <option value="">— all channels —</option>
+          <option>Microf Direct</option>
           <option>OPTIMUS</option>
           <option>Optimus 2.0</option>
+          <option>Optimus - RTO Only</option>
+          <option>Optimus - FTL</option>
+          <option>Optimus - RTO</option>
+          <option>Optimus - Greensky</option>
           <option>360 Finance</option>
           <option>ComfortConnect</option>
-          <option>Comfort Connect</option>
           <option>GoodLeap</option>
-          <option>Microf</option>
           <option>LTO</option>
           <option>SpectrumAC</option>
-          <option>Microf (LTO Only)</option>
-          <option>Microf (Wells Fargo)</option>
+        </select>
+        <select id="ab-bdr" onchange="abLoad(document.getElementById('ab-search').value.trim())"
+                style="margin-top:4px;width:100%;padding:5px 8px;font-size:0.76rem;border:1px solid var(--ms-g40);border-radius:2px;background:var(--ms-g10);font-family:inherit;">
+          <option value="">— all BDRs —</option>
+        </select>
+        <select id="ab-owner" onchange="abLoad(document.getElementById('ab-search').value.trim())"
+                style="margin-top:4px;width:100%;padding:5px 8px;font-size:0.76rem;border:1px solid var(--ms-g40);border-radius:2px;background:var(--ms-g10);font-family:inherit;">
+          <option value="">— all owners —</option>
+        </select>
+        <select id="ab-group" onchange="abLoad(document.getElementById('ab-search').value.trim())"
+                style="margin-top:4px;width:100%;padding:5px 8px;font-size:0.76rem;border:1px solid var(--ms-g40);border-radius:2px;background:var(--ms-g10);font-family:inherit;">
+          <option value="">— all groups —</option>
         </select>
       </div>
       <div class="ab-count" id="ab-count">Loading…</div>
@@ -1166,12 +1180,149 @@ select, input { font-family: inherit; }
 <!-- PRE-BUILT REPORTS TAB                                      -->
 <!-- ══════════════════════════════════════════════════════════ -->
 <div id="tab-prebuilt" class="tab-panel">
-  <div class="prebuilt-grid">
+  <div style="padding:28px 28px 40px;">
+    <h2 style="font-size:1.3rem;font-weight:700;color:var(--mac-text);margin-bottom:6px;">Pre-Built Reports</h2>
+    <p style="font-size:0.82rem;color:var(--mac-text3);margin-bottom:24px;">Click a report to open it in a full page with filters, run, and CSV export.</p>
+    <div class="admin-card-grid">
 
-    <!-- Activations -->
-    <div class="report-card">
-      <span class="badge-icon">🚀</span>
-      <h3>Partner Activations</h3>
+      <a class="admin-card" href="/reports/prebuilt?r=activations" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#1a73e8,#0d47a1);">🚀</div>
+        <div class="ac-title">Partner Activations</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=license" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#f59e0b,#b45309);">📜</div>
+        <div class="ac-title">License Expiration</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=license-this-month" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#0ea5e9,#0369a1);">📅</div>
+        <div class="ac-title">Expiring This Month</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=license-last-month" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#8b5cf6,#5b21b6);">📆</div>
+        <div class="ac-title">Expired Last Month</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=activations-last-week" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#eab308,#92400e);">⚡</div>
+        <div class="ac-title">Activations Last Week</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=not-activated" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#ef4444,#b91c1c);">🔴</div>
+        <div class="ac-title">Not Activated</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=last-app-date" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#64748b,#334155);">📋</div>
+        <div class="ac-title">Last App Date</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=last-rpa-date" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#10b981,#065f46);">🔄</div>
+        <div class="ac-title">Last RPA Date</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=bdr" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#6366f1,#3730a3);">👥</div>
+        <div class="ac-title">BDR Performance</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=training" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#0891b2,#164e63);">🎓</div>
+        <div class="ac-title">Training Summary</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=acta" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#14b8a6,#0f766e);">📊</div>
+        <div class="ac-title">Account Activity</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=team" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#d97706,#92400e);">🏆</div>
+        <div class="ac-title">Team Performance</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=account-program-search" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#3b82f6,#1d4ed8);">🔎</div>
+        <div class="ac-title">Account Channel Search</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=verdata-active" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#22c55e,#15803d);">✅</div>
+        <div class="ac-title">Verdata Active</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=verdata-inactive" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#9ca3af,#4b5563);">📉</div>
+        <div class="ac-title">Verdata Inactive</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=ars-360" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#2c5f8a,#1a3d5c);">🏢</div>
+        <div class="ac-title">ARS 360 Finance</div>
+      </a>
+
+    </div>
+
+    <h2 style="font-size:1.1rem;font-weight:700;color:var(--mac-text);margin:32px 0 6px;">📧 Email Reports</h2>
+    <p style="font-size:0.82rem;color:var(--mac-text3);margin-bottom:20px;">Triggers a send to your configured recipients — results arrive in your inbox.</p>
+    <div class="admin-card-grid">
+
+      <a class="admin-card" href="/reports/prebuilt?r=training-activity" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#1e40af,#1e3a8a);">🎓</div>
+        <div class="ac-title">Training Activity</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=stale-untrained" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#ea580c,#9a3412);">⚠️</div>
+        <div class="ac-title">Stale / Untrained</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=account-status" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#0284c7,#075985);">📋</div>
+        <div class="ac-title">Account Status Summary</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=platform-breakdown" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#7c3aed,#4c1d95);">📊</div>
+        <div class="ac-title">Channel Breakdown</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=partner-activation" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#0d9488,#134e4a);">🤝</div>
+        <div class="ac-title">Partner Activation</div>
+      </a>
+
+      <a class="admin-card" href="/reports/prebuilt?r=oracle-missing" target="_blank">
+        <div class="ac-icon" style="background:linear-gradient(145deg,#dc2626,#991b1b);">🔍</div>
+        <div class="ac-title">Oracle ID Missing</div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- hidden placeholder so prebuilt-results-card still renders if JS navigates back -->
+  <div class="card" id="prebuilt-results-card" style="display:none; margin:0 28px 28px;">
+    <div class="results-bar">
+      <span class="results-count">Found <strong id="prebuilt-count">0</strong> records</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead id="prebuilt-head"></thead>
+        <tbody id="prebuilt-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- keep old hidden report cards so no-JS fallback stays intact -->
+  <div style="display:none;">
+  <!-- Partner Activations -->
+  <div class="report-card" id="_old-act">
+    <span class="badge-icon">🚀</span>
+    <h3>Partner Activations</h3>
       <p>SLP records with "Contractor Activated" status, joined to account data. Filter by date range, channel, or BDR.</p>
       <div class="period-row">
         <span class="period-label">Period</span>
@@ -1923,21 +2074,8 @@ select, input { font-family: inherit; }
       <div id="ars360-result" style="margin-top:10px;"></div>
     </div>
 
-  </div>
-
-  <!-- Prebuilt Results Table -->
-  <div class="card" id="prebuilt-results-card" style="display:none; margin-top:20px;">
-    <div class="results-bar">
-      <span class="results-count">Found <strong id="prebuilt-count">0</strong> records</span>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead id="prebuilt-head"></thead>
-        <tbody id="prebuilt-body"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
+  </div><!-- end hidden old-cards div -->
+</div><!-- end tab-prebuilt -->
 
 <!-- ══════════════════════════════════════════════════════════ -->
 <!-- SMART QUERY TAB                                            -->
@@ -3075,22 +3213,45 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function populateBdrDropdowns() {
-  // BDR dropdowns: act-bdr, su-bdr, om-bdr, na-bdr
-  const selIds = ['act-bdr', 'su-bdr', 'om-bdr', 'na-bdr'];
-  const sels = selIds.map(id => document.getElementById(id)).filter(Boolean);
-  if (!sels.length) return;
+  // BDR dropdowns: prebuilt report cards + accounts sidebar
+  const bdrSelIds = ['act-bdr', 'su-bdr', 'om-bdr', 'na-bdr', 'ab-bdr'];
+  const bdrSels = bdrSelIds.map(id => document.getElementById(id)).filter(Boolean);
   try {
     const res  = await fetch('/api/field-values/slp/assigned-bdr');
     const data = await res.json();
     const bdrs = (data.values || []).filter(v => v).sort();
-    for (const sel of sels) {
+    for (const sel of bdrSels) {
       bdrs.forEach(b => {
         const opt = document.createElement('option');
         opt.value = b; opt.textContent = b;
         sel.appendChild(opt);
       });
     }
-  } catch(e) { /* silently ignore — dropdown just stays empty */ }
+  } catch(e) { /* silently ignore */ }
+
+  // Owner + Group Name dropdowns (accounts sidebar only)
+  try {
+    const res  = await fetch('/api/accounts/filter-options');
+    const data = await res.json();
+
+    const ownerSel = document.getElementById('ab-owner');
+    if (ownerSel) {
+      (data.owners || []).forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.id; opt.textContent = o.name;
+        ownerSel.appendChild(opt);
+      });
+    }
+
+    const groupSel = document.getElementById('ab-group');
+    if (groupSel) {
+      (data.groups || []).forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g; opt.textContent = g;
+        groupSel.appendChild(opt);
+      });
+    }
+  } catch(e) { /* silently ignore */ }
 }
 
 // ── Utils ──────────────────────────────────────────────────────
@@ -3546,7 +3707,10 @@ async function abLoad(q) {
 
   const list    = document.getElementById('ab-list');
   const count   = document.getElementById('ab-count');
-  const program = document.getElementById('ab-program').value;
+  const program  = document.getElementById('ab-program').value;
+  const bdr      = document.getElementById('ab-bdr')?.value   || '';
+  const ownerId  = document.getElementById('ab-owner')?.value || '';
+  const group    = document.getElementById('ab-group')?.value || '';
   const exportBtn = document.getElementById('ab-export-btn');
   const exportContactsBtn = document.getElementById('ab-export-contacts-btn');
   const emailBtn  = document.getElementById('ab-email-btn');
@@ -3556,8 +3720,10 @@ async function abLoad(q) {
   emailBtn.style.display  = 'none';
   document.getElementById('ab-email-panel').style.display = 'none';
 
-  if (!q.trim() && !program) {
-    // No query — show 20 recent accounts
+  const hasFilter = !!(program || bdr || ownerId || group);
+
+  if (!q.trim() && !hasFilter) {
+    // No query, no filters — show 20 recent accounts
     try {
       const res  = await fetch(`/api/accounts/search?q=&limit=20`, { signal });
       const data = await res.json();
@@ -3570,10 +3736,13 @@ async function abLoad(q) {
     return;
   }
 
-  // Global search
+  // Global search (with optional in-memory filters)
   try {
     let url = `/api/global-search?q=${encodeURIComponent(q || ' ')}`;
-    if (program) url += `&program=${encodeURIComponent(program)}`;
+    if (program)  url += `&program=${encodeURIComponent(program)}`;
+    if (bdr)      url += `&bdr=${encodeURIComponent(bdr)}`;
+    if (ownerId)  url += `&owner_id=${encodeURIComponent(ownerId)}`;
+    if (group)    url += `&group=${encodeURIComponent(group)}`;
     const res  = await fetch(url, { signal });
     const data = await res.json();
     ab.results = [];
@@ -3582,13 +3751,14 @@ async function abLoad(q) {
       ab.results.push({ type:'account', id:a.id, accountId:a.id, name:a.name||'(unnamed)', sub });
     }
     for (const s of (data.slps||[])) {
-      ab.results.push({ type:'slp', id:s.record_id, accountId:s.account_id, name:s.dealer_id ? `dealer id ${s.dealer_id}` : s.account_id, sub:`SLP · dealer id ${s.dealer_id}${s.platform ? ' · ' + s.platform : ''}` });
+      ab.results.push({ type:'slp', id:s.record_id, accountId:s.account_id, name:s.dealer_id ? `dealer id ${s.dealer_id}` : s.account_id, sub:`SLP · dealer id ${s.dealer_id}${s.channel ? ' · ' + s.channel : ''}` });
     }
     for (const c of (data.contacts||[])) {
       ab.results.push({ type:'contact', id:c.id, accountId:c.account_id, name:`${c.name||c.email}`, sub:`Contact · ${c.email}` });
     }
     const acctCount = (data.accounts||[]).length;
-    count.textContent = `${data.total} result${data.total!==1?'s':''} (${acctCount} account${acctCount!==1?'s':''}) for "${q}"${program?' · '+program:''}`;
+    const filterLabel = [program, bdr, ownerId && 'owner filter', group].filter(Boolean).join(' · ');
+    count.textContent = `${data.total} result${data.total!==1?'s':''} (${acctCount} account${acctCount!==1?'s':''})${q ? ` for "${q}"` : ''}${filterLabel ? ' · ' + filterLabel : ''}`;
     abRenderList();
     if (ab.results.length) {
       exportBtn.style.display = 'block';
@@ -3603,16 +3773,28 @@ async function abLoad(q) {
 function abExport() {
   const q       = document.getElementById('ab-search').value.trim();
   const program = document.getElementById('ab-program').value;
+  const bdr     = document.getElementById('ab-bdr')?.value   || '';
+  const ownerId = document.getElementById('ab-owner')?.value || '';
+  const group   = document.getElementById('ab-group')?.value || '';
   let url = `/api/global-search/export?q=${encodeURIComponent(q || ' ')}`;
   if (program) url += `&program=${encodeURIComponent(program)}`;
+  if (bdr)     url += `&bdr=${encodeURIComponent(bdr)}`;
+  if (ownerId) url += `&owner_id=${encodeURIComponent(ownerId)}`;
+  if (group)   url += `&group=${encodeURIComponent(group)}`;
   window.location.href = url;
 }
 
 function abExportContacts() {
   const q       = document.getElementById('ab-search').value.trim();
   const program = document.getElementById('ab-program').value;
+  const bdr     = document.getElementById('ab-bdr')?.value   || '';
+  const ownerId = document.getElementById('ab-owner')?.value || '';
+  const group   = document.getElementById('ab-group')?.value || '';
   let url = `/api/global-search/export-contacts?q=${encodeURIComponent(q || ' ')}`;
   if (program) url += `&program=${encodeURIComponent(program)}`;
+  if (bdr)     url += `&bdr=${encodeURIComponent(bdr)}`;
+  if (ownerId) url += `&owner_id=${encodeURIComponent(ownerId)}`;
+  if (group)   url += `&group=${encodeURIComponent(group)}`;
   window.location.href = url;
 }
 

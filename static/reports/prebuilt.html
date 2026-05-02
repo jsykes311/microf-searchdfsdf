@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Report — AC Reporter</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue:   #007aff;
+  --blue2:  #0068e1;
+  --green:  #059669;
+  --red:    #dc2626;
+  --text:   #1c1c1e;
+  --text2:  #3a3a3c;
+  --text3:  #636366;
+  --text4:  #aeaeb2;
+  --border: rgba(0,0,0,0.10);
+  --card:   #ffffff;
+  --bg:     #f2f2f7;
+  --radius: 10px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  font-size: 13px;
+}
+
+/* ── Header ── */
+.page-header {
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  color: var(--text2);
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+.back-btn:hover { background: #e8e8e8; }
+
+.page-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--blue);
+  background: rgba(0,122,255,0.10);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+/* ── Content ── */
+.page-body {
+  max-width: 860px;
+  margin: 28px auto 60px;
+  padding: 0 24px;
+}
+
+.report-desc {
+  font-size: 0.84rem;
+  color: var(--text3);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+/* ── Card ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+
+/* ── Form rows ── */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group label {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.form-group input,
+.form-group select {
+  padding: 7px 10px;
+  font-size: 0.84rem;
+  border: 1px solid rgba(0,0,0,0.16);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0,122,255,0.15);
+}
+
+/* ── Period row ── */
+.period-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 14px;
+  align-items: center;
+}
+
+.period-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text4);
+  margin-right: 2px;
+}
+
+.period-btn {
+  padding: 4px 9px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text2);
+  transition: all 0.12s;
+}
+.period-btn:hover { border-color: var(--blue); color: var(--blue); }
+.period-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+/* ── Action row ── */
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn {
+  padding: 8px 18px;
+  font-size: 0.84rem;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  transition: opacity 0.12s, transform 0.08s;
+}
+.btn:hover { opacity: 0.86; }
+.btn:active { transform: scale(0.97); }
+
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-success { background: var(--green); color: #fff; }
+.btn-email   { background: #7c3aed; color: #fff; }
+.btn-sm      { padding: 6px 12px; font-size: 0.78rem; }
+
+/* ── Email inline ── */
+.email-wrap {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+  padding: 10px;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-radius: 7px;
+}
+.email-wrap input {
+  flex: 1;
+  padding: 6px 9px;
+  font-size: 0.82rem;
+  border: 1px solid #c4b5fd;
+  border-radius: 5px;
+  font-family: inherit;
+  outline: none;
+}
+.email-wrap input:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,.15); }
+
+/* ── Status ── */
+#run-status {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  min-height: 20px;
+}
+
+/* ── Results table ── */
+.results-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  display: none;
+}
+
+.results-bar {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--text3);
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.table-wrap { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+thead th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text3);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 7px 12px;
+  border-bottom: 1px solid rgba(0,0,0,.05);
+  color: var(--text2);
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: #f9fafb; }
+
+/* ── Special result renders ── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.stat-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.stat-card .stat-val { font-size: 1.6rem; font-weight: 700; color: var(--text); }
+.stat-card .stat-lbl { font-size: 0.72rem; color: var(--text3); margin-top: 2px; }
+
+.not-found {
+  padding: 40px;
+  text-align: center;
+  color: var(--text4);
+  font-size: 0.9rem;
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <a class="back-btn" href="/" onclick="history.back(); return false;">← Back</a>
+  <div class="page-title">
+    <span id="hdr-icon">📋</span>
+    <span id="hdr-title">Loading…</span>
+    <span class="page-badge" id="hdr-badge">Report</span>
+  </div>
+</div>
+
+<div class="page-body">
+  <p class="report-desc" id="report-desc"></p>
+
+  <!-- filters card -->
+  <div class="card" id="filters-card">
+    <div class="period-row" id="period-row" style="display:none;"></div>
+    <div class="form-grid" id="form-grid"></div>
+    <div class="action-row">
+      <button class="btn btn-primary" onclick="doRun()">▶ Run Report</button>
+      <button class="btn btn-success" onclick="doDownload()">⬇ Download CSV</button>
+      <button class="btn btn-email btn-sm" onclick="showEmailInput()">✉ Email</button>
+    </div>
+    <div id="email-area" style="display:none;" class="email-wrap">
+      <input type="email" id="email-to" placeholder="recipient@example.com"
+             onkeydown="if(event.key==='Enter') doEmail()"/>
+      <button class="btn btn-email btn-sm" onclick="doEmail()">Send</button>
+      <button class="btn btn-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text2);" onclick="document.getElementById('email-area').style.display='none'">✕</button>
+    </div>
+    <div id="run-status"></div>
+  </div>
+
+  <!-- results -->
+  <div class="results-card" id="results-card">
+    <div class="results-bar">
+      <span>Found <strong id="result-count">0</strong> records</span>
+      <span id="result-note" style="font-size:0.75rem; color:var(--text4);"></span>
+    </div>
+    <div id="custom-render"></div>
+    <div class="table-wrap">
+      <table>
+        <thead id="tbl-head"></thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Report config ──────────────────────────────────────────────────────────
+const CHANNEL_OPTIONS = ['Microf Direct','OPTIMUS','Optimus 2.0','Optimus - RTO Only','Optimus - FTL','Optimus - RTO','Optimus - Greensky','360 Finance','ComfortConnect','GoodLeap','LTO','SpectrumAC'];
+const STATE_OPTIONS   = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
+
+const REPORTS = {
+  'activations': {
+    icon: '🚀', title: 'Partner Activations', badge: 'Report',
+    desc: 'SLP records with "Contractor Activated" status, joined to account data.',
+    endpoint: 'activations',
+    periods: true,
+    fields: [
+      { id:'from', label:'From Date', type:'date' },
+      { id:'to',   label:'To Date',   type:'date' },
+      { id:'channel', label:'Channel', type:'select', options: ['— all —', ...CHANNEL_OPTIONS] },
+      { id:'bdr',   label:'Assigned BDR', type:'select-bdr' },
+      { id:'state', label:'State', type:'select', options: ['— all states —', ...STATE_OPTIONS] },
+      { id:'exclude', label:'Exclude Channels (comma-sep)', type:'text', placeholder:'e.g. LTO, Microf' },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to'), ch = gv('channel'), bdr = gv('bdr'), state = gv('state'), excl = gv('exclude');
+      if (from)  p.set('from_date', from);
+      if (to)    p.set('to_date', to);
+      if (ch && !ch.startsWith('—'))   p.set('platform', ch);
+      if (bdr)   p.set('bdr', bdr);
+      if (state && !state.startsWith('—')) p.set('state', state);
+      if (excl)  p.set('exclude_platforms', excl);
+    },
+    emailType: 'activations',
+  },
+
+  'license': {
+    icon: '📜', title: 'License Expiration', badge: 'Report',
+    desc: 'Contractor license records filtered by expiration date.',
+    endpoint: 'license-expiration',
+    periods: true,
+    fields: [
+      { id:'from', label:'Expiration From', type:'date' },
+      { id:'to',   label:'Expiration To',   type:'date' },
+      { id:'days', label:'— OR — Expiring within (days)', type:'number', value:'90' },
+      { id:'expired', label:'Include Already Expired', type:'select', options:['Yes|true','No|false'] },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to');
+      if (from || to) {
+        if (from) p.set('from_date', from);
+        if (to)   p.set('to_date', to);
+      } else {
+        p.set('days_ahead', gv('days') || '90');
+        p.set('include_expired', gv('expired') || 'true');
+      }
+    },
+    emailType: 'license-expiration',
+  },
+
+  'license-this-month': {
+    icon: '📅', title: 'Licenses Expiring This Month', badge: 'Report',
+    desc: 'Contractor licenses whose expiration date falls within the current calendar month.',
+    endpoint: 'license-expiration',
+    periods: false, fields: [],
+    params: p => { p.set('preset', 'this_month'); },
+    emailType: 'license-expiration',
+  },
+
+  'license-last-month': {
+    icon: '📆', title: 'Licenses Expired Last Month', badge: 'Report',
+    desc: 'Contractor licenses whose expiration date fell within the previous calendar month.',
+    endpoint: 'license-expiration',
+    periods: false, fields: [],
+    params: p => { p.set('preset', 'last_month'); },
+    emailType: 'license-expiration',
+  },
+
+  'activations-last-week': {
+    icon: '⚡', title: 'Dealer Activations Last Week', badge: 'Report',
+    desc: 'All SLP records with "Contractor Activated" status whose activation date falls within last week (Mon–Sun).',
+    endpoint: 'activations',
+    periods: false, fields: [],
+    params: p => {
+      const { from, to } = computeDateRange('last_week');
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+    },
+    emailType: 'activations',
+  },
+
+  'not-activated': {
+    icon: '🔴', title: 'Not Activated', badge: 'Report',
+    desc: 'All SLP records whose status is NOT "Contractor Activated".',
+    endpoint: 'not-activated',
+    periods: true,
+    fields: [
+      { id:'from', label:'From Date', type:'date' },
+      { id:'to',   label:'To Date',   type:'date' },
+      { id:'channel', label:'Channel', type:'select', options: ['— all —', ...CHANNEL_OPTIONS] },
+      { id:'status', label:'Status', type:'select', options:['— all non-activated —','Not Started','Inactive','Pending'] },
+      { id:'bdr',   label:'Assigned BDR', type:'select-bdr' },
+      { id:'state', label:'State', type:'select', options: ['— all states —', ...STATE_OPTIONS] },
+      { id:'exclude', label:'Exclude Channels (comma-sep)', type:'text', placeholder:'e.g. LTO, Microf' },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to'), ch = gv('channel'), status = gv('status'), bdr = gv('bdr'), state = gv('state'), excl = gv('exclude');
+      if (from)   p.set('from_date', from);
+      if (to)     p.set('to_date', to);
+      if (ch && !ch.startsWith('—'))     p.set('platform', ch);
+      if (status && !status.startsWith('—')) p.set('status', status);
+      if (bdr)    p.set('bdr', bdr);
+      if (state && !state.startsWith('—'))   p.set('state', state);
+      if (excl)   p.set('exclude_platforms', excl);
+    },
+    emailType: 'not-activated',
+  },
+
+  'last-app-date': {
+    icon: '📋', title: 'Last App Date', badge: 'Report',
+    desc: 'Accounts where the last application date falls within the selected period.',
+    endpoint: 'last-app-date',
+    periods: true,
+    defaultPeriod: 'last_18_months',
+    fields: [
+      { id:'from', label:'From Date', type:'date' },
+      { id:'to',   label:'To Date',   type:'date' },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to');
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+    },
+    emailType: 'last-app-date',
+  },
+
+  'last-rpa-date': {
+    icon: '🔄', title: 'Last RPA Date', badge: 'Report',
+    desc: 'Accounts where the last RPA date falls within the selected period.',
+    endpoint: 'last-rpa-date',
+    periods: true,
+    defaultPeriod: 'last_18_months',
+    fields: [
+      { id:'from', label:'From Date', type:'date' },
+      { id:'to',   label:'To Date',   type:'date' },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to');
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+    },
+    emailType: 'last-rpa-date',
+  },
+
+  'bdr': {
+    icon: '👥', title: 'BDR Performance Summary', badge: 'Report',
+    desc: 'Activation counts, account counts, and channel breakdowns per Business Development Rep.',
+    endpoint: 'bdr-summary',
+    periods: true,
+    fields: [
+      { id:'from', label:'Activation From', type:'date' },
+      { id:'to',   label:'Activation To',   type:'date' },
+      { id:'channel', label:'Channel', type:'select', options: ['— all —', ...CHANNEL_OPTIONS] },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to'), ch = gv('channel');
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+      if (ch && !ch.startsWith('—')) p.set('platform', ch);
+    },
+    emailType: 'bdr-summary',
+  },
+
+  'training': {
+    icon: '🎓', title: 'Training Summary', badge: 'Report',
+    desc: 'Training records joined with account data.',
+    endpoint: 'training-summary',
+    periods: true,
+    fields: [
+      { id:'from',    label:'From Date',      type:'date' },
+      { id:'to',      label:'To Date',        type:'date' },
+      { id:'trainer', label:'Trainer (optional)', type:'text', placeholder:'e.g. Blake Sanders' },
+      { id:'ttype',   label:'Training Type',  type:'select', options:['— all —','Webinar','Video Link','In Person'] },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to'), trainer = gv('trainer'), tt = gv('ttype');
+      if (from)    p.set('from_date', from);
+      if (to)      p.set('to_date', to);
+      if (trainer) p.set('trainer', trainer);
+      if (tt && !tt.startsWith('—')) p.set('training_type', tt);
+    },
+    emailType: 'training-activity',
+  },
+
+  'acta': {
+    icon: '📊', title: 'Account Activity', badge: 'Report',
+    desc: 'Activity counts grouped by type and by who logged them.',
+    endpoint: 'account-activity',
+    periods: true,
+    fields: [
+      { id:'from',  label:'From Date',     type:'date' },
+      { id:'to',    label:'To Date',       type:'date' },
+      { id:'atype', label:'Activity Type', type:'select', options:['— all —','Call','Email','Meeting','Text','Other'] },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to'), at = gv('atype');
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+      if (at && !at.startsWith('—')) p.set('activity_type', at);
+    },
+    emailType: 'account-activity',
+    customRender: 'acta',
+  },
+
+  'team': {
+    icon: '🏆', title: 'Team Performance', badge: 'Report',
+    desc: 'Who\'s doing the most — combines Notes with Account Activity to show total actions per team member.',
+    endpoint: 'team-activity',
+    periods: true,
+    fields: [
+      { id:'from', label:'From Date', type:'date' },
+      { id:'to',   label:'To Date',   type:'date' },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to');
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+    },
+    emailType: 'team-activity',
+    customRender: 'team',
+  },
+
+  'account-program-search': {
+    icon: '🔎', title: 'Account Channel Search', badge: 'Report',
+    desc: 'Find accounts by name (fuzzy) and channel from their SLPs.',
+    endpoint: 'account-program-search',
+    periods: false,
+    fields: [
+      { id:'name',    label:'Account Name', type:'text', placeholder:'e.g. ARS, American Residential' },
+      { id:'channel', label:'Channel (optional)', type:'select', options:['— all —', ...CHANNEL_OPTIONS] },
+    ],
+    params: p => {
+      const name = gv('name'), ch = gv('channel');
+      if (name) p.set('account_name', name);
+      if (ch && !ch.startsWith('—')) p.set('program', ch);
+    },
+  },
+
+  'verdata-active': {
+    icon: '✅', title: 'Verdata Active Report', badge: 'Report',
+    desc: 'All accounts with Account Status = "Active" — includes Dealer ID, DBA Name, RTO activation date, Tax-ID, website, and address.',
+    endpoint: 'verdata-active',
+    periods: false, fields: [],
+    params: p => {},
+    emailType: 'verdata-active',
+  },
+
+  'verdata-inactive': {
+    icon: '📉', title: 'Verdata Inactive Report', badge: 'Report',
+    desc: 'All accounts with Account Status = "Not Active" — same columns as the Active report.',
+    endpoint: 'verdata-inactive',
+    periods: false, fields: [],
+    params: p => {},
+    emailType: 'verdata-inactive',
+  },
+
+  'ars-360': {
+    icon: '🏢', title: 'ARS 360 Finance Contacts', badge: 'Report',
+    desc: 'All ARS dealers on the 360 Finance program with their linked contacts.',
+    endpoint: 'ars-360',
+    periods: false, fields: [],
+    params: p => {},
+  },
+
+  'training-activity': {
+    icon: '🎓', title: 'Training Activity', badge: 'Email Report',
+    desc: 'Training sessions conducted in the date window, grouped by trainer and account.',
+    endpoint: 'training-activity',
+    periods: true,
+    fields: [
+      { id:'from', label:'From Date', type:'date' },
+      { id:'to',   label:'To Date',   type:'date' },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to');
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+    },
+    emailType: 'training-activity',
+  },
+
+  'stale-untrained': {
+    icon: '⚠️', title: 'Stale / Untrained Dealers', badge: 'Email Report',
+    desc: 'Activated dealers with no training on record, or last training more than N days ago.',
+    endpoint: 'stale-untrained',
+    periods: true,
+    fields: [
+      { id:'stale', label:'Stale After (days)', type:'number', value:'90' },
+      { id:'from',  label:'Activation From',    type:'date' },
+      { id:'to',    label:'Activation To',      type:'date' },
+      { id:'channel', label:'Channel', type:'select', options:['— all —', ...CHANNEL_OPTIONS] },
+      { id:'bdr',   label:'BDR (optional)', type:'select-bdr' },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to'), ch = gv('channel'), bdr = gv('bdr'), stale = gv('stale');
+      if (from)  p.set('from_date', from);
+      if (to)    p.set('to_date', to);
+      if (ch && !ch.startsWith('—'))  p.set('platform', ch);
+      if (bdr)   p.set('bdr', bdr);
+      if (stale) p.set('stale_days', stale);
+    },
+    emailType: 'stale-untrained',
+  },
+
+  'account-status': {
+    icon: '📋', title: 'Account Status Summary', badge: 'Email Report',
+    desc: 'All accounts with their current status and sales region.',
+    endpoint: 'account-status',
+    periods: false, fields: [],
+    params: p => {},
+    emailType: 'account-status',
+  },
+
+  'platform-breakdown': {
+    icon: '📊', title: 'Channel Breakdown', badge: 'Email Report',
+    desc: 'New activations and total SLP counts grouped by channel for the date window.',
+    endpoint: 'platform-breakdown',
+    periods: true,
+    fields: [
+      { id:'from', label:'From Date', type:'date' },
+      { id:'to',   label:'To Date',   type:'date' },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to');
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+    },
+    emailType: 'platform-breakdown',
+  },
+
+  'partner-activation': {
+    icon: '🤝', title: 'Partner Activation', badge: 'Email Report',
+    desc: 'Accounts where the Partner Activation date falls within the selected window.',
+    endpoint: 'partner-activation',
+    periods: true,
+    fields: [
+      { id:'from', label:'From Date', type:'date' },
+      { id:'to',   label:'To Date',   type:'date' },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to');
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+    },
+    emailType: 'partner-activation',
+  },
+
+  'oracle-missing': {
+    icon: '🔍', title: 'Oracle Producer ID Missing', badge: 'Email Report',
+    desc: 'Activated SLPs whose linked account has no Oracle Producer ID on file.',
+    endpoint: 'oracle-missing',
+    periods: true,
+    fields: [
+      { id:'from',    label:'Activation From', type:'date' },
+      { id:'to',      label:'Activation To',   type:'date' },
+      { id:'channel', label:'Channel', type:'select', options:['— all —', ...CHANNEL_OPTIONS] },
+      { id:'bdr',     label:'BDR', type:'select-bdr' },
+    ],
+    params: p => {
+      const from = gv('from'), to = gv('to'), ch = gv('channel'), bdr = gv('bdr');
+      if (from) p.set('from_date', from);
+      if (to)   p.set('to_date', to);
+      if (ch && !ch.startsWith('—')) p.set('platform', ch);
+      if (bdr)  p.set('bdr', bdr);
+    },
+    emailType: 'oracle-missing',
+  },
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const params = new URLSearchParams(location.search);
+const reportKey = params.get('r') || '';
+let cfg = null;
+let _bdrs = [];
+
+function gv(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function setStatus(html, color) {
+  document.getElementById('run-status').innerHTML =
+    `<span style="color:${color || 'var(--text3)'};">${html}</span>`;
+}
+
+// ── Date period helpers ────────────────────────────────────────────────────
+function computeDateRange(period) {
+  const now   = new Date();
+  const pad   = n => String(n).padStart(2,'0');
+  const fmt   = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const dow   = now.getDay(); // 0=Sun
+  const today = fmt(now);
+  const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate()+n); return r; };
+
+  switch (period) {
+    case 'yesterday': {
+      const y = addDays(now,-1); return {from:fmt(y), to:fmt(y)};
+    }
+    case 'last_week': {
+      const mon = addDays(now, -(dow === 0 ? 6 : dow-1) - 7);
+      const sun = addDays(mon, 6);
+      return {from:fmt(mon), to:fmt(sun)};
+    }
+    case 'this_week': {
+      const mon = addDays(now, -(dow === 0 ? 6 : dow-1));
+      return {from:fmt(mon), to:today};
+    }
+    case 'last_month': {
+      const d = new Date(now.getFullYear(), now.getMonth()-1, 1);
+      const e = new Date(now.getFullYear(), now.getMonth(), 0);
+      return {from:fmt(d), to:fmt(e)};
+    }
+    case 'this_month': {
+      const d = new Date(now.getFullYear(), now.getMonth(), 1);
+      return {from:fmt(d), to:today};
+    }
+    case 'last_quarter': {
+      const q = Math.floor(now.getMonth()/3);
+      const s = new Date(now.getFullYear(), (q-1)*3, 1);
+      const e = new Date(now.getFullYear(), q*3, 0);
+      return {from:fmt(s), to:fmt(e)};
+    }
+    case 'this_quarter': {
+      const q = Math.floor(now.getMonth()/3);
+      const s = new Date(now.getFullYear(), q*3, 1);
+      return {from:fmt(s), to:today};
+    }
+    case 'ytd': {
+      return {from:`${now.getFullYear()}-01-01`, to:today};
+    }
+    case 'this_year': {
+      return {from:`${now.getFullYear()}-01-01`, to:`${now.getFullYear()}-12-31`};
+    }
+    case 'last_year': {
+      const y = now.getFullYear()-1;
+      return {from:`${y}-01-01`, to:`${y}-12-31`};
+    }
+    case 'last_18_months': {
+      const d = new Date(now); d.setMonth(d.getMonth()-18);
+      return {from:fmt(d), to:today};
+    }
+    case 'all': return {from:'', to:''};
+    default: return {from:'', to:''};
+  }
+}
+
+function applyPeriod(period, btn) {
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const {from, to} = computeDateRange(period);
+  const fromEl = document.getElementById('from');
+  const toEl   = document.getElementById('to');
+  if (fromEl && from) fromEl.value = from;
+  if (toEl   && to)   toEl.value   = to;
+  if (fromEl && !from) fromEl.value = '';
+  if (toEl   && !to)   toEl.value   = '';
+}
+
+// ── Build UI ───────────────────────────────────────────────────────────────
+function buildPeriodRow() {
+  if (!cfg.periods) return;
+  const row = document.getElementById('period-row');
+  row.style.display = 'flex';
+
+  const PERIODS = [
+    ['yesterday','Yesterday'],['last_week','Last Week'],['last_month','Last Month'],
+    ['this_month','This Month'],['last_quarter','Last Qtr'],['this_quarter','This Qtr'],
+    ['ytd','YTD'],['this_year','This Year'],['last_year','Last Year'],
+    ['last_18_months','Last 18 Mo'],['all','All Time'],
+  ];
+
+  const label = document.createElement('span');
+  label.className = 'period-label';
+  label.textContent = 'Period';
+  row.appendChild(label);
+
+  for (const [key, lbl] of PERIODS) {
+    const btn = document.createElement('button');
+    btn.className = 'period-btn';
+    if (key === (cfg.defaultPeriod || '')) btn.classList.add('active');
+    btn.textContent = lbl;
+    btn.addEventListener('click', () => applyPeriod(key, btn));
+    row.appendChild(btn);
+  }
+
+  // Apply default period on load
+  if (cfg.defaultPeriod) {
+    const {from, to} = computeDateRange(cfg.defaultPeriod);
+    setTimeout(() => {
+      const fromEl = document.getElementById('from');
+      const toEl   = document.getElementById('to');
+      if (fromEl && from) fromEl.value = from;
+      if (toEl   && to)   toEl.value   = to;
+    }, 0);
+  }
+}
+
+function buildForm() {
+  const grid = document.getElementById('form-grid');
+  grid.innerHTML = '';
+
+  for (const f of (cfg.fields || [])) {
+    const grp = document.createElement('div');
+    grp.className = 'form-group';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = f.label;
+    lbl.setAttribute('for', f.id);
+    grp.appendChild(lbl);
+
+    let el;
+    if (f.type === 'select' || f.type === 'select-bdr') {
+      el = document.createElement('select');
+      el.id = f.id;
+      if (f.type === 'select-bdr') {
+        const blankOpt = document.createElement('option');
+        blankOpt.value = ''; blankOpt.textContent = '— all BDRs —';
+        el.appendChild(blankOpt);
+        _bdrs.forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b; opt.textContent = b;
+          el.appendChild(opt);
+        });
+      } else {
+        for (const opt of (f.options || [])) {
+          const o = document.createElement('option');
+          const [label, val] = opt.includes('|') ? opt.split('|') : [opt, opt];
+          o.value = val.startsWith('—') ? '' : val;
+          o.textContent = label;
+          el.appendChild(o);
+        }
+      }
+    } else {
+      el = document.createElement('input');
+      el.id = f.id;
+      el.type = f.type;
+      if (f.placeholder) el.placeholder = f.placeholder;
+      if (f.value) el.value = f.value;
+    }
+    grp.appendChild(el);
+    grid.appendChild(grp);
+  }
+}
+
+// ── Run / Download / Email ─────────────────────────────────────────────────
+function buildParams() {
+  const p = new URLSearchParams();
+  cfg.params(p);
+  return p;
+}
+
+async function doRun() {
+  setStatus('<span class="spinner"></span> Running…', 'var(--text3)');
+  document.getElementById('results-card').style.display = 'none';
+  try {
+    const p = buildParams();
+    const res = await fetch(`/api/report/${cfg.endpoint}?${p}`);
+    if (!res.ok) { setStatus(`✕ Error ${res.status}`, 'var(--red)'); return; }
+    const data = await res.json();
+
+    if (cfg.customRender === 'acta') { renderActa(data); return; }
+    if (cfg.customRender === 'team') { renderTeam(data); return; }
+
+    const records = data.records || [];
+    setStatus(`✓ ${records.length} records`, 'var(--green)');
+    renderTable(records);
+  } catch(e) {
+    setStatus(`✕ ${esc(e.message)}`, 'var(--red)');
+  }
+}
+
+function doDownload() {
+  const p = buildParams();
+  p.set('format', 'csv');
+  window.location.href = `/api/report/${cfg.endpoint}?${p}`;
+}
+
+function showEmailInput() {
+  const area = document.getElementById('email-area');
+  area.style.display = area.style.display === 'none' ? 'flex' : 'none';
+  if (area.style.display !== 'none') document.getElementById('email-to').focus();
+}
+
+async function doEmail() {
+  if (!cfg.emailType) { setStatus('Email not supported for this report.', 'var(--red)'); return; }
+  const toVal = document.getElementById('email-to').value.trim();
+  if (!toVal) { document.getElementById('email-to').focus(); return; }
+  sessionStorage.setItem('report_email_to', toVal);
+
+  const p = new URLSearchParams();
+  const from = gv('from'), to = gv('to');
+  if (from) p.set('start_date', from);
+  if (to)   p.set('end_date',   to);
+  p.set('to', toVal);
+
+  setStatus('Sending…', 'var(--text3)');
+  try {
+    const res  = await fetch(`/api/send-report/${cfg.emailType}?${p}`);
+    const data = await res.json();
+    if (res.ok) {
+      setStatus(`✓ Sent → ${esc((data.recipients||[]).join(', ') || toVal)}`, 'var(--green)');
+      document.getElementById('email-area').style.display = 'none';
+    } else {
+      setStatus(`✕ ${esc(String(data.detail || res.status))}`, 'var(--red)');
+    }
+  } catch(e) {
+    setStatus(`✕ ${esc(e.message)}`, 'var(--red)');
+  }
+}
+
+// ── Table render ───────────────────────────────────────────────────────────
+function renderTable(records) {
+  const card = document.getElementById('results-card');
+  const customDiv = document.getElementById('custom-render');
+  customDiv.innerHTML = '';
+  document.getElementById('tbl-head').innerHTML = '';
+  document.getElementById('tbl-body').innerHTML = '';
+
+  if (!records.length) {
+    document.getElementById('result-count').textContent = '0';
+    card.style.display = 'block';
+    document.getElementById('tbl-body').innerHTML = '<tr><td colspan="999" style="text-align:center;padding:30px;color:var(--text4);">No records found</td></tr>';
+    return;
+  }
+
+  const keys = Object.keys(records[0]);
+  document.getElementById('result-count').textContent = records.length;
+  document.getElementById('tbl-head').innerHTML = '<tr>' + keys.map(k => `<th>${esc(k)}</th>`).join('') + '</tr>';
+  document.getElementById('tbl-body').innerHTML = records.slice(0, 300).map(r =>
+    '<tr>' + keys.map(k => `<td title="${esc(String(r[k]||''))}">${esc(String(r[k]||''))}</td>`).join('') + '</tr>'
+  ).join('');
+  if (records.length > 300) {
+    document.getElementById('result-note').textContent = `Showing 300 of ${records.length} — download CSV for full data`;
+  }
+  card.style.display = 'block';
+}
+
+// ── Custom renders ─────────────────────────────────────────────────────────
+function renderActa(data) {
+  const byType   = data.by_type   || [];
+  const byPerson = data.by_person || [];
+  const total    = data.total || 0;
+  setStatus(`✓ ${total} activities`, 'var(--green)');
+
+  const card = document.getElementById('results-card');
+  document.getElementById('tbl-head').innerHTML = '';
+  document.getElementById('tbl-body').innerHTML = '';
+  document.getElementById('result-count').textContent = total;
+
+  let html = '';
+  if (byType.length) {
+    html += `<div style="padding:16px 16px 0;font-weight:600;font-size:0.82rem;color:var(--text2);">By Activity Type</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Type</th><th style="text-align:right;">Count</th><th style="text-align:right;">Accounts</th></tr></thead>
+        <tbody>${byType.map(r => `<tr><td>${esc(r.activity_type)}</td><td style="text-align:right;">${r.count}</td><td style="text-align:right;">${r.unique_accounts}</td></tr>`).join('')}</tbody>
+      </table></div>`;
+  }
+  if (byPerson.length) {
+    html += `<div style="padding:16px 16px 0;font-weight:600;font-size:0.82rem;color:var(--text2);">By Performed By</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Person</th><th style="text-align:right;">Total</th><th>Breakdown</th></tr></thead>
+        <tbody>${byPerson.map(r => `<tr><td style="font-weight:500;">${esc(r.performed_by)}</td><td style="text-align:right;">${r.count}</td><td style="color:var(--text3);">${Object.entries(r.breakdown||{}).map(([t,c])=>`${esc(t)}: ${c}`).join(' · ')}</td></tr>`).join('')}</tbody>
+      </table></div>`;
+  }
+  document.getElementById('custom-render').innerHTML = html;
+  card.style.display = 'block';
+}
+
+function renderTeam(data) {
+  const records   = data.records   || [];
+  const unmatched = data.unmatched_activity || [];
+  setStatus(`✓ ${records.length} team members`, 'var(--green)');
+
+  const card = document.getElementById('results-card');
+  document.getElementById('tbl-head').innerHTML = '';
+  document.getElementById('tbl-body').innerHTML = '';
+  document.getElementById('result-count').textContent = records.length;
+
+  let html = '';
+  if (records.length) {
+    html = `<div class="table-wrap"><table>
+      <thead><tr>
+        <th>Name</th><th style="text-align:right;">Notes</th><th style="text-align:right;">Activities</th>
+        <th style="text-align:right;">Total</th><th style="text-align:right;">Accounts</th><th>Last Active</th>
+      </tr></thead>
+      <tbody>${records.map(r => `<tr>
+        <td style="font-weight:500;">${esc(r.user_name)}</td>
+        <td style="text-align:right;">${r.notes_written}</td>
+        <td style="text-align:right;">${r.activities_logged}</td>
+        <td style="text-align:right;font-weight:600;">${r.total_actions}</td>
+        <td style="text-align:right;">${r.accounts_touched}</td>
+        <td style="color:var(--text3);">${esc(r.latest_activity_date)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  }
+  if (unmatched.length) {
+    html += `<div style="padding:10px 16px;font-size:0.74rem;color:var(--text4);">⚠ Unmatched: ${unmatched.map(u=>`${esc(u.performed_by)} (${u.activity_count})`).join(', ')}</div>`;
+  }
+  document.getElementById('custom-render').innerHTML = html;
+  card.style.display = 'block';
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  cfg = REPORTS[reportKey];
+  if (!cfg) {
+    document.getElementById('hdr-title').textContent = 'Report not found';
+    document.getElementById('report-desc').textContent = `Unknown report type: "${reportKey}". Return to the main app and choose a report.`;
+    document.getElementById('filters-card').style.display = 'none';
+    return;
+  }
+
+  document.title = `${cfg.title} — AC Reporter`;
+  document.getElementById('hdr-icon').textContent  = cfg.icon;
+  document.getElementById('hdr-title').textContent = cfg.title;
+  document.getElementById('hdr-badge').textContent = cfg.badge || 'Report';
+  document.getElementById('report-desc').textContent = cfg.desc;
+
+  // Load BDRs if needed
+  const needsBdr = (cfg.fields || []).some(f => f.type === 'select-bdr');
+  if (needsBdr) {
+    try {
+      const r = await fetch('/api/field-values/slp/assigned-bdr');
+      const d = await r.json();
+      _bdrs = (d.values || []).filter(v => v).sort();
+    } catch(e) {}
+  }
+
+  // Restore saved email
+  const savedEmail = sessionStorage.getItem('report_email_to') || '';
+  if (savedEmail) document.getElementById('email-to').value = savedEmail;
+
+  buildPeriodRow();
+  buildForm();
+
+  // Hide email button if report doesn't support it
+  if (!cfg.emailType) {
+    document.querySelector('.btn-email')?.style.setProperty('display','none');
+  }
+
+  // Hide filters card if no fields and no periods
+  if (!cfg.periods && !(cfg.fields||[]).length) {
+    document.getElementById('period-row').style.display = 'none';
+    document.getElementById('form-grid').style.display  = 'none';
+  }
+}
+
+init();
+</script>
+</body>
+</html>

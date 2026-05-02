@@ -434,6 +434,7 @@ _account_to_region: dict = {}   # account_id (str) → sales region (customfield
 _account_to_dba: dict = {}      # account_id (str) → DBA Name (customfield 15)
 _account_to_status: dict = {}   # account_id (str) → Account Status (customfield 19)
 _account_to_tax_id: dict = {}   # account_id (str) → Vendor Tax-ID (customfield 40)
+_account_to_group: dict = {}    # account_id (str) → Group Name (CF146)
 _user_id_to_name: dict = {}     # AC user_id (str) → "First Last"
 _program_to_accounts: dict = {} # lowercase(dealer_program) → set of account_ids
 _dealer_index_ts:  float = 0.0
@@ -536,6 +537,7 @@ async def _build_dealer_id_index() -> None:
     DBA_NAME_CF    = 15    # customFieldId for "DBA Name"
     ACCT_STATUS_CF = 19    # customFieldId for "Account Status"
     VENDOR_TAX_CF  = 40    # customFieldId for "Vendor Tax-ID"
+    GROUP_NAME_CF  = 146   # customFieldId for "Group Name"
     CF_PAGE        = 1000  # 1000 records/page → ~190 pages instead of ~1900
     CONCURRENCY    = 8     # 8 concurrent requests → index builds in ~10s instead of ~5min
 
@@ -564,6 +566,7 @@ async def _build_dealer_id_index() -> None:
         acct_to_dba:        dict = {}
         acct_to_status:     dict = {}
         acct_to_tax_id:     dict = {}
+        acct_to_group:      dict = {}
 
         def _ingest(items: list) -> None:
             for item in items:
@@ -605,6 +608,8 @@ async def _build_dealer_id_index() -> None:
                     acct_to_status[aid]     = val
                 elif cf_id == VENDOR_TAX_CF:
                     acct_to_tax_id[aid]     = val
+                elif cf_id == GROUP_NAME_CF:
+                    acct_to_group[aid]      = val
 
         _ingest(first_page.get("accountCustomFieldData", []))
 
@@ -716,6 +721,7 @@ async def _build_dealer_id_index() -> None:
         _account_to_dba.clear();         _account_to_dba.update(acct_to_dba)
         _account_to_status.clear();      _account_to_status.update(acct_to_status)
         _account_to_tax_id.clear();      _account_to_tax_id.update(acct_to_tax_id)
+        _account_to_group.clear();       _account_to_group.update(acct_to_group)
 
         # Reverse index: lowercase dealer program → set of account IDs
         new_prog: dict = {}
@@ -3453,9 +3459,31 @@ async def get_training_records(account_id: str, user=Depends(require_auth)):
 
 @app.get("/api/global-search")
 async def global_search(q: str = Query(..., min_length=1),
-                        program: Optional[str] = Query(None)):
+                        program: Optional[str] = Query(None),
+                        bdr: Optional[str] = Query(None),
+                        owner_id: Optional[str] = Query(None),
+                        group: Optional[str] = Query(None)):
     """Search accounts (by name), contacts (by email only, text queries), and SLPs (by dealer ID or name)."""
     q = q.strip()
+
+    # ── In-memory-only path: filters set but no text query ────────────────────
+    if not q and (bdr or owner_id or group):
+        candidate_ids: set = set(_account_to_name.keys())
+        if bdr:
+            candidate_ids &= {aid for aid, b in _account_to_bdr.items() if b == bdr}
+        if owner_id:
+            candidate_ids &= {aid for aid, o in _account_to_owner.items() if o == owner_id}
+        if group:
+            candidate_ids &= {aid for aid, g in _account_to_group.items() if g == group}
+        if program and _program_to_accounts:
+            prog_key = program.lower().strip()
+            if prog_key in _program_to_accounts:
+                candidate_ids &= set(_program_to_accounts[prog_key])
+        accs = [{"id": aid, "name": _account_to_name.get(aid, ""),
+                  "dealer_id": _account_to_dealer.get(aid, ""),
+                  "account_url": ac_account_url(aid)} for aid in candidate_ids]
+        accs.sort(key=lambda x: x["name"].lower())
+        return {"accounts": accs, "slps": [], "contacts": [], "query": "", "total": len(accs)}
 
     # Normalize phone-like queries: strip dashes, spaces, dots, parens so
     # "225-681-1638" → "2256811638" matches how AC stores phone numbers.
@@ -3691,6 +3719,23 @@ async def global_search(q: str = Query(..., min_length=1),
         matched_slps     = [s for s in matched_slps     if (s.get("channel") or "").lower() == prog_lower]
         matched_contacts = [c for c in matched_contacts if str(c.get("account_id","")) in prog_account_ids]
 
+    # ── BDR / owner / group post-filters ──────────────────────────────────────
+    if bdr or owner_id or group:
+        _allow: set | None = None
+        def _intersect(s: set) -> None:
+            nonlocal _allow
+            _allow = s if _allow is None else _allow & s
+        if bdr:
+            _intersect({aid for aid, b in _account_to_bdr.items() if b == bdr})
+        if owner_id:
+            _intersect({aid for aid, o in _account_to_owner.items() if o == owner_id})
+        if group:
+            _intersect({aid for aid, g in _account_to_group.items() if g == group})
+        if _allow is not None:
+            matched_accounts = [a for a in matched_accounts if str(a.get("id","")) in _allow]
+            matched_slps     = [s for s in matched_slps     if str(s.get("account_id","")) in _allow]
+            matched_contacts = [c for c in matched_contacts if str(c.get("account_id","")) in _allow]
+
     total = len(matched_accounts) + len(matched_contacts) + len(matched_slps)
     print(f"[GLOBAL SEARCH] query={q} results={total}")
     return {
@@ -3703,12 +3748,28 @@ async def global_search(q: str = Query(..., min_length=1),
     }
 
 
+@app.get("/api/accounts/filter-options")
+async def accounts_filter_options():
+    """Return distinct BDR names, owner name+id pairs, and group names for sidebar filters."""
+    bdrs   = sorted({v for v in _account_to_bdr.values()   if v}, key=str.lower)
+    owners = sorted(
+        [{"id": uid, "name": _user_id_to_name.get(uid, uid)}
+         for uid in {v for v in _account_to_owner.values() if v}],
+        key=lambda x: x["name"].lower()
+    )
+    groups = sorted({v for v in _account_to_group.values() if v}, key=str.lower)
+    return {"bdrs": bdrs, "owners": owners, "groups": groups}
+
+
 @app.get("/api/global-search/export")
 async def global_search_export(q: str = Query(default=" "),
-                               program: Optional[str] = Query(None)):
+                               program: Optional[str] = Query(None),
+                               bdr: Optional[str] = Query(None),
+                               owner_id: Optional[str] = Query(None),
+                               group: Optional[str] = Query(None)):
     """Export global search results as CSV using the same in-memory data as the sidebar."""
     effective_q = q.strip() or " "
-    search_data = await global_search(q=effective_q, program=program)
+    search_data = await global_search(q=effective_q, program=program, bdr=bdr, owner_id=owner_id, group=group)
 
     matched_accounts = {str(a["id"]): a for a in search_data.get("accounts", [])}
     if not matched_accounts:
@@ -3757,10 +3818,13 @@ async def global_search_export(q: str = Query(default=" "),
 
 @app.get("/api/global-search/export-contacts")
 async def global_search_export_contacts(q: str = Query(default=" "),
-                                        program: Optional[str] = Query(None)):
+                                        program: Optional[str] = Query(None),
+                                        bdr: Optional[str] = Query(None),
+                                        owner_id: Optional[str] = Query(None),
+                                        group: Optional[str] = Query(None)):
     """Export all contacts for the matched accounts as CSV."""
     effective_q = q.strip() or " "
-    search_data = await global_search(q=effective_q, program=program)
+    search_data = await global_search(q=effective_q, program=program, bdr=bdr, owner_id=owner_id, group=group)
 
     matched_accounts = {str(a["id"]): a for a in search_data.get("accounts", [])}
     if not matched_accounts:
@@ -8058,6 +8122,11 @@ async def _get_tag_id(tag_name: str) -> Optional[str]:
             _WELCOME_TAG_ID_CACHE[tag_name] = tid
             return tid
     return None
+
+
+@app.get("/reports/prebuilt")
+async def reports_prebuilt_page():
+    return FileResponse("static/reports/prebuilt.html")
 
 
 @app.get("/welcome")
