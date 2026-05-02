@@ -220,6 +220,7 @@
     <div class="stat"><div class="stat-value green" id="s-with">—</div><div class="stat-label">With SLPs</div></div>
     <div class="stat"><div class="stat-value amber" id="s-without">—</div><div class="stat-label">Without SLPs</div></div>
     <div class="stat"><div class="stat-value slate" id="s-slps">—</div><div class="stat-label">Total SLPs (filtered)</div></div>
+    <div class="stat" id="s-orphaned-wrap" style="display:none"><div class="stat-value" style="color:#dc2626" id="s-orphaned">0</div><div class="stat-label">⚠️ Unnamed Accounts</div></div>
   </div>
   <div class="cache-note" id="cache-note" style="display:none"></div>
   <div class="breakdown" id="breakdown">
@@ -338,14 +339,24 @@ function renderBreakdown(filtered) {
 function renderFiltered() {
   _filtered = applyFilters(_raw);
 
-  const withSlps    = _filtered.filter(a => a._filtered_slps.length > 0).length;
-  const withoutSlps = _filtered.filter(a => a._filtered_slps.length === 0).length;
-  const totalSlps   = _filtered.reduce((n, a) => n + a._filtered_slps.length, 0);
+  const withSlps      = _filtered.filter(a => a._filtered_slps.length > 0).length;
+  const withoutSlps   = _filtered.filter(a => a._filtered_slps.length === 0).length;
+  const totalSlps     = _filtered.reduce((n, a) => n + a._filtered_slps.length, 0);
+  const orphanedCount = _filtered.filter(a => a.name.startsWith('Unknown Account (')).length;
 
   document.getElementById('s-total').textContent   = _filtered.length.toLocaleString();
   document.getElementById('s-with').textContent    = withSlps.toLocaleString();
   document.getElementById('s-without').textContent = withoutSlps.toLocaleString();
   document.getElementById('s-slps').textContent    = totalSlps.toLocaleString();
+
+  // Orphaned accounts stat (only visible when > 0)
+  const orphanStat = document.getElementById('s-orphaned-wrap');
+  if (orphanedCount > 0) {
+    document.getElementById('s-orphaned').textContent = orphanedCount.toLocaleString();
+    orphanStat.style.display = 'block';
+  } else {
+    orphanStat.style.display = 'none';
+  }
   document.getElementById('summary').style.display = 'flex';
   document.getElementById('csv-btn').style.display = 'inline-block';
 
@@ -364,7 +375,11 @@ function renderFiltered() {
     const badge = cnt > 0
       ? `<span class="slp-count">${cnt}</span>`
       : `<span class="slp-count zero">0</span>`;
-    const acLink = `<a class="ac-link" href="https://microf.api-us1.com/account/${acct.account_id}" target="_blank">${esc(acct.name)}</a>${badge}`;
+    const isUnknown = acct.name.startsWith('Unknown Account (');
+    const nameDisplay = isUnknown
+      ? `<span style="color:#dc2626;font-style:italic">${esc(acct.name)}</span>`
+      : esc(acct.name);
+    const acLink = `<a class="ac-link" href="https://microf.api-us1.com/account/${acct.account_id}" target="_blank">${nameDisplay}</a>${badge}`;
 
     rows += `<tr class="acct-row">
       <td style="font-weight:700;font-size:11px;color:#a5b4fc;width:28px">${idx+1}</td>

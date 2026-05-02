@@ -7952,7 +7952,7 @@ async def parent_child_report(
             })
             continue
 
-        row_name   = _account_to_name.get(aid, f"Unknown Account ({aid})")
+        row_name   = _account_to_name.get(aid) or f"Unknown Account ({aid})"
         row_type   = _account_to_type.get(aid, "")
         row_state  = _account_to_state_prov.get(aid, "")
         row_region = _account_to_region.get(aid, "")
