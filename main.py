@@ -184,6 +184,17 @@ def _require_admin(request: _Request):
     return email
 
 
+def _require_welcome(request: _Request):
+    """Admin or Onboarding group can access the Welcome Email tool."""
+    email = _get_session_email(request)
+    if not _AZ_CLIENT_ID:
+        return "local"
+    em = (email or "").lower()
+    if not em or (em not in _ADMIN_EMAILS and em not in _ONBOARDING_EMAILS):
+        raise HTTPException(status_code=403, detail="Access restricted")
+    return email
+
+
 def _redirect_uri() -> str:
     base = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000").rstrip("/")
     return f"{base}/auth/callback"
@@ -8133,12 +8144,12 @@ async def reports_prebuilt_page():
 
 
 @app.get("/welcome")
-async def welcome_page(_admin=Depends(_require_admin)):
+async def welcome_page(_admin=Depends(_require_welcome)):
     return FileResponse("static/welcome.html")
 
 
 @app.get("/api/welcome/channels")
-async def welcome_channels(_admin=Depends(_require_admin)):
+async def welcome_channels(_admin=Depends(_require_welcome)):
     """Return the list of valid Channel values for the UI dropdown."""
     return {"channels": WELCOME_CHANNELS}
 
@@ -8219,7 +8230,7 @@ async def _eligible_welcome_contacts(account_id: str, channel: str) -> dict:
 
 
 @app.get("/api/welcome/account-slps/{account_id}")
-async def welcome_account_slps(account_id: str, _admin=Depends(_require_admin)):
+async def welcome_account_slps(account_id: str, _admin=Depends(_require_welcome)):
     """Return the SLP rows on this account so the admin can see which Channel(s)
     apply, with one flagged as the recommended pick (most recently activated
     SLP that maps to a supported Channel)."""
@@ -8274,7 +8285,7 @@ async def welcome_account_slps(account_id: str, _admin=Depends(_require_admin)):
 async def welcome_preview(
     account_id: str,
     channel: str = Query(...),
-    _admin=Depends(_require_admin),
+    _admin=Depends(_require_welcome),
 ):
     """Show who would receive the welcome email for this Channel — does NOT send."""
     if channel not in WELCOME_CHANNELS:
@@ -8292,7 +8303,7 @@ class _WelcomeSendRequest(_BaseModel):
 @app.post("/api/welcome/send")
 async def welcome_send(
     payload: _WelcomeSendRequest,
-    user=Depends(_require_admin),
+    user=Depends(_require_welcome),
 ):
     """Tag eligible contacts on the account so the AC welcome automation fires.
     If contact_ids is provided, only tag those specific contacts.
