@@ -364,7 +364,7 @@ const STATE_OPTIONS   = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI',
 
 const REPORTS = {
   'activations': {
-    icon: '🚀', title: 'Partner Activations', badge: 'Report',
+    icon: '🚀', title: 'Activations', badge: 'Report',
     desc: 'SLP records with "Contractor Activated" status, joined to account data.',
     endpoint: 'activations',
     periods: true,
@@ -600,23 +600,21 @@ const REPORTS = {
     },
   },
 
-  'verdata-active': {
-    icon: '✅', title: 'Verdata Active Report', badge: 'Report',
-    desc: 'All accounts with Account Status = "Active" — includes Dealer ID, DBA Name, RTO activation date, Tax-ID, website, and address.',
-    endpoint: 'verdata-active',
-    periods: false, fields: [],
+  'verdata': {
+    icon: '📊', title: 'Verdata Report', badge: 'Report',
+    desc: 'Accounts with Dealer ID, DBA Name, RTO activation date, Tax-ID, website, and address — filter by status.',
+    getEndpoint: () => gv('vstatus') === 'Not Active' ? 'verdata-inactive' : 'verdata-active',
+    periods: false,
+    fields: [
+      { id:'vstatus', label:'Status', type:'select', options:['Active|Active','Not Active|Not Active'] },
+    ],
     params: p => {},
     emailType: 'verdata-active',
   },
 
-  'verdata-inactive': {
-    icon: '📉', title: 'Verdata Inactive Report', badge: 'Report',
-    desc: 'All accounts with Account Status = "Not Active" — same columns as the Active report.',
-    endpoint: 'verdata-inactive',
-    periods: false, fields: [],
-    params: p => {},
-    emailType: 'verdata-inactive',
-  },
+  // Legacy aliases — kept so old bookmarks still resolve
+  'verdata-active':   { icon:'✅', title:'Verdata Active',   badge:'Report', endpoint:'verdata-active',   periods:false, fields:[], params:p=>{}, emailType:'verdata-active' },
+  'verdata-inactive': { icon:'📉', title:'Verdata Inactive', badge:'Report', endpoint:'verdata-inactive', periods:false, fields:[], params:p=>{}, emailType:'verdata-inactive' },
 
   'ars-360': {
     icon: '🏢', title: 'ARS 360 Finance Contacts', badge: 'Report',
@@ -923,7 +921,8 @@ async function doRun() {
   document.getElementById('results-card').style.display = 'none';
   try {
     const p = buildParams();
-    const res = await fetch(`/api/report/${cfg.endpoint}?${p}`);
+    const endpoint = cfg.getEndpoint ? cfg.getEndpoint() : cfg.endpoint;
+    const res = await fetch(`/api/report/${endpoint}?${p}`);
     if (!res.ok) { setStatus(`✕ Error ${res.status}`, 'var(--red)'); return; }
     const data = await res.json();
 
@@ -941,7 +940,8 @@ async function doRun() {
 function doDownload() {
   const p = buildParams();
   p.set('format', 'csv');
-  window.location.href = `/api/report/${cfg.endpoint}?${p}`;
+  const endpoint = cfg.getEndpoint ? cfg.getEndpoint() : cfg.endpoint;
+  window.location.href = `/api/report/${endpoint}?${p}`;
 }
 
 function showEmailInput() {
