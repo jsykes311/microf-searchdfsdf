@@ -17,11 +17,6 @@
   --mac-green-hov:  #28a745;
   --mac-red:        #ff3b30;
 
-  /* Traffic lights */
-  --tl-red:    #ff5f56;
-  --tl-yellow: #ffbd2e;
-  --tl-green:  #27c93f;
-
   /* Surfaces */
   --sidebar-bg:   #e8e8e8;
   --mac-bg:       #f2f2f7;
@@ -102,18 +97,20 @@ body {
   user-select: none;
 }
 
-/* Traffic-light window chrome */
+/* Status bar */
 .nav-titlebar {
-  height: 38px; min-height: 38px; flex-shrink: 0;
-  display: flex; align-items: center; padding: 0 14px; gap: 8px;
+  height: 36px; min-height: 36px; flex-shrink: 0;
+  display: flex; align-items: center; padding: 0 14px; gap: 7px;
   border-bottom: 1px solid var(--mac-line);
 }
-.tl-dot {
-  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; cursor: default;
+.nav-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: #34c759;
+  box-shadow: 0 0 0 2.5px rgba(52,199,89,0.22);
 }
-.tl-red    { background: var(--tl-red);    border: 0.5px solid rgba(0,0,0,0.12); }
-.tl-yellow { background: var(--tl-yellow); border: 0.5px solid rgba(0,0,0,0.12); }
-.tl-green  { background: var(--tl-green);  border: 0.5px solid rgba(0,0,0,0.12); }
+.nav-status-label {
+  font-size: 0.72rem; font-weight: 500; color: var(--mac-text3);
+}
 
 /* App logo below title bar */
 .nav-logo {
@@ -767,11 +764,10 @@ select, input { font-family: inherit; }
 
 <!-- Left sidebar nav -->
 <div class="app-nav">
-  <!-- macOS traffic lights -->
+  <!-- Status bar -->
   <div class="nav-titlebar">
-    <div class="tl-dot tl-red"></div>
-    <div class="tl-dot tl-yellow"></div>
-    <div class="tl-dot tl-green"></div>
+    <div class="nav-status-dot"></div>
+    <span class="nav-status-label">Microf-Search Online</span>
   </div>
   <div class="nav-logo">
     <div class="nav-logo-icon">📊</div>
