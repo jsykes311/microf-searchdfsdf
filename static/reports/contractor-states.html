@@ -88,8 +88,8 @@
       </select>
     </div>
     <div class="filter-group">
-      <label>Program</label>
-      <select id="program">
+      <label>Channel</label>
+      <select id="channel">
         <option value="">All programs</option>
         <option>360 Finance</option>
         <option>ComfortConnect</option>
@@ -120,7 +120,7 @@ let _lastData = [];
 async function runReport() {
   const acctState = document.getElementById("acct-state").value;
   const bizState  = document.getElementById("biz-state").value;
-  const program   = document.getElementById("program").value;
+  const channel   = document.getElementById("channel").value;
   const btn = document.getElementById("run-btn");
 
   btn.disabled = true; btn.textContent = "Loading…";
@@ -131,7 +131,7 @@ async function runReport() {
   let url = "/api/reports/contractor-states?_=1";
   if (acctState) url += `&acct_state=${encodeURIComponent(acctState)}`;
   if (bizState)  url += `&biz_state=${encodeURIComponent(bizState)}`;
-  if (program)   url += `&program=${encodeURIComponent(program)}`;
+  if (channel)   url += `&program=${encodeURIComponent(channel)}`;
 
   try {
     const resp = await fetch(url);
@@ -170,7 +170,7 @@ function renderResults(data) {
       <td><a class="ac-link" href="https://microf.api-us1.com/account/${r.account_id}" target="_blank">${r.account_name || "(unknown)"}</a></td>
       <td>${r.account_state || ""}</td>
       <td><span class="badge">${r.dealer_id || "—"}</span></td>
-      <td>${r.program || "—"}</td>
+      <td>${r.channel || "—"}</td>
       <td><div class="states-list">${states || "—"}</div></td>
     </tr>`;
   }).join("");
@@ -182,7 +182,7 @@ function renderResults(data) {
           <th>Account Name</th>
           <th>Account State</th>
           <th>Dealer ID</th>
-          <th>Program</th>
+          <th>Channel</th>
           <th>Doing Business In</th>
         </tr></thead>
         <tbody>${rows}</tbody>
@@ -191,9 +191,9 @@ function renderResults(data) {
 }
 
 function downloadCSV() {
-  const headers = ["Account Name","Account State","Dealer ID","Program","Doing Business In"];
+  const headers = ["Account Name","Account State","Dealer ID","Channel","Doing Business In"];
   const rows = _lastData.map(r => [
-    r.account_name, r.account_state, r.dealer_id, r.program, r.doing_business_in_states
+    r.account_name, r.account_state, r.dealer_id, r.channel, r.doing_business_in_states
   ].map(v => `"${(v||"").replace(/"/g,'""')}"`).join(","));
   const csv = [headers.join(","), ...rows].join("\n");
   const a = document.createElement("a");

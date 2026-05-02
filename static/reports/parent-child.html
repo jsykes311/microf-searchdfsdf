@@ -154,8 +154,8 @@
       </select>
     </div>
     <div class="filter-group">
-      <label>Program</label>
-      <select id="program" onchange="onFilterChange()">
+      <label>Channel</label>
+      <select id="channel" onchange="onFilterChange()">
         <option value="">All Programs</option>
         <option>360 Finance</option>
         <option>ComfortConnect</option>
@@ -269,7 +269,7 @@ function applyFilters(data) {
   const acctType   = document.getElementById('acct-type').value;
   const region     = document.getElementById('region').value;
   const acctState  = document.getElementById('acct-state').value;
-  const program    = document.getElementById('program').value;
+  const channel    = document.getElementById('channel').value;
   const slpStatus  = document.getElementById('slp-status').value;
   const owner      = document.getElementById('owner').value;
   const bdr        = document.getElementById('bdr').value;
@@ -290,7 +290,7 @@ function applyFilters(data) {
 
       // Filter SLP children
       let filteredSlps = acct.slps;
-      if (program)   filteredSlps = filteredSlps.filter(s => s.program === program);
+      if (channel)   filteredSlps = filteredSlps.filter(s => s.channel === channel);
       if (slpStatus) filteredSlps = filteredSlps.filter(s => s.status  === slpStatus);
       if (bdr)       filteredSlps = filteredSlps.filter(s => s.bdr     === bdr);
 
@@ -382,7 +382,7 @@ function renderFiltered() {
         <td>↳</td>
         <td style="color:#4f46e5;font-size:12px">${esc(slp.dealer_id)}</td>
         <td></td><td></td><td></td><td></td>
-        <td>${esc(slp.program)}</td>
+        <td>${esc(slp.channel)}</td>
         <td>${statusBadge(slp.status)}</td>
         <td>${esc(slp.activation_date ? slp.activation_date.split('T')[0] : '')}</td>
         <td style="font-family:monospace;font-size:11px">${esc(slp.oracle_ids)}</td>
@@ -401,7 +401,7 @@ function renderFiltered() {
           <th>State</th>
           <th>Region</th>
           <th>Owner</th>
-          <th>Program</th>
+          <th>Channel</th>
           <th>SLP Status</th>
           <th>Activation Date</th>
           <th>Oracle IDs</th>
@@ -502,7 +502,7 @@ async function loadReport() {
 // ── CSV export ─────────────────────────────────────────────────────────────────
 function exportCsv() {
   if (!_filtered) { alert('Run the report first.'); return; }
-  const rows = [['Account Name','Account ID','Account Type','State','Region','Owner','Dealer ID','Program','SLP Status','Activation Date','Oracle IDs','BDR','Doing Business In']];
+  const rows = [['Account Name','Account ID','Account Type','State','Region','Owner','Dealer ID','Channel','SLP Status','Activation Date','Oracle IDs','BDR','Doing Business In']];
   _filtered.forEach(acct => {
     const slps = acct._filtered_slps;
     if (slps.length === 0) {
@@ -510,7 +510,7 @@ function exportCsv() {
     } else {
       slps.forEach(slp => {
         rows.push([acct.name, acct.account_id, acct.type, acct.state, acct.region, acct.owner,
-          slp.dealer_id, slp.program, slp.status,
+          slp.dealer_id, slp.channel, slp.status,
           slp.activation_date ? slp.activation_date.split('T')[0] : '',
           slp.oracle_ids, slp.bdr, slp.doing_business_in]);
       });

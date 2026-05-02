@@ -69,8 +69,8 @@
       </select>
     </div>
     <div class="filter-group">
-      <label>Program</label>
-      <select id="program">
+      <label>Channel</label>
+      <select id="channel">
         <option value="">All programs</option>
         <option>360 Finance</option>
         <option>ComfortConnect</option>
@@ -107,7 +107,7 @@ async function runReport() {
   if (!issue) { alert("Please select an issue type."); return; }
 
   const region = document.getElementById("region").value;
-  const program = document.getElementById("program").value;
+  const channel = document.getElementById("channel").value;
   const btn = document.getElementById("run-btn");
 
   btn.disabled = true;
@@ -117,7 +117,7 @@ async function runReport() {
 
   let url = `/api/reports/slp-health?issue=${encodeURIComponent(issue)}`;
   if (region) url += `&region=${encodeURIComponent(region)}`;
-  if (program) url += `&program=${encodeURIComponent(program)}`;
+  if (channel) url += `&program=${encodeURIComponent(channel)}`;
 
   try {
     const resp = await fetch(url);
@@ -159,7 +159,7 @@ function renderReport(data) {
 
     return `<tr>
       <td>${acLink}</td>
-      <td>${esc(r.program || "—")}</td>
+      <td>${esc(r.channel || "—")}</td>
       <td>${esc(r.region || "—")}</td>
       <td>${dealerCell}</td>
       <td>${esc(r.status_detail || "—")}</td>
@@ -171,7 +171,7 @@ function renderReport(data) {
     <div class="results">
       <table>
         <thead><tr>
-          <th>Account</th><th>Program</th><th>Region</th>
+          <th>Account</th><th>Channel</th><th>Region</th>
           <th>Dealer ID</th>
           <th>Status</th><th>Activation Date</th>
         </tr></thead>
