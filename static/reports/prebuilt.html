@@ -1099,13 +1099,18 @@ async function init() {
   const savedEmail = sessionStorage.getItem('report_email_to') || '';
   if (savedEmail) document.getElementById('email-to').value = savedEmail;
 
-  // Prebuilt reports run with default parameters — no user filter UI
-  document.getElementById('period-row').style.display = 'none';
-  document.getElementById('form-grid').style.display  = 'none';
+  buildPeriodRow();
+  buildForm();
 
   // Hide email button if report doesn't support it
   if (!cfg.emailType) {
     document.querySelector('.btn-email')?.style.setProperty('display','none');
+  }
+
+  // Hide filter UI for reports with no configurable fields
+  if (!cfg.periods && !(cfg.fields||[]).length) {
+    document.getElementById('period-row').style.display = 'none';
+    document.getElementById('form-grid').style.display  = 'none';
   }
 }
 
