@@ -1218,8 +1218,15 @@ async def get_field_values(object_type: str, field_id: str):
     """Return unique values for a field (for dropdown filters in UI)."""
     values: set = set()
     try:
-        schema_map = {"slp": SLP_SCHEMA_ID, "trainings": TRAINING_SCHEMA_ID, "license_details": LICENSE_SCHEMA_ID}
-        if object_type in schema_map:
+        if object_type == "slp":
+            # Use in-memory SLP cache — fast, already loaded at startup
+            records = _slp_cache_records if _slp_cache_records else await get_slp_cache()
+            for r in records:
+                for fo in r.get("fields", []):
+                    if fo.get("id") == field_id and fo.get("value"):
+                        values.add(str(fo["value"]))
+        elif object_type in {"trainings", "license_details"}:
+            schema_map = {"trainings": TRAINING_SCHEMA_ID, "license_details": LICENSE_SCHEMA_ID}
             records = await ac_get_all(f"customObjects/records/{schema_map[object_type]}", "records", {})
             for r in records[:2000]:
                 for fo in r.get("fields", []):

@@ -368,6 +368,7 @@ const REPORTS = {
     desc: 'SLP records with "Contractor Activated" status, joined to account data.',
     endpoint: 'activations',
     periods: true,
+    defaultPeriod: 'this_month',
     fields: [
       { id:'from', label:'From Date', type:'date' },
       { id:'to',   label:'To Date',   type:'date' },
@@ -448,6 +449,7 @@ const REPORTS = {
     desc: 'All SLP records whose status is NOT "Contractor Activated".',
     endpoint: 'not-activated',
     periods: true,
+    defaultPeriod: 'this_month',
     fields: [
       { id:'from', label:'From Date', type:'date' },
       { id:'to',   label:'To Date',   type:'date' },
@@ -511,6 +513,7 @@ const REPORTS = {
     desc: 'Activation counts, account counts, and channel breakdowns per Business Development Rep.',
     endpoint: 'bdr-summary',
     periods: true,
+    defaultPeriod: 'this_month',
     fields: [
       { id:'from', label:'Activation From', type:'date' },
       { id:'to',   label:'Activation To',   type:'date' },
@@ -530,6 +533,7 @@ const REPORTS = {
     desc: 'Training records joined with account data.',
     endpoint: 'training-summary',
     periods: true,
+    defaultPeriod: 'this_month',
     fields: [
       { id:'from',    label:'From Date',      type:'date' },
       { id:'to',      label:'To Date',        type:'date' },
@@ -551,6 +555,7 @@ const REPORTS = {
     desc: 'Activity counts grouped by type and by who logged them.',
     endpoint: 'account-activity',
     periods: true,
+    defaultPeriod: 'this_month',
     fields: [
       { id:'from',  label:'From Date',     type:'date' },
       { id:'to',    label:'To Date',       type:'date' },
@@ -571,6 +576,7 @@ const REPORTS = {
     desc: 'Who\'s doing the most — combines Notes with Account Activity to show total actions per team member.',
     endpoint: 'team-activity',
     periods: true,
+    defaultPeriod: 'this_month',
     fields: [
       { id:'from', label:'From Date', type:'date' },
       { id:'to',   label:'To Date',   type:'date' },
@@ -629,6 +635,7 @@ const REPORTS = {
     desc: 'Training sessions conducted in the date window, grouped by trainer and account.',
     endpoint: 'training-activity',
     periods: true,
+    defaultPeriod: 'this_month',
     fields: [
       { id:'from', label:'From Date', type:'date' },
       { id:'to',   label:'To Date',   type:'date' },
@@ -645,7 +652,8 @@ const REPORTS = {
     icon: '⚠️', title: 'Stale / Untrained Dealers', badge: 'Email Report',
     desc: 'Activated dealers with no training on record, or last training more than N days ago.',
     endpoint: 'stale-untrained',
-    periods: true,
+    periods: false,
+    defaultPeriod: null,
     fields: [
       { id:'stale', label:'Stale After (days)', type:'number', value:'90' },
       { id:'from',  label:'Activation From',    type:'date' },
@@ -678,6 +686,7 @@ const REPORTS = {
     desc: 'New activations and total SLP counts grouped by channel for the date window.',
     endpoint: 'platform-breakdown',
     periods: true,
+    defaultPeriod: 'this_month',
     fields: [
       { id:'from', label:'From Date', type:'date' },
       { id:'to',   label:'To Date',   type:'date' },
@@ -695,6 +704,7 @@ const REPORTS = {
     desc: 'Accounts where the Partner Activation date falls within the selected window.',
     endpoint: 'partner-activation',
     periods: true,
+    defaultPeriod: 'this_month',
     fields: [
       { id:'from', label:'From Date', type:'date' },
       { id:'to',   label:'To Date',   type:'date' },
@@ -711,7 +721,8 @@ const REPORTS = {
     icon: '🔍', title: 'Oracle Producer ID Missing', badge: 'Email Report',
     desc: 'Activated SLPs whose linked account has no Oracle Producer ID on file.',
     endpoint: 'oracle-missing',
-    periods: true,
+    periods: false,
+    defaultPeriod: null,
     fields: [
       { id:'from',    label:'Activation From', type:'date' },
       { id:'to',      label:'Activation To',   type:'date' },
@@ -824,6 +835,8 @@ function applyPeriod(period, btn) {
 }
 
 // ── Build UI ───────────────────────────────────────────────────────────────
+// NOTE: buildForm() must be called BEFORE buildPeriodRow() so date inputs
+// exist when the default period values are applied synchronously.
 function buildPeriodRow() {
   if (!cfg.periods) return;
   const row = document.getElementById('period-row');
@@ -850,15 +863,16 @@ function buildPeriodRow() {
     row.appendChild(btn);
   }
 
-  // Apply default period on load
+  // Apply default period synchronously (inputs already exist because
+  // buildForm() is called before buildPeriodRow())
   if (cfg.defaultPeriod) {
     const {from, to} = computeDateRange(cfg.defaultPeriod);
-    setTimeout(() => {
-      const fromEl = document.getElementById('from');
-      const toEl   = document.getElementById('to');
-      if (fromEl && from) fromEl.value = from;
-      if (toEl   && to)   toEl.value   = to;
-    }, 0);
+    const fromEl = document.getElementById('from');
+    const toEl   = document.getElementById('to');
+    if (fromEl && from) fromEl.value = from;
+    if (toEl   && to)   toEl.value   = to;
+    if (fromEl && !from) fromEl.value = '';
+    if (toEl   && !to)   toEl.value   = '';
   }
 }
 
@@ -1083,34 +1097,58 @@ async function init() {
   document.getElementById('hdr-icon').textContent  = cfg.icon;
   document.getElementById('hdr-title').textContent = cfg.title;
   document.getElementById('hdr-badge').textContent = cfg.badge || 'Report';
-  document.getElementById('report-desc').textContent = cfg.desc;
-
-  // Load BDRs if needed
-  const needsBdr = (cfg.fields || []).some(f => f.type === 'select-bdr');
-  if (needsBdr) {
-    try {
-      const r = await fetch('/api/field-values/slp/assigned-bdr');
-      const d = await r.json();
-      _bdrs = (d.values || []).filter(v => v).sort();
-    } catch(e) {}
-  }
+  document.getElementById('report-desc').textContent = cfg.desc || '';
 
   // Restore saved email
   const savedEmail = sessionStorage.getItem('report_email_to') || '';
   if (savedEmail) document.getElementById('email-to').value = savedEmail;
-
-  buildPeriodRow();
-  buildForm();
 
   // Hide email button if report doesn't support it
   if (!cfg.emailType) {
     document.querySelector('.btn-email')?.style.setProperty('display','none');
   }
 
+  // ── Build form immediately so the UI is interactive right away ──────────
+  // Order matters: buildForm() first so date inputs exist, then
+  // buildPeriodRow() can apply the default period synchronously.
+  buildForm();
+  buildPeriodRow();
+
   // Hide filter UI for reports with no configurable fields
   if (!cfg.periods && !(cfg.fields||[]).length) {
     document.getElementById('period-row').style.display = 'none';
     document.getElementById('form-grid').style.display  = 'none';
+  }
+
+  // ── Load BDRs in background — don't block the UI ────────────────────────
+  const needsBdr = (cfg.fields || []).some(f => f.type === 'select-bdr');
+  if (needsBdr) {
+    fetch('/api/field-values/slp/assigned-bdr')
+      .then(r => r.json())
+      .then(d => {
+        _bdrs = (d.values || []).filter(v => v).sort();
+        // Repopulate BDR selects with loaded values (there may be more than one)
+        document.querySelectorAll('select[id="bdr"]').forEach(sel => {
+          const cur = sel.value;
+          sel.innerHTML = '';
+          const blank = document.createElement('option');
+          blank.value = ''; blank.textContent = '— all BDRs —';
+          sel.appendChild(blank);
+          _bdrs.forEach(b => {
+            const o = document.createElement('option');
+            o.value = b; o.textContent = b;
+            sel.appendChild(o);
+          });
+          sel.value = cur; // restore selection if any
+        });
+      })
+      .catch(() => {});
+  }
+
+  // ── Auto-run on load ────────────────────────────────────────────────────
+  // Skip account-program-search (requires a name to be useful)
+  if (reportKey !== 'account-program-search') {
+    doRun();
   }
 }
 
