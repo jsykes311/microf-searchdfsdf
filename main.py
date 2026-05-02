@@ -8121,6 +8121,10 @@ def _welcomed_tag_name(channel: str) -> str:
     return f"welcomed-{_channel_slug(channel)}"
 
 
+def _resend_tag_name(channel: str) -> str:
+    return f"resend-{_channel_slug(channel)}"
+
+
 # Tag-name → tag-id cache (in-memory; refreshed on first lookup)
 _WELCOME_TAG_ID_CACHE: dict = {}
 
@@ -8323,9 +8327,16 @@ async def welcome_send(
             "Create it first (Contacts → Manage Tags) and build the matching automation.",
         )
 
-    # ── Force-resend path: strip both tags then re-tag everyone ────────────
+    # ── Force-resend path: apply resend-{channel} tag to trigger AC automation ─
     if payload.force_resend:
-        welcomed_tag_id = await _get_tag_id(welcomed_tag)  # may be None if never set up
+        resend_tag  = _resend_tag_name(payload.channel)
+        resend_tag_id = await _get_tag_id(resend_tag)
+        if not resend_tag_id:
+            raise HTTPException(
+                500,
+                f"Tag '{resend_tag}' does not exist in ActiveCampaign. "
+                "Create it first and attach it to the resend automation trigger.",
+            )
 
         acc_data, contacts_resp = await asyncio.gather(
             ac_get(f"accounts/{payload.account_id}"),
@@ -8344,12 +8355,13 @@ async def welcome_send(
             allowed = set(str(cid) for cid in payload.contact_ids)
             all_cids = [cid for cid in all_cids if str(cid) in allowed]
 
+        # Fetch contact details to filter out unsubscribed / no-email contacts
         details = await asyncio.gather(
-            *[ac_get(f"contacts/{cid}", {"include": "contactTags.tag"}) for cid in all_cids],
+            *[ac_get(f"contacts/{cid}") for cid in all_cids],
             return_exceptions=True,
         )
 
-        stripped = tagged = errors = 0
+        tagged = errors = 0
         results = []
         for d in details:
             if not isinstance(d, dict):
@@ -8360,40 +8372,28 @@ async def welcome_send(
             name  = f"{c.get('firstName','')} {c.get('lastName','')}".strip()
 
             if not email or str(c.get("status") or "") == "2":
-                results.append({"contact_id": cid, "email": email, "name": name, "status": "skipped", "skip_reason": "no email" if not email else "unsubscribed"})
+                results.append({"contact_id": cid, "email": email, "name": name,
+                                 "status": "skipped",
+                                 "skip_reason": "no email" if not email else "unsubscribed"})
                 continue
 
-            # Use already-known tag IDs directly — avoids fragile name-lookup
-            tags_to_strip = {str(tag_id)}
-            if welcomed_tag_id:
-                tags_to_strip.add(str(welcomed_tag_id))
-
-            # Remove welcomed-{channel} and welcome-{channel} contactTag records
-            for ct in d.get("contactTags", []):
-                if str(ct.get("tag", "")) in tags_to_strip:
-                    try:
-                        await ac_delete(f"contactTags/{ct['id']}")
-                        stripped += 1
-                    except Exception:
-                        pass  # best-effort removal
-
-            # Re-apply the welcome trigger tag
             try:
-                await ac_post("contactTags", {"contactTag": {"contact": cid, "tag": tag_id}})
+                await ac_post("contactTags", {"contactTag": {"contact": cid, "tag": resend_tag_id}})
                 tagged += 1
-                results.append({"contact_id": cid, "email": email, "name": name, "status": "retagged"})
+                results.append({"contact_id": cid, "email": email, "name": name, "status": "tagged"})
             except Exception as e:
                 errors += 1
-                results.append({"contact_id": cid, "email": email, "name": name, "status": "error", "detail": str(e)[:200]})
+                results.append({"contact_id": cid, "email": email, "name": name,
+                                 "status": "error", "detail": str(e)[:200]})
 
         print(f"[welcome-resend] {user} → account={payload.account_id} channel={payload.channel} "
-              f"stripped={stripped} tagged={tagged} errors={errors}")
+              f"tag={resend_tag} tagged={tagged} errors={errors}")
         skipped_list = [r for r in results if r["status"] == "skipped"]
         return {
             "account_id":     payload.account_id,
             "account_name":   account_name,
             "channel":        payload.channel,
-            "tag_applied":    welcome_tag,
+            "tag_applied":    resend_tag,
             "total_contacts": len(all_cids),
             "tagged":         tagged,
             "errors":         errors,
@@ -8402,7 +8402,6 @@ async def welcome_send(
             "results":        [r for r in results if r["status"] != "skipped"],
             "by":             user,
             "resend":         True,
-            "stripped":       stripped,
         }
 
     # ── Normal send path ───────────────────────────────────────────────────
