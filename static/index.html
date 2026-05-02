@@ -86,6 +86,17 @@ body {
 .app-shell.admin-user .app-nav { display: flex; }
 .app-shell.admin-user.accounts-mode .app-nav { display: none; }
 .app-shell.apps-user:not(.admin-user) .app-nav { display: none !important; }
+.app-shell.nav-collapsed .app-nav { display: none !important; }
+
+/* Sidebar toggle button */
+.sidebar-toggle-btn {
+  background: none; border: 1px solid transparent; color: var(--mac-text3);
+  width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center; transition: all 0.1s;
+  flex-shrink: 0;
+}
+.sidebar-toggle-btn:hover { background: rgba(0,0,0,0.07); border-color: var(--mac-line); color: var(--mac-text); }
+.app-shell:not(.admin-user) .sidebar-toggle-btn { display: none; }
 
 /* ── macOS Finder-style sidebar ── */
 .app-nav {
@@ -826,6 +837,7 @@ select, input { font-family: inherit; }
 
 <!-- Command bar -->
 <div class="ms-cmdbar">
+  <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="Toggle sidebar" onclick="toggleSidebar()">☰</button>
   <div class="ms-cmdbar-breadcrumb" style="flex-shrink:0;">
     <strong>AC Reports</strong>
     <span class="sep">›</span>
@@ -1185,62 +1197,62 @@ select, input { font-family: inherit; }
     <p style="font-size:0.82rem;color:var(--mac-text3);margin-bottom:24px;">Click a report to open it in a full page with filters, run, and CSV export.</p>
     <div class="admin-card-grid">
 
-      <a class="admin-card" href="/reports/prebuilt?r=activations" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=activations">
         <div class="ac-icon" style="background:linear-gradient(145deg,#1a73e8,#0d47a1);">🚀</div>
         <div class="ac-title">Activations</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=license" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=license">
         <div class="ac-icon" style="background:linear-gradient(145deg,#f59e0b,#b45309);">📜</div>
         <div class="ac-title">License Expiration</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=not-activated" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=not-activated">
         <div class="ac-icon" style="background:linear-gradient(145deg,#ef4444,#b91c1c);">🔴</div>
         <div class="ac-title">Not Activated</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=last-app-date" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=last-app-date">
         <div class="ac-icon" style="background:linear-gradient(145deg,#64748b,#334155);">📋</div>
         <div class="ac-title">Last App Date</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=last-rpa-date" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=last-rpa-date">
         <div class="ac-icon" style="background:linear-gradient(145deg,#10b981,#065f46);">🔄</div>
         <div class="ac-title">Last RPA Date</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=bdr" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=bdr">
         <div class="ac-icon" style="background:linear-gradient(145deg,#6366f1,#3730a3);">👥</div>
         <div class="ac-title">BDR Performance</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=training" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=training">
         <div class="ac-icon" style="background:linear-gradient(145deg,#0891b2,#164e63);">🎓</div>
         <div class="ac-title">Training Summary</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=acta" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=acta">
         <div class="ac-icon" style="background:linear-gradient(145deg,#14b8a6,#0f766e);">📊</div>
         <div class="ac-title">Account Activity</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=team" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=team">
         <div class="ac-icon" style="background:linear-gradient(145deg,#d97706,#92400e);">🏆</div>
         <div class="ac-title">Team Performance</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=account-program-search" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=account-program-search">
         <div class="ac-icon" style="background:linear-gradient(145deg,#3b82f6,#1d4ed8);">🔎</div>
         <div class="ac-title">Account Channel Search</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=verdata" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=verdata">
         <div class="ac-icon" style="background:linear-gradient(145deg,#22c55e,#15803d);">📊</div>
         <div class="ac-title">Verdata</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=ars-360" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=ars-360">
         <div class="ac-icon" style="background:linear-gradient(145deg,#2c5f8a,#1a3d5c);">🏢</div>
         <div class="ac-title">ARS 360 Finance</div>
       </a>
@@ -1251,32 +1263,32 @@ select, input { font-family: inherit; }
     <p style="font-size:0.82rem;color:var(--mac-text3);margin-bottom:20px;">Triggers a send to your configured recipients — results arrive in your inbox.</p>
     <div class="admin-card-grid">
 
-      <a class="admin-card" href="/reports/prebuilt?r=training-activity" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=training-activity">
         <div class="ac-icon" style="background:linear-gradient(145deg,#1e40af,#1e3a8a);">🎓</div>
         <div class="ac-title">Training Activity</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=stale-untrained" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=stale-untrained">
         <div class="ac-icon" style="background:linear-gradient(145deg,#ea580c,#9a3412);">⚠️</div>
         <div class="ac-title">Stale / Untrained</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=account-status" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=account-status">
         <div class="ac-icon" style="background:linear-gradient(145deg,#0284c7,#075985);">📋</div>
         <div class="ac-title">Account Status Summary</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=platform-breakdown" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=platform-breakdown">
         <div class="ac-icon" style="background:linear-gradient(145deg,#7c3aed,#4c1d95);">📊</div>
         <div class="ac-title">Channel Breakdown</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=partner-activation" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=partner-activation">
         <div class="ac-icon" style="background:linear-gradient(145deg,#0d9488,#134e4a);">🤝</div>
         <div class="ac-title">Partner Activation</div>
       </a>
 
-      <a class="admin-card" href="/reports/prebuilt?r=oracle-missing" target="_blank">
+      <a class="admin-card" href="/reports/prebuilt?r=oracle-missing">
         <div class="ac-icon" style="background:linear-gradient(145deg,#dc2626,#991b1b);">🔍</div>
         <div class="ac-title">Oracle ID Missing</div>
       </a>
@@ -2295,6 +2307,17 @@ const _VALID_TABS = new Set(Object.keys(_TAB_NAMES));
 
 let _isAdmin = false;     // set after /api/me resolves
 let _isAppsUser = false;  // apps-only users see Apps tab but not left nav
+
+function toggleSidebar() {
+  const shell = document.querySelector('.app-shell');
+  const collapsed = shell.classList.toggle('nav-collapsed');
+  try { localStorage.setItem('navCollapsed', collapsed ? '1' : '0'); } catch(e) {}
+}
+
+// Restore collapsed state on load
+(function(){
+  try { if (localStorage.getItem('navCollapsed') === '1') document.querySelector('.app-shell')?.classList.add('nav-collapsed'); } catch(e) {}
+})();
 
 function showTab(id, btn, pushHistory = true) {
   if (!_VALID_TABS.has(id)) id = 'accounts';
