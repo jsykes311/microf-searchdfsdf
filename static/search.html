@@ -8,24 +8,26 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --blue:   #1e44b8;
-      --blue2:  #0f2878;
-      --text:   #1a1a2e;
-      --muted:  #666;
-      --border: #e0e4ef;
+      --blue:   #007aff;
+      --blue2:  #0068e1;
+      --text:   #1c1c1e;
+      --muted:  #636366;
+      --border: rgba(0,0,0,0.10);
       --card:   #ffffff;
-      --bg:     #f5f7fc;
-      --tag-bg: #eef1fb;
-      --radius: 12px;
+      --bg:     #f2f2f7;
+      --tag-bg: rgba(0,122,255,0.10);
+      --radius: 10px;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      font-size: 13px;
     }
 
     /* ── Hero / centered stage ─────────────────────────────────────── */
@@ -89,20 +91,21 @@
 
     #q {
       width: 100%;
-      padding: 16px 48px 16px 50px;
-      font-size: 1.05rem;
-      border: 2px solid var(--border);
+      padding: 14px 48px 14px 50px;
+      font-size: 1rem;
+      border: 1px solid var(--border);
       border-radius: 50px;
       outline: none;
       background: white;
       color: var(--text);
-      box-shadow: 0 2px 10px rgba(0,0,0,.07);
+      box-shadow: 0 1px 4px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.06);
       transition: border-color 0.2s, box-shadow 0.2s;
+      font-family: inherit;
     }
 
     #q:focus {
       border-color: var(--blue);
-      box-shadow: 0 2px 16px rgba(30,68,184,.15);
+      box-shadow: 0 0 0 3px rgba(0,122,255,0.18), 0 1px 4px rgba(0,0,0,.08);
     }
 
     body.active #q {
@@ -176,16 +179,17 @@
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 14px 18px;
-      margin-bottom: 8px;
+      padding: 12px 16px;
+      margin-bottom: 6px;
       text-decoration: none;
       color: inherit;
-      transition: box-shadow 0.15s, border-color 0.15s, transform 0.15s;
+      transition: box-shadow 0.15s, border-color 0.15s, transform 0.12s;
       cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
     }
 
     .result-card:hover {
-      box-shadow: 0 4px 18px rgba(30,68,184,.12);
+      box-shadow: 0 4px 14px rgba(0,0,0,.10);
       border-color: var(--blue);
       transform: translateY(-1px);
     }
@@ -251,7 +255,7 @@
 </head>
 <body class="idle">
 
-  <a href="/" style="position:fixed;top:14px;right:16px;z-index:100;padding:6px 14px;background:#1e44b8;color:#fff;border-radius:6px;font-size:0.82rem;font-weight:600;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.15);">Account View</a>
+  <a href="/" style="position:fixed;top:14px;right:16px;z-index:100;padding:5px 14px;background:#007aff;color:#fff;border-radius:6px;font-size:0.76rem;font-weight:500;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;box-shadow:0 1px 3px rgba(0,0,0,.15);-webkit-font-smoothing:antialiased;">Account View</a>
 
   <div id="stage">
     <div class="logo">
