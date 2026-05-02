@@ -710,22 +710,51 @@ select, input { font-family: inherit; }
 .ab-result-badge.slp     { background: #ecf9f1; color: #2e844a; }
 .ab-result-badge.contact { background: #f3f3f3; color: #706e6b; }
 
-/* ── Admin Hub / Apps grid ── */
+/* ── Apps Grid — macOS Launchpad style ── */
 #tab-admin { background: var(--mac-bg); }
-.admin-hub { padding: 28px 32px; }
-.admin-hub h2 { font-size: 1.2rem; font-weight: 700; color: var(--mac-text); margin-bottom: 5px; }
-.admin-hub .admin-subtitle { font-size: 0.8rem; color: var(--mac-text3); margin-bottom: 28px; }
-.admin-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
-.admin-card {
-  background: var(--mac-surface); border: 1px solid var(--mac-line); border-radius: var(--r-md);
-  padding: 20px 18px; cursor: pointer;
-  transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
-  text-align: left; font-family: inherit; box-shadow: var(--mac-sh1);
+.admin-hub { padding: 32px 36px; }
+.admin-hub h2 { font-size: 1.1rem; font-weight: 700; color: var(--mac-text); margin-bottom: 4px; }
+.admin-hub .admin-subtitle { font-size: 0.78rem; color: var(--mac-text3); margin-bottom: 28px; }
+
+.admin-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px 6px;
 }
-.admin-card:hover { box-shadow: var(--mac-sh2); border-color: rgba(0,0,0,0.18); transform: translateY(-2px); }
-.admin-card .ac-icon { font-size: 1.9rem; margin-bottom: 10px; }
-.admin-card .ac-title { font-size: 0.88rem; font-weight: 600; color: var(--mac-text); margin-bottom: 4px; }
-.admin-card .ac-desc  { font-size: 0.74rem; color: var(--mac-text3); line-height: 1.45; }
+
+.admin-card {
+  background: none; border: none; box-shadow: none;
+  padding: 10px 6px 12px;
+  cursor: pointer; font-family: inherit;
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  border-radius: 12px;
+  transition: opacity 0.12s;
+}
+.admin-card:hover { opacity: 0.72; }
+.admin-card:hover .ac-icon { transform: scale(1.06); }
+.admin-card:active .ac-icon { transform: scale(0.96); }
+
+/* The icon square — macOS superellipse */
+.admin-card .ac-icon {
+  width: 72px; height: 72px;
+  border-radius: 17px;           /* iOS/macOS superellipse ≈ 23.6% */
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.14), 0 0 0 0.5px rgba(0,0,0,0.07);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.1rem;
+  flex-shrink: 0;
+  transition: transform 0.12s;
+}
+
+.admin-card .ac-title {
+  font-size: 0.72rem; font-weight: 400;
+  color: var(--mac-text2); line-height: 1.3;
+  text-align: center; max-width: 84px;
+  display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+/* Hide descriptions — icon + label only */
+.admin-card .ac-desc { display: none; }
 
 /* Apps button in toolbar */
 .admin-nav-btn {
@@ -879,85 +908,64 @@ select, input { font-family: inherit; }
     <p class="admin-subtitle">Reports, search tools, and scheduler settings.</p>
     <div class="admin-card-grid">
       <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-prebuilt" onclick="showTab('prebuilt', null)">
-        <div class="ac-icon">📋</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#1a73e8,#0d47a1);">📋</div>
         <div class="ac-title">Pre-Built Reports</div>
-        <div class="ac-desc">Run saved reports for activations, ARS, BDR summaries, and more.</div>
       </button>
       <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-builder" onclick="showTab('builder', null)">
-        <div class="ac-icon">⚙</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#5e5ce6,#3634a3);">⚙️</div>
         <div class="ac-title">Report Builder</div>
-        <div class="ac-desc">Build custom reports by filtering any AC object and field.</div>
       </button>
       <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-smartquery" onclick="showTab('smartquery', null)">
-        <div class="ac-icon">💡</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#ff9f0a,#cc7700);">💡</div>
         <div class="ac-title">Smart Search</div>
-        <div class="ac-desc">Natural-language search across accounts, SLPs, and contacts.</div>
       </button>
       <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-globalsearch" onclick="showTab('globalsearch', null)">
-        <div class="ac-icon">🌐</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#30b0c7,#0e7a90);">🌐</div>
         <div class="ac-title">Global Search</div>
-        <div class="ac-desc">Find any value across all AC objects and fields.</div>
       </button>
       <button class="admin-card ac-group-admin" id="admin-card-move" onclick="showMoveRecords()">
-        <div class="ac-icon">🔀</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#bf5af2,#8944ab);">🔀</div>
         <div class="ac-title">Move Records</div>
-        <div class="ac-desc">Move a Deal, Contact, or SLP to a different account.</div>
       </button>
       <button class="admin-card" id="admin-card-moogle" onclick="window.open('/search','_blank')">
-        <div class="ac-icon">🔍</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#34c759,#248a3d);">🔍</div>
         <div class="ac-title">Account Search</div>
-        <div class="ac-desc">Fast account lookup by name, dealer ID, or email.</div>
       </button>
       <button class="admin-card" id="admin-card-welcome" onclick="window.open('/welcome','_blank')">
-        <div class="ac-icon">✉️</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#007aff,#0051a8);">✉️</div>
         <div class="ac-title">Welcome Email</div>
-        <div class="ac-desc">Tag and send welcome emails to newly activated accounts.</div>
       </button>
       <button class="admin-card" id="admin-card-weather" onclick="showMicrofMap()">
-        <div class="ac-icon">🌡</div>
-        <div class="ac-title">Dealer Locator / Temp Map</div>
-        <div class="ac-desc">Live temperature map — click any region to see demand signal.</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#ff6b35,#c73e00);">🌡️</div>
+        <div class="ac-title">Dealer Locator</div>
       </button>
       <button class="admin-card ac-group-admin" id="admin-card-scheduler" onclick="showTab('scheduler', null)">
-        <div class="ac-icon">🕐</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#636366,#3a3a3c);">🕐</div>
         <div class="ac-title">Scheduler</div>
-        <div class="ac-desc">Schedule automated email reports for your team.</div>
       </button>
       <button class="admin-card ac-group-admin ac-group-enrollment" id="admin-card-optimus-deact" onclick="showOptimusDeactivator()">
-        <div class="ac-icon" style="display:flex;align-items:center;gap:6px;">
-          <img src="https://egia.org/wp-content/uploads/2021/02/egiaLogo.png" style="height:22px;object-fit:contain;" onerror="this.style.display='none'">
-          🔴
-        </div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#ff3b30,#b01c14);">🚫</div>
         <div class="ac-title">OPTIMUS Deactivation</div>
-        <div class="ac-desc">Paste EGIA suspension email to bulk-deactivate OPTIMUS SLPs/Accounts.</div>
       </button>
       <button class="admin-card ac-group-admin ac-group-enrollment" id="admin-card-optimus-react" onclick="showOptimusReactivator()">
-        <div class="ac-icon" style="display:flex;align-items:center;gap:6px;">
-          <img src="https://egia.org/wp-content/uploads/2021/02/egiaLogo.png" style="height:22px;object-fit:contain;" onerror="this.style.display='none'">
-          🟢
-        </div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#30d158,#1a8a34);">✅</div>
         <div class="ac-title">OPTIMUS Reactivation</div>
-        <div class="ac-desc">Paste EGIA reactivation email to bulk-reactivate OPTIMUS SLPs/Accounts.</div>
       </button>
       <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-account-slp" onclick="window.open('/reports/account-slp','_blank')">
-        <div class="ac-icon">🏢</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#2c5f8a,#1a3d5c);">🏢</div>
         <div class="ac-title">Account / SLP Report</div>
-        <div class="ac-desc">SLP-driven view — only accounts with SLPs. Filter by type, region, program, and status.</div>
       </button>
       <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-parent-child" onclick="window.open('/reports/parent-child','_blank')">
-        <div class="ac-icon">🔗</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#ff9f0a,#a85e00);">🔗</div>
         <div class="ac-title">Parent-Child Report</div>
-        <div class="ac-desc">All accounts with SLP children below — all account types, toggle to include accounts with no SLPs.</div>
       </button>
       <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-slp-health" onclick="window.open('/reports/slp-health','_blank')">
-        <div class="ac-icon">🩺</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#ff2d55,#a8001e);">🩺</div>
         <div class="ac-title">SLP Health Report</div>
-        <div class="ac-desc">Audit SLP records for missing fields, bad data, and common issues.</div>
       </button>
       <button class="admin-card ac-group-admin ac-group-account_management" id="admin-card-am-activity" onclick="window.open('/reports/am-activity','_blank')">
-        <div class="ac-icon">📈</div>
-        <div class="ac-title">AM Activity Dashboard</div>
-        <div class="ac-desc">Per-account last app date and last RPA date — filter by AM to prioritize outreach.</div>
+        <div class="ac-icon" style="background:linear-gradient(145deg,#28a745,#155c26);">📈</div>
+        <div class="ac-title">AM Activity</div>
       </button>
     </div>
 
