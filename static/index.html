@@ -813,9 +813,9 @@ select, input { font-family: inherit; }
     <div class="nav-section-label">Reports</div>
     <button data-tab="builder" onclick="showTab('builder', this)"><i class="nav-icon">⚙</i> Report Builder</button>
     <button data-tab="prebuilt" onclick="showTab('prebuilt', this)"><i class="nav-icon">📋</i> Pre-Built Reports</button>
-    <div class="nav-divider"></div>
-    <div class="nav-section-label">Tools</div>
-    <button data-tab="smartquery" onclick="showTab('smartquery', this)"><i class="nav-icon">💡</i> Smart Search</button>
+    <div class="nav-divider" id="tools-nav-divider" style="display:none;"></div>
+    <div class="nav-section-label" id="tools-nav-label" style="display:none;">Tools</div>
+    <button id="smartquery-nav-btn" data-tab="smartquery" onclick="showTab('smartquery', this)" style="display:none;"><i class="nav-icon">💡</i> Smart Search</button>
     <div class="nav-divider" id="scheduler-nav-divider" style="display:none;"></div>
     <button id="scheduler-nav-btn" data-tab="scheduler" onclick="showTab('scheduler', this)" style="display:none;"><i class="nav-icon">🕐</i> Scheduler</button>
   </nav>
@@ -3204,8 +3204,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (d.is_admin) {
       _isAdmin = true;
       shell.classList.add('admin-user');
-      document.getElementById('scheduler-nav-btn').style.display = '';
+      document.getElementById('tools-nav-divider').style.display = '';
+      document.getElementById('tools-nav-label').style.display = '';
+      document.getElementById('smartquery-nav-btn').style.display = '';
       document.getElementById('scheduler-nav-divider').style.display = '';
+      document.getElementById('scheduler-nav-btn').style.display = '';
     }
     if (window.location.hash === '#admin' && d.is_apps_user) _navToHash('#admin');
   }).catch(()=>{});
