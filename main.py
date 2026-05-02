@@ -5382,14 +5382,14 @@ async def _job_partner_activation(start_date: Optional[date] = None, end_date: O
     cols = [("Account","Account"), ("Dealer ID","Dealer ID"), ("Channel","Channel"),
             ("BDR","BDR"), ("Partner Activation","Partner Activation")]
     html = _HTML_WRAPPER.format(
-        title=f"Partner Activations — {date_label}",
-        subtitle=f"{len(records)} partner activation{'s' if len(records) != 1 else ''}",
+        title=f"Activations — {date_label}",
+        subtitle=f"{len(records)} activation{'s' if len(records) != 1 else ''}",
         table=_html_table(records, cols),
         timestamp=datetime.now().strftime("%b %d %Y %H:%M"),
     )
     csv_label = str(_start) if _start == _end else f"{_start}_{_end}"
     await _send_email(
-        subject=f"Partner Activations — {date_label} ({len(records)} records)",
+        subject=f"Activations — {date_label} ({len(records)} records)",
         html=html,
         csv_data=_csv_bytes(records),
         csv_name=f"partner_activation_{csv_label}.csv",
