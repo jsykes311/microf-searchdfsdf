@@ -2926,7 +2926,12 @@ async def accounts_search(q: str = Query(""), limit: int = Query(20)):
 _slp_state_index: dict = {}       # state (str) → {account_id: {name, dealer_id}}
 _slp_state_index_ts: float = 0.0
 _SLP_STATE_TTL = 86400            # rebuild at most once per 24 hours
-_MICROF_PROGRAMS = {"microf", "lto", "microf (lto only)"}
+def _is_microf_channel(ch: str) -> bool:
+    """True for any channel that is a Microf/LTO program.
+    Matches 'Microf', 'Microf Direct', 'Microf (LTO Only)', 'LTO', etc.
+    Uses 'contains microf' so new variants are caught automatically."""
+    c = (ch or "").strip().lower()
+    return "microf" in c or c == "lto"
 
 # ── Shared qualifying-accounts cache ─────────────────────────────────────────
 # Both the state index and the location index need "accounts with a Contractor
@@ -2949,7 +2954,7 @@ async def _get_qualifying_microf_accounts() -> set:
         fields = {f.get("field") or f.get("id"): f.get("value") for f in r.get("fields", [])}
         if str(fields.get("slp-status-detail", "")).strip() != "Contractor Activated":
             continue
-        if str(fields.get("channel", "")).strip().lower() not in _MICROF_PROGRAMS:
+        if not _is_microf_channel(str(fields.get("channel", ""))):
             continue
         rel    = r.get("relationships", {}).get("account", [])
         a0     = rel[0] if rel else None
