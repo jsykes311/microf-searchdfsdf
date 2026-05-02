@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse,
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.requests import Request as _Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from typing import Optional
+from typing import Optional, List
 import httpx
 import os
 import csv
@@ -8203,8 +8203,9 @@ async def welcome_preview(
 
 
 class _WelcomeSendRequest(_BaseModel):
-    account_id: str
-    channel:    str
+    account_id:  str
+    channel:     str
+    contact_ids: Optional[List[str]] = None  # if set, only tag these contact IDs
 
 
 @app.post("/api/welcome/send")
@@ -8212,7 +8213,9 @@ async def welcome_send(
     payload: _WelcomeSendRequest,
     user=Depends(_require_admin),
 ):
-    """Tag every eligible contact on the account so the AC welcome automation fires."""
+    """Tag eligible contacts on the account so the AC welcome automation fires.
+    If contact_ids is provided, only tag those specific contacts (must still be eligible).
+    """
     if payload.channel not in WELCOME_CHANNELS:
         raise HTTPException(400, f"Unknown channel: {payload.channel}")
 
@@ -8226,15 +8229,22 @@ async def welcome_send(
             "Create it first (Contacts → Manage Tags) and build the matching automation.",
         )
 
+    # Filter to selected contacts if caller passed a list
+    to_tag = preview["eligible"]
+    if payload.contact_ids is not None:
+        allowed = set(str(cid) for cid in payload.contact_ids)
+        to_tag = [c for c in to_tag if str(c["contact_id"]) in allowed]
+
     results = []
-    for c in preview["eligible"]:
+    for c in to_tag:
         try:
             await ac_post("contactTags", {"contactTag": {"contact": c["contact_id"], "tag": tag_id}})
-            results.append({"contact_id": c["contact_id"], "email": c["email"], "status": "tagged"})
+            results.append({"contact_id": c["contact_id"], "email": c["email"], "name": c.get("name",""), "status": "tagged"})
         except Exception as e:
             results.append({
                 "contact_id": c["contact_id"],
                 "email":      c["email"],
+                "name":       c.get("name", ""),
                 "status":     "error",
                 "detail":     str(e)[:200],
             })

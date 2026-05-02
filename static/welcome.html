@@ -386,6 +386,7 @@ code {
       <button class="btn btn-secondary" id="btn-preview">Preview eligible contacts</button>
       <button class="btn btn-success" id="btn-send" disabled>Send Welcome Email</button>
     </div>
+    <div class="muted" id="send-hint" style="margin-top:8px;font-size:0.78rem;">Pick an account and channel, then send directly or preview first to select specific contacts.</div>
 
     <div id="status"></div>
   </div>
@@ -398,9 +399,15 @@ code {
     </div>
 
     <div id="eligible-block">
-      <div class="section-title">Eligible (will / did receive)</div>
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Eligible (will / did receive)</span>
+        <span id="check-hint" class="muted" style="font-size:0.75rem;text-transform:none;letter-spacing:0;font-weight:400;"></span>
+      </div>
       <table>
-        <thead><tr><th>Email</th><th>Name</th><th>Status</th></tr></thead>
+        <thead><tr>
+          <th style="width:32px;"><input type="checkbox" id="chk-all" title="Select all"></th>
+          <th>Email</th><th>Name</th><th>Status</th>
+        </tr></thead>
         <tbody id="eligible-tbody"></tbody>
       </table>
     </div>
@@ -420,7 +427,8 @@ const $        = id => document.getElementById(id);
 const statusEl = $("status");
 
 // Selected account state — set when the user picks from the typeahead.
-let pickedAccount = null;   // { id, name, dealer_id }
+let pickedAccount    = null;   // { id, name, dealer_id }
+let previewedContacts = null;  // array of eligible contacts from last preview, or null
 
 function showStatus(kind, msg) {
   statusEl.className   = "show " + kind;
@@ -436,11 +444,13 @@ let searchAbort = null;
 let searchTimer = null;
 
 function clearPicked() {
-  pickedAccount = null;
+  pickedAccount     = null;
+  previewedContacts = null;
   $("picked_wrap").style.display = "none";
   $("picked_pill").innerHTML = "";
   $("slp_panel").innerHTML   = "";
   $("btn-send").disabled = true;
+  $("result-card").style.display = "none";
 }
 
 function setPicked(acct) {
@@ -453,7 +463,8 @@ function setPicked(acct) {
   $("picked_wrap").style.display = "block";
   $("account_search").value  = "";
   $("account_results").classList.remove("show");
-  $("btn-send").disabled = true;   // require a fresh preview before send
+  previewedContacts = null;
+  updateSendBtn();
 
   loadAccountSlps(acct.id);
 }
@@ -539,10 +550,10 @@ function renderSlpPanel(data) {
     btn.addEventListener("click", () => {
       const ch = btn.dataset.channel;
       $("channel").value = ch;
-      // Visual highlight on the picked row
       panel.querySelectorAll(".slp-use-btn").forEach(b => b.classList.remove("selected"));
       btn.classList.add("selected");
-      $("btn-send").disabled = true;   // still require Preview before Send
+      previewedContacts = null;
+      updateSendBtn();
       clearStatus();
     });
   });
@@ -636,6 +647,27 @@ async function loadChannels() {
   }
 }
 
+function updateSendBtn() {
+  const ready = pickedAccount && $("channel").value;
+  $("btn-send").disabled = !ready;
+  $("send-hint").style.display = ready ? "none" : "block";
+}
+
+function getCheckedContactIds() {
+  // Returns array of checked contact_id strings, or null if no checkboxes rendered
+  const boxes = $("eligible-tbody").querySelectorAll("input[type=checkbox]");
+  if (!boxes.length) return null;
+  return Array.from(boxes).filter(b => b.checked).map(b => b.dataset.cid);
+}
+
+function updateCheckHint() {
+  const boxes   = $("eligible-tbody").querySelectorAll("input[type=checkbox]");
+  const checked = Array.from(boxes).filter(b => b.checked).length;
+  const hint    = $("check-hint");
+  if (!boxes.length) { hint.textContent = ""; return; }
+  hint.textContent = `${checked} of ${boxes.length} selected`;
+}
+
 function renderResult(data, mode) {
   $("result-card").style.display = "block";
 
@@ -643,8 +675,8 @@ function renderResult(data, mode) {
     `<b>${data.account_name || "(unnamed)"}</b> · Account ID <code>${data.account_id}</code> · ` +
     `Channel <code>${data.channel}</code> · Tag <code>${data.tag_applied || data.tag_to_apply}</code>`;
 
-  const tagged = mode === "send" ? (data.tagged ?? 0) : (data.eligible || []).length;
-  const errors = mode === "send" ? (data.errors ?? 0) : 0;
+  const tagged  = mode === "send" ? (data.tagged ?? 0) : (data.eligible || []).length;
+  const errors  = mode === "send" ? (data.errors ?? 0) : 0;
   const skipped = mode === "send" ? data.skipped : (data.skipped || []).length;
 
   $("result-summary").innerHTML = `
@@ -655,18 +687,58 @@ function renderResult(data, mode) {
   `;
 
   const eligibleRows = mode === "send"
-    ? (data.results || []).filter(r => r.status !== "error")
+    ? (data.results || [])
     : (data.eligible || []);
-  $("eligible-tbody").innerHTML = eligibleRows.length === 0
-    ? `<tr><td colspan="3" class="muted">No eligible contacts.</td></tr>`
-    : eligibleRows.map(c => `
-        <tr>
+
+  const chkAllEl = $("chk-all");
+
+  if (eligibleRows.length === 0) {
+    $("eligible-tbody").innerHTML = `<tr><td colspan="4" class="muted">No eligible contacts.</td></tr>`;
+    if (chkAllEl) chkAllEl.style.display = "none";
+  } else {
+    if (chkAllEl) chkAllEl.style.display = "";
+    $("eligible-tbody").innerHTML = eligibleRows.map(c => {
+      if (mode === "preview") {
+        return `<tr>
+          <td><input type="checkbox" checked data-cid="${c.contact_id}"></td>
           <td>${c.email || "—"}</td>
           <td>${c.name || ""}</td>
-          <td><span class="tag-pill ${mode === "send" ? (c.status === "error" ? "error" : "tagged") : ""}">${
-            mode === "send" ? (c.status || "tagged") : "eligible"
-          }</span></td>
-        </tr>`).join("");
+          <td><span class="tag-pill">eligible</span></td>
+        </tr>`;
+      } else {
+        const pillClass = c.status === "error" ? "error" : "tagged";
+        return `<tr>
+          <td></td>
+          <td>${c.email || "—"}</td>
+          <td>${c.name || ""}</td>
+          <td><span class="tag-pill ${pillClass}">${c.status || "tagged"}</span></td>
+        </tr>`;
+      }
+    }).join("");
+
+    // Wire up checkboxes
+    if (mode === "preview") {
+      const boxes = $("eligible-tbody").querySelectorAll("input[type=checkbox]");
+      boxes.forEach(b => b.addEventListener("change", () => {
+        const allChecked = Array.from(boxes).every(x => x.checked);
+        const anyChecked = Array.from(boxes).some(x => x.checked);
+        if (chkAllEl) {
+          chkAllEl.checked       = allChecked;
+          chkAllEl.indeterminate = !allChecked && anyChecked;
+        }
+        updateCheckHint();
+      }));
+      if (chkAllEl) {
+        chkAllEl.checked = true;
+        chkAllEl.indeterminate = false;
+        chkAllEl.onclick = () => {
+          boxes.forEach(b => b.checked = chkAllEl.checked);
+          updateCheckHint();
+        };
+      }
+      updateCheckHint();
+    }
+  }
 
   const skippedRows = mode === "send" ? (data.skipped_detail || []) : (data.skipped || []);
   $("skipped-tbody").innerHTML = skippedRows.length === 0
@@ -681,13 +753,13 @@ function renderResult(data, mode) {
 
 async function previewClick() {
   clearStatus();
-  $("btn-send").disabled = true;
   if (!pickedAccount) { showStatus("error", "Search and pick an account first."); return; }
   const account_id = pickedAccount.id;
   const channel    = $("channel").value;
   if (!channel)    { showStatus("error", "Pick a Channel."); return; }
 
   showStatus("info", "Loading…");
+  $("btn-preview").disabled = true;
   try {
     const r = await fetch(
       `/api/welcome/preview/${encodeURIComponent(account_id)}?channel=${encodeURIComponent(channel)}`,
@@ -698,47 +770,66 @@ async function previewClick() {
       throw new Error(err.detail || `HTTP ${r.status}`);
     }
     const data = await r.json();
+    previewedContacts = data.eligible || [];
     renderResult(data, "preview");
-    const elig = (data.eligible || []).length;
+    const elig = previewedContacts.length;
     if (elig === 0) {
       showStatus("info", `No eligible contacts on this account for ${channel}.`);
     } else {
-      showStatus("success", `${elig} contact(s) eligible. Click Send to fire the AC automation.`);
-      $("btn-send").disabled = false;
+      showStatus("success", `${elig} contact(s) eligible — uncheck any you want to skip, then click Send.`);
     }
   } catch (e) {
     showStatus("error", "Preview failed: " + e.message);
+  } finally {
+    $("btn-preview").disabled = false;
   }
 }
 
 async function sendClick() {
   clearStatus();
-  if (!pickedAccount) return;
+  if (!pickedAccount) { showStatus("error", "Pick an account first."); return; }
   const account_id = pickedAccount.id;
   const channel    = $("channel").value;
-  if (!channel) return;
+  if (!channel)    { showStatus("error", "Pick a Channel first."); return; }
+
+  // If a preview was done, use the checked contact IDs; otherwise send to all eligible
+  const checkedIds = getCheckedContactIds();  // null if no checkboxes shown
+  const sendingAll = checkedIds === null;
+  const count      = checkedIds ? checkedIds.length : "all eligible";
+
+  if (checkedIds !== null && checkedIds.length === 0) {
+    showStatus("error", "No contacts selected — check at least one to send.");
+    return;
+  }
 
   const label = pickedAccount.dealer_id
     ? `${pickedAccount.dealer_id} — ${pickedAccount.name}`
     : pickedAccount.name;
-  if (!confirm(`Send welcome email for "${channel}" to all eligible contacts on ${label}?`)) return;
+  const confirmMsg = sendingAll
+    ? `Send welcome email for "${channel}" to ALL eligible contacts on ${label}?`
+    : `Send welcome email for "${channel}" to ${checkedIds.length} selected contact(s) on ${label}?`;
+  if (!confirm(confirmMsg)) return;
 
-  $("btn-send").disabled = true;
+  $("btn-send").disabled    = true;
   $("btn-preview").disabled = true;
   showStatus("info", "Sending…");
 
   try {
+    const body = { account_id, channel };
+    if (checkedIds !== null) body.contact_ids = checkedIds;
+
     const r = await fetch("/api/welcome/send", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ account_id, channel }),
+      body: JSON.stringify(body),
     });
     if (!r.ok) {
       const err = await r.json().catch(() => ({}));
       throw new Error(err.detail || `HTTP ${r.status}`);
     }
     const data = await r.json();
+    previewedContacts = null;
     renderResult(data, "send");
     if (data.errors > 0) {
       showStatus("error", `Tagged ${data.tagged}, but ${data.errors} error(s). Check the table.`);
@@ -749,6 +840,7 @@ async function sendClick() {
     showStatus("error", "Send failed: " + e.message);
   } finally {
     $("btn-preview").disabled = false;
+    updateSendBtn();
   }
 }
 
@@ -757,8 +849,12 @@ document.addEventListener("DOMContentLoaded", () => {
   $("btn-preview").addEventListener("click", previewClick);
   $("btn-send").addEventListener("click", sendClick);
   $("account_search").addEventListener("input", onSearchInput);
-  // Reset send button when the user changes the channel (must re-preview)
-  $("channel").addEventListener("change", () => { $("btn-send").disabled = true; });
+  $("channel").addEventListener("change", () => {
+    previewedContacts = null;
+    $("result-card").style.display = "none";
+    updateSendBtn();
+    clearStatus();
+  });
 });
 </script>
 </body>
