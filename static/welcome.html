@@ -358,7 +358,7 @@ code {
   <div class="card">
     <h1>Send Welcome Email</h1>
     <div class="subtitle">
-      Admin-only · tags every eligible contact on the account so the AC automation for that Channel fires.
+      Tags every eligible contact on the account so the AC automation for that Channel fires.
     </div>
 
     <div class="form-row">
@@ -520,10 +520,15 @@ function renderSlpPanel(data) {
     const action = s.supported
       ? `<button class="slp-use-btn" data-channel="${s.channel}">Use this</button>`
       : `<span class="slp-noaction">no automation</span>`;
+    // Show the mapped channel as primary label; show raw platform as a gray hint if different
+    const channelLabel = s.channel || s.platform;
+    const platformHint = (s.channel && s.channel !== s.platform)
+      ? ` <span style="font-size:0.75rem;color:#9ca3af;font-weight:400;">(${s.platform})</span>`
+      : "";
     return `
       <div class="${cls}">
         <span>${star}</span>
-        <span class="slp-platform">${s.platform}</span>
+        <span class="slp-platform">${channelLabel}${platformHint}</span>
         <span><span class="slp-status ${statusClass(s.status)}">${s.status || '—'}</span></span>
         <span class="slp-date">${fmtDate(s.activated)}</span>
         <span class="slp-action">${action}</span>
@@ -539,7 +544,7 @@ function renderSlpPanel(data) {
     <div class="slp-panel">
       <div class="slp-header">
         <span>SLPs on this account</span>
-        <span class="hint">★ recommended pick · click "Use this" to set the Channel</span>
+        <span class="hint">★ recommended channel · click "Use this" to set the Channel</span>
       </div>
       ${rowsHtml}
     </div>

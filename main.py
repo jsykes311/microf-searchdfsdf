@@ -520,7 +520,7 @@ async def _build_dealer_id_index() -> None:
     Runs on server startup; re-triggered via /api/dealer-index/refresh."""
     global _dealer_index_ts, _dealer_index_error
     DEALER_CF_ID   = 18    # customFieldId for "Parent Dealer ID"
-    PLATFORM_CF_ID = 29    # customFieldId for "Dealer Program"
+    # PLATFORM_CF_ID 29 (Dealer Program) deleted from PROD — channel lives on SLP records now
     BDR_CF_ID      = 119   # customFieldId for "Assigned BDR"
     STATES_CF_ID   = 22    # customFieldId for "Doing Business in States"
     ZIP_CF_ID      = 6     # customFieldId for "Postal Code"
@@ -577,8 +577,6 @@ async def _build_dealer_id_index() -> None:
                     continue
                 if cf_id == DEALER_CF_ID:
                     acct_to_dealer[aid]     = val
-                elif cf_id == PLATFORM_CF_ID:
-                    acct_to_platform[aid]   = val
                 elif cf_id == BDR_CF_ID:
                     acct_to_bdr[aid]        = val
                 elif cf_id == STATES_CF_ID:
@@ -675,7 +673,19 @@ async def _build_dealer_id_index() -> None:
                         if not acct_to_last_rpa.get(_aid) or rpa_v > acct_to_last_rpa[_aid]:
                             acct_to_last_rpa[_aid] = rpa_v
                             slp_rpa_n += 1
-            print(f"[dealer-index] SLP supplement: {slp_app_n} last-app, {slp_rpa_n} last-rpa from {len(slp_recs_for_dates)} SLPs")
+            # Also build channel index from SLP channel field
+            slp_ch_n = 0
+            for slp_rec in slp_recs_for_dates:
+                for acct_id in slp_rec.get("relationships", {}).get("account", []):
+                    _aid = str(acct_id)
+                    for _f in slp_rec.get("fields", []):
+                        if _f.get("id") == "channel":
+                            _ch = (_f.get("value") or "").strip()
+                            if _ch and not acct_to_platform.get(_aid):
+                                acct_to_platform[_aid] = _ch
+                                slp_ch_n += 1
+                            break
+            print(f"[dealer-index] SLP supplement: {slp_app_n} last-app, {slp_rpa_n} last-rpa, {slp_ch_n} channel from {len(slp_recs_for_dates)} SLPs")
         except Exception as _slp_date_exc:
             print(f"[dealer-index] SLP last-app/rpa supplement failed (non-fatal): {_slp_date_exc}")
 
@@ -740,8 +750,7 @@ ACCT_FIELD = {
     "doing_business_in":     "22",
     "sales_region":          "23",
     "partner_activation":    "26",
-    "dealer_program":        "29",
-    "platforms":             "34",
+    # "dealer_program" (CF29) and "platforms" (CF34) deleted from PROD
     "original_owner":        "35",
     "assigned_bdr":          "119",
     "oracle_producer_id":    "118",
@@ -3672,14 +3681,14 @@ async def global_search(q: str = Query(..., min_length=1),
         # Build set of account IDs that have a matching SLP platform
         prog_account_ids: set = set()
         for slp in matched_slps:
-            if (slp.get("platform") or "").lower() == prog_lower:
+            if (slp.get("channel") or "").lower() == prog_lower:
                 prog_account_ids.add(str(slp["account_id"]))
         # Also check in-memory index for accounts not yet in matched_slps
         for aid, plat in _account_to_platform.items():
             if plat.lower() == prog_lower:
                 prog_account_ids.add(str(aid))
         matched_accounts = [a for a in matched_accounts if str(a["id"]) in prog_account_ids]
-        matched_slps     = [s for s in matched_slps     if (s.get("platform") or "").lower() == prog_lower]
+        matched_slps     = [s for s in matched_slps     if (s.get("channel") or "").lower() == prog_lower]
         matched_contacts = [c for c in matched_contacts if str(c.get("account_id","")) in prog_account_ids]
 
     total = len(matched_accounts) + len(matched_contacts) + len(matched_slps)
@@ -4713,10 +4722,10 @@ async def _job_activations(start_date: Optional[date] = None, end_date: Optional
             if isinstance(cf_r, dict):
                 for item in cf_r.get("accountCustomFieldData", []):
                     cfs[str(item.get("customFieldId", ""))] = (item.get("fieldValue") or "").strip()
-            return aid, {"name": name, "platform": cfs.get("29", ""), "bdr": cfs.get("119", ""),
+            return aid, {"name": name, "channel": "", "bdr": cfs.get("119", ""),
                          "dealer_id": _account_to_dealer.get(aid, "")}
         except Exception:
-            return aid, {"name": "", "platform": "", "bdr": "", "dealer_id": _account_to_dealer.get(aid, "")}
+            return aid, {"name": "", "channel": "", "bdr": "", "dealer_id": _account_to_dealer.get(aid, "")}
 
     acct_cache: dict = dict(await asyncio.gather(*[_fetch_acct_act(aid) for aid in account_ids]))
 
@@ -4895,9 +4904,9 @@ async def _job_bdr_summary(start_date: Optional[date] = None, end_date: Optional
                 cf_r = await ac_get(f"accounts/{aid}/accountCustomFieldData")
                 cfs  = {str(i.get("customFieldId", "")): (i.get("fieldValue") or "").strip()
                         for i in cf_r.get("accountCustomFieldData", [])}
-                return aid, {"bdr": cfs.get("119", ""), "platform": cfs.get("29", "")}
+                return aid, {"bdr": cfs.get("119", "")}
             except Exception:
-                return aid, {"bdr": "", "platform": ""}
+                return aid, {"bdr": ""}
         acct_cf_cache = dict(await asyncio.gather(*[_fetch_cf_bdr(aid) for aid in acct_ids_needed]))
 
     # Pass 2 – process with fallbacks
@@ -6003,13 +6012,12 @@ async def trigger_report(
 # Copies missing field values from the linked account's custom fields into
 # the SLP custom object record.  Fields synced:
 #   dealer-id    ← _account_to_dealer index (account customfield 18)
-#   platform     ← account customfield 29  (Dealer Program)
 #   assigned-bdr ← account customfield 119 (Assigned BDR)
+# NOTE: platform (CF29 Dealer Program) deleted from PROD — channel lives on SLP directly
 
 _SLP_SYNC_FIELDS = [
     # (slp_field_id, account_cf_id_str)  — None means use the dealer-id index
     ("dealer-id",    None),
-    ("platform",     "29"),
     ("assigned-bdr", "119"),
 ]
 
@@ -6070,8 +6078,6 @@ async def _run_slp_sync(dry_run: bool) -> None:
                         continue
                     if cf_id is None:          # dealer-id → dealer index
                         val = _account_to_dealer.get(acc_id, "") if acc_id else ""
-                    elif cf_id == "29":        # platform → platform index
-                        val = _account_to_platform.get(acc_id, "") if acc_id else ""
                     elif cf_id == "119":       # BDR → BDR index
                         val = _account_to_bdr.get(acc_id, "") if acc_id else ""
                     else:
@@ -6408,7 +6414,7 @@ async def optimus_deactivate_preview(body: dict = Body(...), admin=Depends(_requ
                 "dealer_id":      did,
                 "account_name":   acct_name,
                 "current_status": fmap.get("slp-status-detail", ""),
-                "platform":       fmap.get("platform", "Optimus"),
+                "channel":        fmap.get("channel", "OPTIMUS"),
             })
         else:
             # Fetch OPTIMUS SLPs for this account (CF18-indexed path)
@@ -6417,7 +6423,7 @@ async def optimus_deactivate_preview(body: dict = Body(...), admin=Depends(_requ
             found_any = False
             for r in slp_data.get("records", []):
                 fmap = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
-                if "optimus" not in (fmap.get("platform") or "").lower():
+                if "optimus" not in (fmap.get("channel") or "").lower():
                     continue
                 found_any = True
                 rows.append({
@@ -6426,7 +6432,7 @@ async def optimus_deactivate_preview(body: dict = Body(...), admin=Depends(_requ
                     "dealer_id":      did,
                     "account_name":   acct_name,
                     "current_status": fmap.get("slp-status-detail", ""),
-                    "platform":       fmap.get("platform", ""),
+                    "channel":        fmap.get("channel", ""),
                 })
             if not found_any:
                 not_found.append(did)
@@ -6589,7 +6595,7 @@ async def optimus_reactivate_preview(body: dict = Body(...), admin=Depends(_requ
         found_any = False
         for r in slp_data.get("records", []):
             fmap = {f["id"]: f.get("value", "") for f in r.get("fields", [])}
-            if (fmap.get("platform") or "").strip().upper() != "OPTIMUS":
+            if "optimus" not in (fmap.get("channel") or "").lower():
                 continue
             found_any = True
             rows.append({
@@ -6598,7 +6604,7 @@ async def optimus_reactivate_preview(body: dict = Body(...), admin=Depends(_requ
                 "dealer_id":      did,
                 "account_name":   acct_name,
                 "current_status": fmap.get("slp-status-detail", ""),
-                "platform":       fmap.get("platform", ""),
+                "channel":        fmap.get("channel", ""),
                 "fields":         fmap,
             })
         if not found_any:
@@ -7503,7 +7509,7 @@ async def slp_health_report(
     SLUG_MAP = {
         "no_dealer_id": "dealer-id",
         "no_status": "slp-status-detail",
-        "no_platform": "platform",
+        "no_platform": "channel",
         "no_date": "contractor-activated-date",
         "id_mismatch": "dealer-id",
     }
@@ -7529,7 +7535,7 @@ async def slp_health_report(
 
     # Optional program filter
     if program:
-        candidates = [s for s in candidates if get_field(s, "platform") == program]
+        candidates = [s for s in candidates if get_field(s, "channel") == program]
 
     # Build results — all account data from in-memory index (no AC calls)
     records = []
@@ -7552,7 +7558,7 @@ async def slp_health_report(
             "slp_id": slp["id"],
             "account_id": account_id,
             "account_name": acct_name,
-            "program": get_field(slp, "platform"),
+            "channel": get_field(slp, "channel"),
             "region": acct_region,
             "dealer_id": slp_dealer_id,
             "cf18": cf18,
@@ -7590,7 +7596,7 @@ async def contractor_states_report(
     all_slps = list(await get_slp_cache())
 
     if program:
-        all_slps = [s for s in all_slps if get_field(s, "platform") == program]
+        all_slps = [s for s in all_slps if get_field(s, "channel") == program]
 
     # Build records — all account data from in-memory index
     records = []
@@ -7615,7 +7621,7 @@ async def contractor_states_report(
             "account_name":             _account_to_name.get(aid_str, ""),
             "account_state":            acct_state_val,
             "dealer_id":                get_field(slp, "dealer-id"),
-            "program":                  get_field(slp, "platform"),
+            "channel":                  get_field(slp, "channel"),
             "doing_business_in_states": dbi,
         })
 
@@ -7665,7 +7671,7 @@ async def account_slp_report(user=Depends(require_auth)):
         for slp in slps:
             slp_list.append({
                 "slp_id":            slp["id"],
-                "program":           get_field(slp, "platform"),
+                "channel":           get_field(slp, "channel"),
                 "status":            get_field(slp, "slp-status-detail"),
                 "activation_date":   get_field(slp, "contractor-activated-date"),
                 "oracle_ids":        get_field(slp, "oracle-producer-ids"),
@@ -7673,7 +7679,7 @@ async def account_slp_report(user=Depends(require_auth)):
                 "doing_business_in": get_field(slp, "doing-business-in-states"),
                 "dealer_id":         get_field(slp, "dealer-id"),
             })
-        slp_list.sort(key=lambda x: x["program"])
+        slp_list.sort(key=lambda x: x["channel"])
         accounts_out.append({
             "account_id": aid_str,
             "name":       _account_to_name.get(aid_str, ""),
@@ -7795,13 +7801,13 @@ async def parent_child_report(
     def _build_slp_list(raw_slps):
         slp_list = []
         for slp in raw_slps:
-            p = get_field(slp, "platform")
+            p = get_field(slp, "channel")
             s = get_field(slp, "slp-status-detail")
             if program    and norm(p) != norm(program):    continue
             if slp_status and norm(s) != norm(slp_status): continue
             slp_list.append({
                 "slp_id":            slp["id"],
-                "program":           p,
+                "channel":           p,
                 "status":            s,
                 "activation_date":   get_field(slp, "contractor-activated-date"),
                 "oracle_ids":        get_field(slp, "oracle-producer-ids"),
@@ -7809,7 +7815,7 @@ async def parent_child_report(
                 "doing_business_in": get_field(slp, "doing-business-in-states"),
                 "dealer_id":         get_field(slp, "dealer-id"),
             })
-        slp_list.sort(key=lambda x: x["program"])
+        slp_list.sort(key=lambda x: x["channel"])
         return slp_list
 
     ALL_ACCOUNT_IDS = set(_account_to_name.keys()) | set(slps_by_account.keys())
@@ -8004,14 +8010,16 @@ WELCOME_CHANNELS = [
     "OPTIMUS",
 ]
 
-# Map SLP `platform` values → the Channel we'd send a welcome for.
-# Fuzzier than exact match so e.g. "Microf (LTO Only)" still maps to "Microf".
-PLATFORM_TO_CHANNEL = {
-    "Microf":             "Microf",
-    "Microf (LTO Only)":  "Microf",
-    "LTO":                "Microf",
+# Map SLP `channel` field values → the welcome Channel (AC automation).
+# SLP channel dropdown has finer values (e.g. "Optimus - RTO") that map to broader welcome channels.
+CHANNEL_TO_WELCOME_CHANNEL = {
+    "Microf Direct":      "Microf",
     "OPTIMUS":            "OPTIMUS",
     "Optimus 2.0":        "OPTIMUS",
+    "Optimus - RTO Only": "OPTIMUS",
+    "Optimus - FTL":      "OPTIMUS",
+    "Optimus - RTO":      "OPTIMUS",
+    "Optimus - Greensky": "OPTIMUS",
 }
 
 
@@ -8150,18 +8158,18 @@ async def welcome_account_slps(account_id: str, _admin=Depends(_require_admin)):
     rows = []
     for r in resp.get("records", []):
         f = {x.get("id") or x.get("field"): x.get("value", "") for x in r.get("fields", [])}
-        platform = (f.get("platform") or "").strip()
-        if not platform:
+        channel_val = (f.get("channel") or "").strip()
+        if not channel_val:
             continue
-        suggested = PLATFORM_TO_CHANNEL.get(platform)
+        suggested = CHANNEL_TO_WELCOME_CHANNEL.get(channel_val)
         rows.append({
             "record_id":    r.get("id"),
-            "platform":     platform,
+            "platform":     channel_val,   # raw SLP channel value (shown in panel)
             "status":       (f.get("slp-status-detail") or "").strip(),
             "activated":    (f.get("contractor-activated-date") or "").strip(),
             "dealer_id":    (f.get("dealer-id") or "").strip(),
             "supported":    bool(suggested),
-            "channel":      suggested,   # which Channel to pick if "Use this" clicked
+            "channel":      suggested,     # welcome channel for "Use this" button
         })
 
     # Sort by activated desc (ISO strings sort correctly), then by platform
