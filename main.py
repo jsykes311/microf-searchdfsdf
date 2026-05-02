@@ -8211,9 +8211,10 @@ async def welcome_preview(
 
 
 class _WelcomeSendRequest(_BaseModel):
-    account_id:  str
-    channel:     str
-    contact_ids: Optional[List[str]] = None  # if set, only tag these contact IDs
+    account_id:   str
+    channel:      str
+    contact_ids:  Optional[List[str]] = None  # if set, only tag these contact IDs
+    force_resend: bool = False                # strip welcomed+welcome tags first, then re-tag everyone
 
 
 @app.post("/api/welcome/send")
@@ -8222,13 +8223,15 @@ async def welcome_send(
     user=Depends(_require_admin),
 ):
     """Tag eligible contacts on the account so the AC welcome automation fires.
-    If contact_ids is provided, only tag those specific contacts (must still be eligible).
+    If contact_ids is provided, only tag those specific contacts.
+    If force_resend is True, strip welcomed+welcome tags first then re-tag all contacts.
     """
     if payload.channel not in WELCOME_CHANNELS:
         raise HTTPException(400, f"Unknown channel: {payload.channel}")
 
-    preview = await _eligible_welcome_contacts(payload.account_id, payload.channel)
-    welcome_tag = _welcome_tag_name(payload.channel)
+    welcome_tag  = _welcome_tag_name(payload.channel)
+    welcomed_tag = _welcomed_tag_name(payload.channel)
+
     tag_id = await _get_tag_id(welcome_tag)
     if not tag_id:
         raise HTTPException(
@@ -8236,6 +8239,90 @@ async def welcome_send(
             f"Tag '{welcome_tag}' does not exist in ActiveCampaign. "
             "Create it first (Contacts → Manage Tags) and build the matching automation.",
         )
+
+    # ── Force-resend path: strip both tags then re-tag everyone ────────────
+    if payload.force_resend:
+        welcomed_tag_id = await _get_tag_id(welcomed_tag)  # may be None if never set up
+
+        acc_data, contacts_resp = await asyncio.gather(
+            ac_get(f"accounts/{payload.account_id}"),
+            ac_get(f"accounts/{payload.account_id}/contacts"),
+            return_exceptions=True,
+        )
+        if not isinstance(acc_data, dict) or not acc_data.get("account"):
+            raise HTTPException(404, f"Account {payload.account_id} not found")
+        account_name = acc_data["account"].get("name", "")
+
+        all_cids = []
+        if isinstance(contacts_resp, dict):
+            all_cids = [ac.get("contact") for ac in contacts_resp.get("accountContacts", []) if ac.get("contact")]
+
+        if payload.contact_ids is not None:
+            allowed = set(str(cid) for cid in payload.contact_ids)
+            all_cids = [cid for cid in all_cids if str(cid) in allowed]
+
+        details = await asyncio.gather(
+            *[ac_get(f"contacts/{cid}", {"include": "contactTags.tag"}) for cid in all_cids],
+            return_exceptions=True,
+        )
+
+        stripped = tagged = errors = 0
+        results = []
+        for d in details:
+            if not isinstance(d, dict):
+                continue
+            c     = d.get("contact", {})
+            cid   = c.get("id")
+            email = (c.get("email") or "").strip()
+            name  = f"{c.get('firstName','')} {c.get('lastName','')}".strip()
+
+            if not email or str(c.get("status") or "") == "2":
+                results.append({"contact_id": cid, "email": email, "name": name, "status": "skipped", "skip_reason": "no email" if not email else "unsubscribed"})
+                continue
+
+            # Build tag-name lookup from the included tags array
+            tag_id_to_name = {str(t["id"]): (t.get("tag") or "").lower() for t in d.get("tags", []) if t.get("id")}
+
+            # Remove welcomed-{channel} and welcome-{channel} contactTag records
+            for ct in d.get("contactTags", []):
+                ct_tag_name = tag_id_to_name.get(str(ct.get("tag", "")), "")
+                if ct_tag_name in (welcome_tag.lower(), welcomed_tag.lower()):
+                    try:
+                        await ac_delete(f"contactTags/{ct['id']}")
+                        stripped += 1
+                    except Exception:
+                        pass  # best-effort removal
+
+            # Re-apply the welcome trigger tag
+            try:
+                await ac_post("contactTags", {"contactTag": {"contact": cid, "tag": tag_id}})
+                tagged += 1
+                results.append({"contact_id": cid, "email": email, "name": name, "status": "retagged"})
+            except Exception as e:
+                errors += 1
+                results.append({"contact_id": cid, "email": email, "name": name, "status": "error", "detail": str(e)[:200]})
+
+        print(f"[welcome-resend] {user} → account={payload.account_id} channel={payload.channel} "
+              f"stripped={stripped} tagged={tagged} errors={errors}")
+        skipped_list = [r for r in results if r["status"] == "skipped"]
+        return {
+            "account_id":     payload.account_id,
+            "account_name":   account_name,
+            "channel":        payload.channel,
+            "tag_applied":    welcome_tag,
+            "total_contacts": len(all_cids),
+            "tagged":         tagged,
+            "errors":         errors,
+            "skipped":        len(skipped_list),
+            "skipped_detail": skipped_list,
+            "results":        [r for r in results if r["status"] != "skipped"],
+            "by":             user,
+            "resend":         True,
+            "stripped":       stripped,
+        }
+
+    # ── Normal send path ───────────────────────────────────────────────────
+    preview = await _eligible_welcome_contacts(payload.account_id, payload.channel)
 
     # Filter to selected contacts if caller passed a list
     to_tag = preview["eligible"]

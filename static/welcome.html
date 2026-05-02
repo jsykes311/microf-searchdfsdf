@@ -113,6 +113,12 @@ h1 {
 }
 .btn-success:hover { background: #15803d; }
 .btn-success:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-resend {
+  background: #ea580c;
+  color: white;
+}
+.btn-resend:hover { background: #c2410c; }
+.btn-resend:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Account typeahead ── */
 .typeahead-wrap {
@@ -385,6 +391,7 @@ code {
     <div class="btn-row">
       <button class="btn btn-secondary" id="btn-preview">Preview eligible contacts</button>
       <button class="btn btn-success" id="btn-send" disabled>Send Welcome Email</button>
+      <button class="btn btn-resend" id="btn-resend" disabled title="Strips welcomed + welcome tags first, then re-tags all contacts — use to retrigger for contacts who already received it">↺ Resend</button>
     </div>
     <div class="muted" id="send-hint" style="margin-top:8px;font-size:0.78rem;">Pick an account and channel, then send directly or preview first to select specific contacts.</div>
 
@@ -654,7 +661,8 @@ async function loadChannels() {
 
 function updateSendBtn() {
   const ready = pickedAccount && $("channel").value;
-  $("btn-send").disabled = !ready;
+  $("btn-send").disabled    = !ready;
+  $("btn-resend").disabled  = !ready;
   $("send-hint").style.display = ready ? "none" : "block";
 }
 
@@ -800,7 +808,6 @@ async function sendClick() {
   // If a preview was done, use the checked contact IDs; otherwise send to all eligible
   const checkedIds = getCheckedContactIds();  // null if no checkboxes shown
   const sendingAll = checkedIds === null;
-  const count      = checkedIds ? checkedIds.length : "all eligible";
 
   if (checkedIds !== null && checkedIds.length === 0) {
     showStatus("error", "No contacts selected — check at least one to send.");
@@ -816,6 +823,7 @@ async function sendClick() {
   if (!confirm(confirmMsg)) return;
 
   $("btn-send").disabled    = true;
+  $("btn-resend").disabled  = true;
   $("btn-preview").disabled = true;
   showStatus("info", "Sending…");
 
@@ -849,10 +857,56 @@ async function sendClick() {
   }
 }
 
+async function resendClick() {
+  clearStatus();
+  if (!pickedAccount) { showStatus("error", "Pick an account first."); return; }
+  const account_id = pickedAccount.id;
+  const channel    = $("channel").value;
+  if (!channel)    { showStatus("error", "Pick a Channel first."); return; }
+
+  const label = pickedAccount.dealer_id
+    ? `${pickedAccount.dealer_id} — ${pickedAccount.name}`
+    : pickedAccount.name;
+  if (!confirm(`Resend welcome email for "${channel}" to ALL contacts on ${label}?\n\nThis will strip the welcomed-${channel.toLowerCase()} tag and retrigger the AC automation for every contact.`)) return;
+
+  $("btn-send").disabled    = true;
+  $("btn-resend").disabled  = true;
+  $("btn-preview").disabled = true;
+  showStatus("info", "Stripping tags and retagging…");
+
+  try {
+    const r = await fetch("/api/welcome/send", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ account_id, channel, force_resend: true }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    const data = await r.json();
+    previewedContacts = null;
+    renderResult(data, "send");
+    const stripped = data.stripped ?? 0;
+    if (data.errors > 0) {
+      showStatus("error", `Retagged ${data.tagged} (stripped ${stripped} old tags), but ${data.errors} error(s).`);
+    } else {
+      showStatus("success", `Resent — stripped ${stripped} old tag(s), retagged ${data.tagged} contact(s).`);
+    }
+  } catch (e) {
+    showStatus("error", "Resend failed: " + e.message);
+  } finally {
+    $("btn-preview").disabled = false;
+    updateSendBtn();
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   loadChannels();
   $("btn-preview").addEventListener("click", previewClick);
   $("btn-send").addEventListener("click", sendClick);
+  $("btn-resend").addEventListener("click", resendClick);
   $("account_search").addEventListener("input", onSearchInput);
   $("channel").addEventListener("change", () => {
     previewedContacts = null;
