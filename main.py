@@ -88,10 +88,11 @@ _RECIPIENTS = [r.strip() for r in os.getenv("REPORT_RECIPIENTS", "").split(",") 
 
 # ── Admin / Scheduler ─────────────────────────────────────────────────────
 _ADMIN_EMAILS       = {e.strip().lower() for e in os.getenv("ADMIN_EMAIL",       "jsykes@microf.com,bsanders@microf.com").split(",") if e.strip()}
-_ENROLLMENT_EMAILS  = {e.strip().lower() for e in os.getenv("ENROLLMENT_EMAIL",  "elove@microf.com,cristian.perez@microf.com").split(",") if e.strip()}
+_CONTRACTOR_SUPPORT_EMAILS = {e.strip().lower() for e in os.getenv("CONTRACTOR_SUPPORT_EMAIL", "elove@microf.com,cristian.perez@microf.com").split(",") if e.strip()}
+_ONBOARDING_EMAILS  = {e.strip().lower() for e in os.getenv("ONBOARDING_EMAIL",  "tbillings@microf.com").split(",") if e.strip()}
 _ACCT_MGMT_EMAILS   = {e.strip().lower() for e in os.getenv("ACCT_MGMT_EMAIL",   "").split(",") if e.strip()}
 # All groups that can access the Apps tab
-_APPS_EMAILS        = _ADMIN_EMAILS | _ENROLLMENT_EMAILS | _ACCT_MGMT_EMAILS | {e.strip().lower() for e in os.getenv("APPS_EMAIL", "").split(",") if e.strip()}
+_APPS_EMAILS        = _ADMIN_EMAILS | _CONTRACTOR_SUPPORT_EMAILS | _ONBOARDING_EMAILS | _ACCT_MGMT_EMAILS | {e.strip().lower() for e in os.getenv("APPS_EMAIL", "").split(",") if e.strip()}
 _SCHEDULES_FILE = os.getenv("SCHEDULES_FILE", os.path.join(os.path.dirname(__file__), "schedules.json"))
 _scheduler      = AsyncIOScheduler()
 _schedules: dict = {}   # job_id → schedule dict
@@ -3929,8 +3930,10 @@ async def get_me(request: _Request):
     em = email.lower() if email else ""
     if (not _AZ_CLIENT_ID) or em in _ADMIN_EMAILS:
         group = "admin"
-    elif em in _ENROLLMENT_EMAILS:
-        group = "enrollment"
+    elif em in _CONTRACTOR_SUPPORT_EMAILS:
+        group = "contractor_support"
+    elif em in _ONBOARDING_EMAILS:
+        group = "onboarding"
     elif em in _ACCT_MGMT_EMAILS:
         group = "account_management"
     else:
@@ -8349,13 +8352,14 @@ async def welcome_send(
                 results.append({"contact_id": cid, "email": email, "name": name, "status": "skipped", "skip_reason": "no email" if not email else "unsubscribed"})
                 continue
 
-            # Build tag-name lookup from the included tags array
-            tag_id_to_name = {str(t["id"]): (t.get("tag") or "").lower() for t in d.get("tags", []) if t.get("id")}
+            # Use already-known tag IDs directly — avoids fragile name-lookup
+            tags_to_strip = {str(tag_id)}
+            if welcomed_tag_id:
+                tags_to_strip.add(str(welcomed_tag_id))
 
             # Remove welcomed-{channel} and welcome-{channel} contactTag records
             for ct in d.get("contactTags", []):
-                ct_tag_name = tag_id_to_name.get(str(ct.get("tag", "")), "")
-                if ct_tag_name in (welcome_tag.lower(), welcomed_tag.lower()):
+                if str(ct.get("tag", "")) in tags_to_strip:
                     try:
                         await ac_delete(f"contactTags/{ct['id']}")
                         stripped += 1
