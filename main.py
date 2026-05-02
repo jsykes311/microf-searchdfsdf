@@ -88,7 +88,7 @@ _RECIPIENTS = [r.strip() for r in os.getenv("REPORT_RECIPIENTS", "").split(",") 
 
 # ── Admin / Scheduler ─────────────────────────────────────────────────────
 _ADMIN_EMAILS       = {e.strip().lower() for e in os.getenv("ADMIN_EMAIL",       "jsykes@microf.com,bsanders@microf.com").split(",") if e.strip()}
-_CONTRACTOR_SUPPORT_EMAILS = {e.strip().lower() for e in os.getenv("CONTRACTOR_SUPPORT_EMAIL", "elove@microf.com,cristian.perez@microf.com").split(",") if e.strip()}
+_CONTRACTOR_SUPPORT_EMAILS = {e.strip().lower() for e in os.getenv("CONTRACTOR_SUPPORT_EMAIL", "elove@microf.com,cristian.perez@microf.com,rlugo@microf.com").split(",") if e.strip()}
 _ONBOARDING_EMAILS  = {e.strip().lower() for e in os.getenv("ONBOARDING_EMAIL",  "tbillings@microf.com").split(",") if e.strip()}
 _ACCT_MGMT_EMAILS   = {e.strip().lower() for e in os.getenv("ACCT_MGMT_EMAIL",   "jtiplady@microf.com,ajones@microf.com,lfutrell@microf.com,abergen@microf.com,wneely@microf.com,charden@microf.com,zolbrys@microf.com,rolbrys@microf.com,ctwiggs@microf.com").split(",") if e.strip()}
 # All groups that can access the Apps tab
@@ -3076,6 +3076,21 @@ async def _build_location_index() -> dict:
     # Reuse the shared qualifying-accounts cache (avoids a duplicate SLP fetch)
     qualifying = await _get_qualifying_microf_accounts()
 
+    # Build channel map directly from SLP records (avoids dependency on
+    # _account_to_platform which may be empty on cold start)
+    slp_raw = await get_slp_cache()
+    acct_to_channel: dict = {}
+    for _r in slp_raw:
+        _flds = {_f.get("field") or _f.get("id"): _f.get("value") for _f in _r.get("fields", [])}
+        _ch = str(_flds.get("channel", "") or "").strip()
+        if not _ch:
+            continue
+        _rel = _r.get("relationships", {}).get("account", [])
+        _a0  = _rel[0] if _rel else None
+        _aid = str(_a0) if isinstance(_a0, (int, str)) else (str(_a0.get("id", "")) if _a0 else None)
+        if _aid and _aid not in acct_to_channel:
+            acct_to_channel[_aid] = _ch
+
     import math as _math, random
 
     # zip-level lookup for the small subset of accounts that actually have CF6
@@ -3130,7 +3145,7 @@ async def _build_location_index() -> dict:
             "city":      city,
             "state":     st,
             "zip":       z,
-            "platform":  _account_to_platform.get(aid, ""),
+            "platform":  acct_to_channel.get(aid, ""),
             "approx":    precision != "zip",
         }
 
