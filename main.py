@@ -8174,6 +8174,11 @@ async def reports_prebuilt_page():
     return FileResponse("static/reports/prebuilt.html")
 
 
+@app.get("/am-guide")
+async def am_guide_page(user=Depends(require_auth)):
+    return FileResponse("static/am-guide.html")
+
+
 @app.get("/welcome")
 async def welcome_page(_admin=Depends(_require_welcome)):
     return FileResponse("static/welcome.html")

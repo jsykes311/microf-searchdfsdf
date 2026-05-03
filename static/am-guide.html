@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AC Reporter — Account Manager User Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue:        #0078d4;
+  --blue-light:  #deecf9;
+  --blue-dark:   #005a9e;
+  --bg:          #f3f6fb;
+  --surface:     #ffffff;
+  --text:        #1c1c1e;
+  --text2:       #3a3a3c;
+  --text3:       #636366;
+  --text4:       #aeaeb2;
+  --border:      #e5e7eb;
+  --border2:     #d1d5db;
+  --green:       #107c10;
+  --green-light: #dff6dd;
+  --yellow:      #fef3c7;
+  --yellow-dark: #92400e;
+  --tip-bg:      #fffbeb;
+  --note-bg:     #eff6ff;
+  --r-sm:        6px;
+  --r-md:        10px;
+  --r-lg:        14px;
+  --sh:          0 2px 8px rgba(0,0,0,.08);
+  --sh-lg:       0 4px 24px rgba(0,0,0,.12);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.guide-wrap {
+  display: flex;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+  gap: 48px;
+  align-items: flex-start;
+}
+
+/* ── Sidebar TOC ── */
+.toc {
+  width: 220px;
+  min-width: 220px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 80px;
+  padding: 20px 0;
+}
+.toc-title {
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text4);
+  padding: 0 12px 10px;
+}
+.toc a {
+  display: block;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  color: var(--text3);
+  text-decoration: none;
+  border-radius: var(--r-sm);
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+  line-height: 1.3;
+}
+.toc a:hover { color: var(--blue); background: var(--blue-light); }
+.toc a.active { color: var(--blue); font-weight: 600; border-left-color: var(--blue); background: var(--blue-light); }
+.toc .toc-sub { padding-left: 22px; font-size: 0.77rem; }
+
+/* ── Main content ── */
+.guide-main {
+  flex: 1;
+  min-width: 0;
+  padding: 40px 0 80px;
+}
+
+/* ── Page Header ── */
+.guide-header {
+  background: var(--blue);
+  color: #fff;
+  padding: 48px 40px 40px;
+  margin-bottom: 0;
+}
+.guide-header .badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  background: rgba(255,255,255,0.2);
+  padding: 3px 10px;
+  border-radius: 99px;
+  display: inline-block;
+  margin-bottom: 14px;
+}
+.guide-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 10px;
+}
+.guide-header p {
+  font-size: 1rem;
+  opacity: 0.88;
+  max-width: 560px;
+}
+.guide-meta {
+  margin-top: 20px;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+/* ── Sections ── */
+.section {
+  padding: 48px 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.section:last-child { border-bottom: none; }
+
+.section-label {
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--blue);
+  margin-bottom: 6px;
+}
+.section h2 {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 14px;
+  line-height: 1.25;
+}
+.section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 24px 0 8px;
+}
+.section p { margin-bottom: 12px; color: var(--text2); }
+.section p:last-child { margin-bottom: 0; }
+
+/* ── Steps ── */
+.steps { list-style: none; margin: 16px 0 20px; }
+.steps li {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 14px;
+  align-items: flex-start;
+}
+.step-num {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+.step-body { flex: 1; }
+.step-body strong { font-weight: 600; color: var(--text); }
+.step-body p { margin: 0; color: var(--text2); }
+
+/* ── Callouts ── */
+.callout {
+  border-radius: var(--r-md);
+  padding: 14px 18px;
+  margin: 18px 0;
+  font-size: 0.88rem;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  line-height: 1.55;
+}
+.callout-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+.callout-body { flex: 1; }
+.callout-body strong { display: block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 3px; }
+.callout.tip { background: var(--tip-bg); border: 1px solid #fcd34d; color: var(--yellow-dark); }
+.callout.note { background: var(--note-bg); border: 1px solid #93c5fd; color: #1e3a8a; }
+.callout.info { background: #f0fdf4; border: 1px solid #86efac; color: #14532d; }
+
+/* ── Mockup wrapper ── */
+.mockup {
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.13);
+  overflow: hidden;
+  margin: 26px 0;
+  border: 1px solid rgba(0,0,0,.07);
+}
+
+/* Browser chrome */
+.browser-chrome {
+  background: #ebebeb;
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #d1d1d1;
+}
+.browser-dots { display: flex; gap: 6px; }
+.browser-dots span {
+  width: 12px; height: 12px; border-radius: 50%;
+  display: inline-block;
+}
+.dot-red    { background: #ff5f57; }
+.dot-yellow { background: #febc2e; }
+.dot-green  { background: #28c840; }
+.browser-url {
+  flex: 1;
+  background: #fff;
+  border: 1px solid #c8c8c8;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.73rem;
+  color: #555;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.browser-url .protocol { color: #888; }
+
+/* ── Mockup contents ── */
+
+/* Login mockup */
+.mock-login-bg {
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+}
+.mock-login-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.10);
+  padding: 44px 36px 36px;
+  width: 320px;
+  text-align: center;
+}
+.mock-login-logo {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  letter-spacing: -1px;
+  margin-bottom: 4px;
+}
+.mock-login-tagline {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-bottom: 30px;
+}
+.mock-ms-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #2563eb;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  width: 100%;
+  cursor: pointer;
+}
+.mock-ms-btn svg { flex-shrink: 0; }
+.mock-login-footer { margin-top: 24px; font-size: 0.72rem; color: #9ca3af; }
+
+/* Apps grid mockup */
+.mock-apps-bg {
+  background: #f2f2f7;
+  padding: 32px 28px 36px;
+}
+.mock-apps-header {
+  margin-bottom: 24px;
+}
+.mock-apps-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #636366;
+  margin-bottom: 3px;
+}
+.mock-apps-welcome {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1c1c1e;
+}
+.mock-apps-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+.mock-app-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  padding: 20px 10px 16px;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid rgba(0,0,0,.06);
+}
+.mock-app-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin: 0 auto 10px;
+}
+.mock-app-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #1c1c1e;
+  line-height: 1.3;
+}
+
+/* Search mockup */
+.mock-search-bg {
+  background: #f2f2f7;
+  padding: 0;
+}
+.mock-search-topbar {
+  background: #1e3a5f;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 10px;
+}
+.mock-search-topbar .logo-text {
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.mock-search-topbar .search-pill {
+  flex: 1;
+  max-width: 340px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.mock-search-topbar .search-pill span.qs {
+  color: #fff;
+  font-size: 0.82rem;
+}
+.mock-search-topbar .search-pill span.qi {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.8rem;
+}
+.mock-search-body {
+  padding: 16px 14px;
+  background: #fff;
+}
+.mock-search-results-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #636366;
+  margin-bottom: 8px;
+}
+.mock-search-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+}
+.mock-search-result:hover { background: #f9fafb; }
+.mock-result-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.mock-result-info { flex: 1; min-width: 0; }
+.mock-result-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mock-result-meta { font-size: 0.72rem; color: #6b7280; margin-top: 1px; }
+.mock-result-badge {
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.badge-blue-sm  { background: #dbeafe; color: #1e40af; }
+.badge-green-sm { background: #dcfce7; color: #166534; }
+.badge-gray-sm  { background: #f3f4f6; color: #6b7280; }
+.badge-purple-sm { background: #ede9fe; color: #6d28d9; }
+.mock-export-bar {
+  padding: 8px 12px;
+  border-top: 1px solid #e5e7eb;
+  text-align: right;
+}
+.mock-export-btn {
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+}
+
+/* Account detail mockup */
+.mock-detail-bg {
+  background: #f2f2f7;
+}
+.mock-detail-topbar {
+  background: rgba(255,255,255,0.8);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: #636366;
+}
+.mock-detail-topbar strong { color: #1c1c1e; font-weight: 600; }
+.mock-bc-sep { color: #aeaeb2; }
+.mock-detail-body { padding: 16px 14px; }
+.mock-acct-header {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.mock-acct-name {
+  font-size: 0.97rem;
+  font-weight: 700;
+  color: #1c1c1e;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mock-acct-sub {
+  font-size: 0.75rem;
+  color: #636366;
+  margin-bottom: 12px;
+}
+.mock-acct-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+.mock-field { }
+.mock-field-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #aeaeb2;
+  margin-bottom: 2px;
+}
+.mock-field-val {
+  font-size: 0.79rem;
+  color: #1c1c1e;
+  font-weight: 500;
+}
+.mock-tabs-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 10px;
+}
+.mock-tab {
+  padding: 7px 14px;
+  font-size: 0.79rem;
+  cursor: pointer;
+  color: #636366;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+}
+.mock-tab.active { color: #007aff; border-bottom-color: #007aff; }
+.mock-slp-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+.mock-slp-table th {
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #aeaeb2;
+  border-bottom: 1px solid #e5e7eb;
+}
+.mock-slp-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #3a3a3c;
+}
+.mock-slp-table tr:last-child td { border-bottom: none; }
+.status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+/* Reports grid mockup */
+.mock-reports-bg {
+  background: #f2f2f7;
+  padding: 18px 16px 22px;
+}
+.mock-reports-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #636366;
+  margin-bottom: 12px;
+}
+.mock-reports-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.mock-report-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px 14px 12px;
+  cursor: pointer;
+}
+.mock-report-icon {
+  font-size: 1.3rem;
+  margin-bottom: 6px;
+}
+.mock-report-name {
+  font-size: 0.79rem;
+  font-weight: 600;
+  color: #1c1c1e;
+  margin-bottom: 3px;
+}
+.mock-report-desc {
+  font-size: 0.68rem;
+  color: #9ca3af;
+  line-height: 1.35;
+}
+
+/* Report builder mockup */
+.mock-builder-bg {
+  background: #f2f2f7;
+  padding: 16px 14px;
+  display: flex;
+  gap: 12px;
+}
+.mock-builder-left {
+  width: 200px;
+  flex-shrink: 0;
+}
+.mock-builder-right { flex: 1; min-width: 0; }
+.mock-builder-panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.mock-builder-panel-header {
+  padding: 9px 12px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #636366;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+.mock-builder-panel-body { padding: 10px 12px; }
+.mock-obj-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  color: #1c1c1e;
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+.mock-obj-btn.active { background: #007aff; color: #fff; }
+.mock-obj-btn:not(.active):hover { background: #f3f4f6; }
+.mock-field-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  color: #3a3a3c;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mock-field-check input { accent-color: #007aff; }
+.mock-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+}
+.mock-filter-row select, .mock-filter-row input {
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: #374151;
+  outline: none;
+}
+.mock-run-btn {
+  background: #007aff;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+}
+.mock-results-table { width: 100%; border-collapse: collapse; font-size: 0.73rem; }
+.mock-results-table th {
+  background: #f9fafb;
+  padding: 5px 8px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+.mock-results-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+.mock-results-table tr:last-child td { border-bottom: none; }
+
+/* Map mockup */
+.mock-map-bg {
+  background: #e8edf2;
+  height: 340px;
+  position: relative;
+  overflow: hidden;
+}
+.mock-map-tiles {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(#d0dce8 0%, #c8d8e6 30%, #dce8f0 60%, #c8d4e0 100%);
+  background-size: 40px 40px, 40px 40px, 100% 100%;
+}
+/* Road-like lines */
+.mock-map-tiles::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      rgba(255,255,255,0.35) 0px, rgba(255,255,255,0.35) 2px, transparent 2px
+    ) 0 110px / 100% 100%,
+    linear-gradient(
+      90deg, rgba(255,255,255,0.30) 0px, rgba(255,255,255,0.30) 2px, transparent 2px
+    ) 140px 0 / 100% 100%,
+    linear-gradient(
+      rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.2) 1px, transparent 1px
+    ) 0 210px / 100% 100%,
+    linear-gradient(
+      90deg, rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.2) 1px, transparent 1px
+    ) 280px 0 / 100% 100%;
+}
+.map-pin {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+.map-pin.active-pin { background: #107c10; width: 17px; height: 17px; }
+.map-pin.blue-pin   { background: #0078d4; }
+.map-pin.orange-pin { background: #e08000; }
+.map-side-panel {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 240px;
+  background: #fff;
+  border-left: 1px solid #d1d5db;
+  padding: 14px;
+  overflow-y: auto;
+}
+.map-panel-title {
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #636366;
+  margin-bottom: 10px;
+}
+.map-acct-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.map-acct-card.selected { border-color: #0078d4; background: #eff6ff; }
+.map-acct-name { font-size: 0.78rem; font-weight: 600; color: #1c1c1e; margin-bottom: 2px; }
+.map-acct-meta { font-size: 0.7rem; color: #6b7280; }
+.map-acct-status { font-size: 0.67rem; font-weight: 700; color: #107c10; margin-top: 3px; }
+
+/* ── Table styles ── */
+table.doc-table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 0.85rem; }
+table.doc-table th {
+  text-align: left;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text3);
+}
+table.doc-table td {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  vertical-align: top;
+}
+table.doc-table tr:hover td { background: #fafafa; }
+
+/* ── Inline code ── */
+code {
+  background: #f0f0f5;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.82em;
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  color: #0a6640;
+}
+
+/* ── Hero banner ── */
+.hero {
+  background: linear-gradient(135deg, #0078d4 0%, #004b91 100%);
+  padding: 48px 40px 40px;
+  color: #fff;
+}
+
+/* ── Responsive ── */
+@media (max-width: 780px) {
+  .guide-wrap { flex-direction: column; padding: 0 16px; }
+  .toc { position: relative; top: auto; width: 100%; min-width: unset; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+  .mock-apps-grid { grid-template-columns: repeat(3, 1fr); }
+  .mock-reports-grid { grid-template-columns: repeat(2, 1fr); }
+  .mock-builder-bg { flex-direction: column; }
+  .mock-builder-left { width: 100%; }
+  .mock-acct-fields { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Print ── */
+@media print {
+  .toc { display: none; }
+  .guide-wrap { max-width: 100%; padding: 0; }
+  .mockup { page-break-inside: avoid; }
+  .section { page-break-before: always; }
+  body { font-size: 13px; }
+  .hero { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<!-- Page header hero -->
+<div class="hero">
+  <div style="max-width:900px;margin:0 auto;">
+    <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;background:rgba(255,255,255,0.18);padding:3px 10px;border-radius:99px;display:inline-block;margin-bottom:14px;">Account Manager Guide</span>
+    <h1 style="font-size:2rem;font-weight:700;line-height:1.2;margin-bottom:10px;">AC Reporter — Moogle Search</h1>
+    <p style="font-size:1rem;opacity:.88;max-width:560px;">Everything you need to find accounts, run reports, and explore dealer data in the Microf web app.</p>
+    <p style="margin-top:16px;font-size:0.8rem;opacity:.65;">Last updated May 2026 &nbsp;·&nbsp; For questions, contact your team lead or IT support.</p>
+  </div>
+</div>
+
+<div class="guide-wrap">
+
+  <!-- Sidebar Table of Contents -->
+  <aside class="toc">
+    <div class="toc-title">On This Page</div>
+    <a href="#logging-in">1. Logging In</a>
+    <a href="#apps-grid">2. The Apps Grid</a>
+    <a href="#account-search">3. Account Search</a>
+    <a href="#account-view">4. Account View</a>
+    <a href="#prebuilt-reports">5. Pre-Built Reports</a>
+    <a href="#report-builder">6. Report Builder</a>
+    <a href="#dealer-locator">7. Dealer Locator</a>
+    <a href="#global-search">8. Global Search</a>
+  </aside>
+
+  <!-- Main content -->
+  <main class="guide-main">
+
+    <!-- ── 1. Logging In ── -->
+    <section class="section" id="logging-in">
+      <div class="section-label">Section 1</div>
+      <h2>Logging In</h2>
+      <p>AC Reporter uses your existing <strong>Microf Microsoft account</strong> for authentication. No separate password is required — just sign in with the same credentials you use for Outlook and Teams.</p>
+
+      <ol class="steps">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Open the app in your browser</strong>
+            <p>Navigate to the Render URL your team has shared (e.g., <code>https://microf-ac.onrender.com</code>). You can bookmark it for quick access.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Click "Sign in with Microsoft"</strong>
+            <p>You'll see the login screen below with a blue button. Click it to be redirected to Microsoft's secure sign-in flow.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Use your @microf.com account</strong>
+            <p>Enter your <code>firstname.lastname@microf.com</code> email and password. If your organization uses multi-factor authentication, complete the MFA prompt.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>You're in — you'll land on the Apps Grid</strong>
+            <p>After successful authentication, you're taken directly to the Apps page where you can choose what to do.</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="callout note">
+        <span class="callout-icon">ℹ️</span>
+        <div class="callout-body">
+          <strong>Microsoft SSO</strong>
+          Access is restricted to <strong>@microf.com</strong> accounts only. If you see an "Access Denied" message, confirm you're signed into the correct Microsoft account — you may need to sign out of a personal Microsoft account first.
+        </div>
+      </div>
+
+      <!-- Login mockup -->
+      <div class="mockup">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="dot-red"></span>
+            <span class="dot-yellow"></span>
+            <span class="dot-green"></span>
+          </div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/login</div>
+        </div>
+        <div class="mock-login-bg">
+          <div class="mock-login-card">
+            <div class="mock-login-logo">Moogle</div>
+            <div class="mock-login-tagline">Microf ActiveCampaign Reporter</div>
+            <div class="mock-ms-btn">
+              <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
+                <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+                <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+                <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+                <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+              </svg>
+              Sign in with Microsoft
+            </div>
+            <div class="mock-login-footer">@microf.com accounts only</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── 2. Apps Grid ── -->
+    <section class="section" id="apps-grid">
+      <div class="section-label">Section 2</div>
+      <h2>The Apps Grid</h2>
+      <p>After logging in, you land on the <strong>Apps Grid</strong> — a Launchpad-style page showing all the tools available to you. As an Account Manager you'll see five app cards. There is no left sidebar on this page.</p>
+
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <div class="callout-body">
+          <strong>Tip — No sidebar needed</strong>
+          The Apps Grid is your home base. Some apps open within the main app; others (Account Search and Dealer Locator) open in a new tab so you can keep the grid open.
+        </div>
+      </div>
+
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th>App</th>
+            <th>What it does</th>
+            <th>Opens in</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>📋 Pre-Built Reports</strong></td>
+            <td>Run curated reports: Activations, License Expiration, Last App Date, BDR Performance, and more. Filter by date, region, platform.</td>
+            <td>Same tab</td>
+          </tr>
+          <tr>
+            <td><strong>⚙️ Report Builder</strong></td>
+            <td>Build custom ad-hoc queries by choosing any combination of fields. For one-off questions not covered by pre-built reports.</td>
+            <td>Same tab</td>
+          </tr>
+          <tr>
+            <td><strong>🌐 Global Search</strong></td>
+            <td>Search across accounts, contacts, and SLP records simultaneously from a single search box.</td>
+            <td>Same tab</td>
+          </tr>
+          <tr>
+            <td><strong>🔍 Account Search</strong></td>
+            <td>Full-featured account search (Moogle). Find accounts by name, dealer ID, or email. View SLP records and contacts. Export to CSV.</td>
+            <td>New tab (<code>/search</code>)</td>
+          </tr>
+          <tr>
+            <td><strong>📍 Dealer Locator</strong></td>
+            <td>Interactive map of active Microf dealers. Browse by territory, click pins for account details. Useful for coverage planning.</td>
+            <td>New tab (<code>/dealer-locator</code>)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Apps grid mockup -->
+      <div class="mockup">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="dot-red"></span>
+            <span class="dot-yellow"></span>
+            <span class="dot-green"></span>
+          </div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/</div>
+        </div>
+        <div class="mock-apps-bg">
+          <div class="mock-apps-header">
+            <div class="mock-apps-title">AC Reporter</div>
+            <div class="mock-apps-welcome">Good morning, Sarah — choose an app to get started.</div>
+          </div>
+          <div class="mock-apps-grid">
+            <div class="mock-app-card">
+              <div class="mock-app-icon" style="background:linear-gradient(135deg,#0078d4,#005a9e);">📋</div>
+              <div class="mock-app-label">Pre-Built Reports</div>
+            </div>
+            <div class="mock-app-card">
+              <div class="mock-app-icon" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);">⚙️</div>
+              <div class="mock-app-label">Report Builder</div>
+            </div>
+            <div class="mock-app-card">
+              <div class="mock-app-icon" style="background:linear-gradient(135deg,#0891b2,#0e7490);">🌐</div>
+              <div class="mock-app-label">Global Search</div>
+            </div>
+            <div class="mock-app-card">
+              <div class="mock-app-icon" style="background:linear-gradient(135deg,#059669,#047857);">🔍</div>
+              <div class="mock-app-label">Account Search</div>
+            </div>
+            <div class="mock-app-card">
+              <div class="mock-app-icon" style="background:linear-gradient(135deg,#ea580c,#c2410c);">📍</div>
+              <div class="mock-app-label">Dealer Locator</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── 3. Account Search ── -->
+    <section class="section" id="account-search">
+      <div class="section-label">Section 3</div>
+      <h2>Account Search (Moogle)</h2>
+      <p>Clicking <strong>Account Search</strong> opens a full-featured search interface at <code>/search</code> in a new browser tab. This is the fastest way to look up a specific account, contact, or dealer record.</p>
+
+      <h3>Searching for an Account</h3>
+      <ol class="steps">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Type your query in the search bar</strong>
+            <p>You can search by: account name (or partial name), dealer ID number, or contact email address. The search updates results as you type.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Review the results list</strong>
+            <p>Results are shown as cards grouped by type. Each card shows the account name, dealer ID, region, and status. Accounts matched via a contact's email will show a <span class="mock-result-badge badge-purple-sm">via contact</span> badge.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Click a result to view its detail</strong>
+            <p>Clicking opens the Account View (see Section 4). A "View in ActiveCampaign" link lets you jump directly to the live AC record.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Export results as CSV</strong>
+            <p>Use the <strong>Export CSV</strong> button in the top-right to download the current results list as a spreadsheet for offline work.</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <div class="callout-body">
+          <strong>Search tip — partial names work great</strong>
+          Searching "comfort air" will match "COMFORT AIR LLC-44821 DBA ARS of Dallas". You don't need the exact full name. For ARS accounts, try searching by the city name or dealer ID.
+        </div>
+      </div>
+
+      <!-- Account Search mockup -->
+      <div class="mockup">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="dot-red"></span>
+            <span class="dot-yellow"></span>
+            <span class="dot-green"></span>
+          </div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/search</div>
+        </div>
+        <div class="mock-search-bg">
+          <div class="mock-search-topbar">
+            <span class="logo-text">Moogle</span>
+            <div class="search-pill">
+              <span class="qi">🔍</span>
+              <span class="qs">COMFORT AIR</span>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px;">
+              <div style="background:rgba(255,255,255,0.15);border-radius:5px;padding:4px 10px;font-size:0.73rem;color:#fff;cursor:pointer;">Export CSV</div>
+            </div>
+          </div>
+          <div class="mock-search-body">
+            <div class="mock-search-results-label">3 Accounts found</div>
+
+            <div class="mock-search-result">
+              <div class="mock-result-avatar" style="background:#0078d4;">CA</div>
+              <div class="mock-result-info">
+                <div class="mock-result-name">COMFORT AIR LLC-44821 DBA ARS of Dallas</div>
+                <div class="mock-result-meta">Dealer #44821 &nbsp;·&nbsp; Southwest &nbsp;·&nbsp; Contractor</div>
+              </div>
+              <span class="mock-result-badge badge-green-sm">Active</span>
+            </div>
+
+            <div class="mock-search-result">
+              <div class="mock-result-avatar" style="background:#7c3aed;">CA</div>
+              <div class="mock-result-info">
+                <div class="mock-result-name">COMFORT AIR SOLUTIONS-38274 DBA ARS of Houston</div>
+                <div class="mock-result-meta">Dealer #38274 &nbsp;·&nbsp; Southeast &nbsp;·&nbsp; Contractor</div>
+              </div>
+              <span class="mock-result-badge badge-green-sm">Active</span>
+            </div>
+
+            <div class="mock-search-result">
+              <div class="mock-result-avatar" style="background:#059669;">JM</div>
+              <div class="mock-result-info">
+                <div class="mock-result-name">COMFORT AIR LLC-44821 DBA ARS of Dallas</div>
+                <div class="mock-result-meta">Matched via: j.miller@comfortair.com &nbsp;·&nbsp; Dealer #44821</div>
+              </div>
+              <span class="mock-result-badge badge-purple-sm">via contact</span>
+            </div>
+          </div>
+          <div class="mock-export-bar">
+            <button class="mock-export-btn">⬇ Export CSV</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── 4. Account View ── -->
+    <section class="section" id="account-view">
+      <div class="section-label">Section 4</div>
+      <h2>Account View</h2>
+      <p>The Account View shows everything about a single account — its core fields, SLP (Strategic Lending Partner) program records, and associated contacts. You reach it by clicking any result in Account Search, or via the account lookup within the main app.</p>
+
+      <h3>Core Account Information</h3>
+      <p>At the top of the detail panel you'll see:</p>
+      <ul style="margin:8px 0 14px 20px;color:var(--text2);">
+        <li><strong>Account Name</strong> — full name including DBA (Doing Business As) if applicable</li>
+        <li><strong>Account Type</strong> — Contractor, Dealer, etc.</li>
+        <li><strong>Sales Region</strong> — Mid-West, Southeast, Northeast, Northwest, or Southwest</li>
+        <li><strong>Dealer ID</strong> — the unique ID used to match this account across systems</li>
+        <li><strong>Account Owner</strong> — the assigned BDR or AM in ActiveCampaign</li>
+      </ul>
+
+      <h3>SLP Records Tab</h3>
+      <p>Each account can have one or more <strong>SLP records</strong> — one per lending program (e.g., an account may have both a 360 Finance SLP and an OPTIMUS SLP). The table shows:</p>
+      <ul style="margin:8px 0 14px 20px;color:var(--text2);">
+        <li><strong>Channel / Platform</strong> — the lending program (360 Finance, OPTIMUS, LTO, Microf, etc.)</li>
+        <li><strong>Status</strong> — current onboarding/activation status</li>
+        <li><strong>Activation Date</strong> — date the contractor was activated on this program</li>
+        <li><strong>Oracle IDs</strong> — the Oracle producer ID(s) associated with this record</li>
+        <li><strong>Assigned BDR</strong> — the BDR responsible for this SLP</li>
+        <li><strong>Doing Business In</strong> — states where this dealer operates</li>
+      </ul>
+
+      <h3>Contacts Tab</h3>
+      <p>Switch to the Contacts tab to see all contacts linked to this account: their name, email address, phone, and role/title as stored in ActiveCampaign.</p>
+
+      <div class="callout info">
+        <span class="callout-icon">✅</span>
+        <div class="callout-body">
+          <strong>Jump to ActiveCampaign</strong>
+          Every account detail view has a <strong>"View in ActiveCampaign →"</strong> link. Click it to open the live AC record in a new tab, where you can make edits, send emails, or review activity history.
+        </div>
+      </div>
+
+      <!-- Account detail mockup -->
+      <div class="mockup">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="dot-red"></span>
+            <span class="dot-yellow"></span>
+            <span class="dot-green"></span>
+          </div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/search#account/44821</div>
+        </div>
+        <div class="mock-detail-bg">
+          <div class="mock-detail-topbar">
+            <span>Account Search</span>
+            <span class="mock-bc-sep">›</span>
+            <strong>COMFORT AIR LLC-44821</strong>
+          </div>
+          <div class="mock-detail-body">
+            <div class="mock-acct-header">
+              <div class="mock-acct-name">COMFORT AIR LLC-44821 DBA ARS of Dallas</div>
+              <div class="mock-acct-sub">ActiveCampaign ID: 10482 &nbsp;·&nbsp; <span style="color:#0078d4;cursor:pointer;">View in ActiveCampaign →</span></div>
+              <div class="mock-acct-fields">
+                <div class="mock-field">
+                  <div class="mock-field-label">Account Type</div>
+                  <div class="mock-field-val">Contractor</div>
+                </div>
+                <div class="mock-field">
+                  <div class="mock-field-label">Sales Region</div>
+                  <div class="mock-field-val">Southwest</div>
+                </div>
+                <div class="mock-field">
+                  <div class="mock-field-label">Dealer ID</div>
+                  <div class="mock-field-val" style="font-family:monospace;">44821</div>
+                </div>
+                <div class="mock-field">
+                  <div class="mock-field-label">Account Owner</div>
+                  <div class="mock-field-val">Marcus Rivera</div>
+                </div>
+                <div class="mock-field">
+                  <div class="mock-field-label">Phone</div>
+                  <div class="mock-field-val">(214) 555-0183</div>
+                </div>
+                <div class="mock-field">
+                  <div class="mock-field-label">Website</div>
+                  <div class="mock-field-val" style="color:#0078d4;">comfortairdallas.com</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:#fff;border-radius:10px;border:1px solid #e5e7eb;overflow:hidden;">
+              <div class="mock-tabs-bar" style="padding:0 14px;background:#f9fafb;">
+                <div class="mock-tab active">SLP Records (2)</div>
+                <div class="mock-tab">Contacts (3)</div>
+                <div class="mock-tab">Custom Fields</div>
+              </div>
+              <div style="padding:12px 14px;">
+                <table class="mock-slp-table">
+                  <thead>
+                    <tr>
+                      <th>Platform</th>
+                      <th>Status</th>
+                      <th>Activation Date</th>
+                      <th>Oracle IDs</th>
+                      <th>BDR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>360 Finance</strong></td>
+                      <td><span class="status-pill" style="background:#dff6dd;color:#107c10;">Contractor Activated</span></td>
+                      <td style="color:#636366;">2023-06-14</td>
+                      <td><code style="font-size:0.72rem;">TX-01612</code></td>
+                      <td>m.rivera</td>
+                    </tr>
+                    <tr>
+                      <td><strong>OPTIMUS</strong></td>
+                      <td><span class="status-pill" style="background:#fef3c7;color:#92400e;">Pending – Training Not Completed</span></td>
+                      <td style="color:#636366;">—</td>
+                      <td style="color:#aeaeb2;">—</td>
+                      <td>m.rivera</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── 5. Pre-Built Reports ── -->
+    <section class="section" id="prebuilt-reports">
+      <div class="section-label">Section 5</div>
+      <h2>Pre-Built Reports</h2>
+      <p>The Reports library gives you one-click access to curated data exports. Each report has pre-configured fields and built-in filters. Click the <strong>Pre-Built Reports</strong> card on the Apps Grid to open the report library.</p>
+
+      <h3>Available Reports for Account Managers</h3>
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th>Report</th>
+            <th>What it shows</th>
+            <th>Key filters</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Activations</strong></td>
+            <td>SLP records with "Contractor Activated" status</td>
+            <td>Date range, platform/channel, BDR, state</td>
+          </tr>
+          <tr>
+            <td><strong>License Expiration</strong></td>
+            <td>Contractors with licenses expiring soon</td>
+            <td>Date range or days ahead (e.g., next 30 days)</td>
+          </tr>
+          <tr>
+            <td><strong>Last App Date</strong></td>
+            <td>Accounts filtered by their last application date</td>
+            <td>Date range</td>
+          </tr>
+          <tr>
+            <td><strong>Last RPA Date</strong></td>
+            <td>Accounts filtered by their last RPA (Rental Purchase Agreement) date</td>
+            <td>Date range</td>
+          </tr>
+          <tr>
+            <td><strong>BDR Performance</strong></td>
+            <td>Activation summary grouped by BDR — count of activations per person</td>
+            <td>Date range, region</td>
+          </tr>
+          <tr>
+            <td><strong>Training Summary</strong></td>
+            <td>Training records by trainer, date, and training type</td>
+            <td>Trainer name, date range, type</td>
+          </tr>
+          <tr>
+            <td><strong>Account Activity</strong></td>
+            <td>Engagement summary — active vs. cold accounts by region/BDR</td>
+            <td>Region, BDR, account type</td>
+          </tr>
+          <tr>
+            <td><strong>Team Performance</strong></td>
+            <td>Internal notes and activity log summary for team tracking</td>
+            <td>Date range, team member</td>
+          </tr>
+          <tr>
+            <td><strong>Account Channel Search</strong></td>
+            <td>Find accounts by name and program/channel combination</td>
+            <td>Account name, channel/program</td>
+          </tr>
+          <tr>
+            <td><strong>Verdata</strong></td>
+            <td>Active and inactive accounts with dealer ID, DBA name, address, and tax ID</td>
+            <td>Status (active/inactive)</td>
+          </tr>
+          <tr>
+            <td><strong>ARS 360 Finance</strong></td>
+            <td>ARS dealers on the 360 Finance program, with associated contacts</td>
+            <td>State, activation status</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>How to Run a Report</h3>
+      <ol class="steps">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Click a report card</strong>
+            <p>From the reports library, click the card for the report you want to run. Each card shows the report name and a short description.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Adjust the filters</strong>
+            <p>A filter panel will appear. Set your date range, platform, region, or other filters as needed. Leave a filter blank to include all values.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Click "Run Report"</strong>
+            <p>Results appear in a table below the filters. Larger reports may take a few seconds to load.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Download as CSV</strong>
+            <p>Click the <strong>Download CSV</strong> button to export the results to a spreadsheet. The filename includes the report name and date.</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <div class="callout-body">
+          <strong>Date filters — start broad, then narrow</strong>
+          When you're not sure of exact dates, start with a wide range (e.g., the whole quarter) and scan the results before narrowing down. All date filters use your local timezone.
+        </div>
+      </div>
+
+      <!-- Reports grid mockup -->
+      <div class="mockup">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="dot-red"></span>
+            <span class="dot-yellow"></span>
+            <span class="dot-green"></span>
+          </div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/ — Pre-Built Reports</div>
+        </div>
+        <div class="mock-reports-bg">
+          <div class="mock-reports-title">Pre-Built Reports — 11 available</div>
+          <div class="mock-reports-grid">
+            <div class="mock-report-card">
+              <div class="mock-report-icon">✅</div>
+              <div class="mock-report-name">Activations</div>
+              <div class="mock-report-desc">Contractor Activated SLPs by date, platform, BDR</div>
+            </div>
+            <div class="mock-report-card">
+              <div class="mock-report-icon">📅</div>
+              <div class="mock-report-name">License Expiration</div>
+              <div class="mock-report-desc">Licenses expiring within a selected window</div>
+            </div>
+            <div class="mock-report-card">
+              <div class="mock-report-icon">📱</div>
+              <div class="mock-report-name">Last App Date</div>
+              <div class="mock-report-desc">Accounts by last application date range</div>
+            </div>
+            <div class="mock-report-card">
+              <div class="mock-report-icon">📝</div>
+              <div class="mock-report-name">Last RPA Date</div>
+              <div class="mock-report-desc">Accounts by last rental purchase agreement date</div>
+            </div>
+            <div class="mock-report-card">
+              <div class="mock-report-icon">🏆</div>
+              <div class="mock-report-name">BDR Performance</div>
+              <div class="mock-report-desc">Activation counts grouped by BDR</div>
+            </div>
+            <div class="mock-report-card">
+              <div class="mock-report-icon">🎓</div>
+              <div class="mock-report-name">Training Summary</div>
+              <div class="mock-report-desc">Training records by trainer and type</div>
+            </div>
+            <div class="mock-report-card">
+              <div class="mock-report-icon">📊</div>
+              <div class="mock-report-name">Account Activity</div>
+              <div class="mock-report-desc">Engagement status — active vs cold accounts</div>
+            </div>
+            <div class="mock-report-card">
+              <div class="mock-report-icon">🔎</div>
+              <div class="mock-report-name">Account Channel Search</div>
+              <div class="mock-report-desc">Find accounts by name + program/channel</div>
+            </div>
+            <div class="mock-report-card">
+              <div class="mock-report-icon">🏢</div>
+              <div class="mock-report-name">Verdata</div>
+              <div class="mock-report-desc">Dealer IDs, DBA names, addresses, tax IDs</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── 6. Report Builder ── -->
+    <section class="section" id="report-builder">
+      <div class="section-label">Section 6</div>
+      <h2>Report Builder</h2>
+      <p>Report Builder lets you create <strong>custom ad-hoc queries</strong> against ActiveCampaign data. Use it when you need a combination of fields that no pre-built report covers — for example, "all accounts in the Southwest region on the LTO program with a last app date in the last 90 days."</p>
+
+      <h3>How to Build a Custom Report</h3>
+      <ol class="steps">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Choose a data object</strong>
+            <p>Select whether you want to query <strong>Accounts</strong>, <strong>Contacts</strong>, or <strong>SLP Records</strong>. This determines which fields are available.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Select the fields (columns) you want</strong>
+            <p>Check the boxes for each field you want to appear in the output. For Accounts these include name, region, dealer ID, type, owner, and any custom fields. For SLPs: platform, status, activation date, oracle IDs, and more.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Add filters</strong>
+            <p>Apply one or more filter conditions to narrow results — e.g., <em>Region = Southwest</em>, <em>Platform = LTO</em>, or <em>Status = Contractor Activated</em>.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Run and export</strong>
+            <p>Click <strong>Run Query</strong>. Results appear below. Download via <strong>Export CSV</strong> to share or analyze in Excel.</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="callout note">
+        <span class="callout-icon">ℹ️</span>
+        <div class="callout-body">
+          <strong>When to use Report Builder vs Pre-Built Reports</strong>
+          Use pre-built reports for day-to-day tasks — they're faster and already formatted. Use Report Builder when you need an unusual combination of fields, want to cross SLP data with account fields, or are doing a one-off data pull for a specific project.
+        </div>
+      </div>
+
+      <!-- Report Builder mockup -->
+      <div class="mockup">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="dot-red"></span>
+            <span class="dot-yellow"></span>
+            <span class="dot-green"></span>
+          </div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/ — Report Builder</div>
+        </div>
+        <div class="mock-builder-bg">
+          <div class="mock-builder-left">
+            <div class="mock-builder-panel" style="margin-bottom:10px;">
+              <div class="mock-builder-panel-header">Data Object</div>
+              <div class="mock-builder-panel-body" style="padding:8px;">
+                <div class="mock-obj-btn active">🏢 Accounts</div>
+                <div class="mock-obj-btn">👤 Contacts</div>
+                <div class="mock-obj-btn">📋 SLP Records</div>
+              </div>
+            </div>
+            <div class="mock-builder-panel">
+              <div class="mock-builder-panel-header">Fields to include</div>
+              <div class="mock-builder-panel-body" style="padding:8px;">
+                <div class="mock-field-check"><input type="checkbox" checked readonly/> Account Name</div>
+                <div class="mock-field-check"><input type="checkbox" checked readonly/> Dealer ID</div>
+                <div class="mock-field-check"><input type="checkbox" checked readonly/> Sales Region</div>
+                <div class="mock-field-check"><input type="checkbox" checked readonly/> Account Type</div>
+                <div class="mock-field-check"><input type="checkbox" readonly/> Account Owner</div>
+                <div class="mock-field-check"><input type="checkbox" readonly/> Phone</div>
+                <div class="mock-field-check"><input type="checkbox" readonly/> Website</div>
+              </div>
+            </div>
+          </div>
+          <div class="mock-builder-right">
+            <div class="mock-builder-panel">
+              <div class="mock-builder-panel-header">Filters</div>
+              <div class="mock-builder-panel-body">
+                <div class="mock-filter-row">
+                  <select style="width:120px;"><option>Sales Region</option></select>
+                  <select style="width:60px;"><option>is</option></select>
+                  <select style="width:100px;"><option>Southwest</option></select>
+                </div>
+                <div class="mock-filter-row">
+                  <select style="width:120px;"><option>Account Type</option></select>
+                  <select style="width:60px;"><option>is</option></select>
+                  <select style="width:100px;"><option>Contractor</option></select>
+                </div>
+                <button class="mock-run-btn">▶ Run Query</button>
+              </div>
+            </div>
+            <div style="margin-top:10px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+              <div style="padding:8px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#636366;">142 results</span>
+                <button class="mock-export-btn">⬇ Export CSV</button>
+              </div>
+              <table class="mock-results-table">
+                <thead>
+                  <tr>
+                    <th>Account Name</th>
+                    <th>Dealer ID</th>
+                    <th>Region</th>
+                    <th>Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>COMFORT AIR LLC-44821 DBA ARS of Dallas</td>
+                    <td><code style="font-size:.72rem;">44821</code></td>
+                    <td>Southwest</td>
+                    <td>Contractor</td>
+                  </tr>
+                  <tr>
+                    <td>SOUTHWEST HVAC SERVICES-31209</td>
+                    <td><code style="font-size:.72rem;">31209</code></td>
+                    <td>Southwest</td>
+                    <td>Contractor</td>
+                  </tr>
+                  <tr>
+                    <td>LONE STAR COOLING LLC-52847</td>
+                    <td><code style="font-size:.72rem;">52847</code></td>
+                    <td>Southwest</td>
+                    <td>Contractor</td>
+                  </tr>
+                  <tr>
+                    <td style="color:#9ca3af;font-style:italic;" colspan="4">… 139 more rows</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── 7. Dealer Locator ── -->
+    <section class="section" id="dealer-locator">
+      <div class="section-label">Section 7</div>
+      <h2>Dealer Locator</h2>
+      <p>The Dealer Locator opens at <code>/dealer-locator</code> in a new tab and shows an <strong>interactive map</strong> of active Microf dealers across your territory. Use it to quickly see dealer density in a region, verify coverage for a zip code, or look up a specific dealer by clicking its pin.</p>
+
+      <h3>Using the Map</h3>
+      <ul style="margin:8px 0 14px 20px;color:var(--text2);">
+        <li><strong>Green pins</strong> — Contractor Activated dealers</li>
+        <li><strong>Blue pins</strong> — dealers with other active statuses</li>
+        <li><strong>Orange pins</strong> — dealers on hold or with limited activity</li>
+        <li><strong>Click any pin</strong> to open a summary card in the right panel showing the account name, dealer ID, program, and activation date</li>
+        <li><strong>Zoom and pan</strong> using standard map controls or your scroll wheel</li>
+      </ul>
+
+      <h3>Side Panel</h3>
+      <p>The right panel lists nearby accounts as you move around the map. Click any card in the list to highlight and center the corresponding pin. The panel also shows a direct link to open the full account detail view.</p>
+
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <div class="callout-body">
+          <strong>Territory planning use case</strong>
+          Zoom into a metro area and use the side panel to spot gaps — zip codes with no active dealers. This can help you identify expansion opportunities to discuss with your BDR team.
+        </div>
+      </div>
+
+      <!-- Dealer Locator mockup -->
+      <div class="mockup">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="dot-red"></span>
+            <span class="dot-yellow"></span>
+            <span class="dot-green"></span>
+          </div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/dealer-locator</div>
+        </div>
+        <div class="mock-map-bg">
+          <div class="mock-map-tiles"></div>
+          <!-- Map pins -->
+          <div class="map-pin active-pin" style="left:18%;top:45%;"></div>
+          <div class="map-pin active-pin" style="left:22%;top:32%;"></div>
+          <div class="map-pin blue-pin"   style="left:31%;top:55%;"></div>
+          <div class="map-pin active-pin" style="left:38%;top:28%;"></div>
+          <div class="map-pin orange-pin" style="left:42%;top:62%;"></div>
+          <div class="map-pin blue-pin"   style="left:48%;top:40%;"></div>
+          <div class="map-pin active-pin" style="left:28%;top:72%;"></div>
+          <div class="map-pin active-pin" style="left:55%;top:50%;width:20px;height:20px;background:#107c10;box-shadow:0 0 0 5px rgba(16,124,16,0.18);"></div>
+          <div class="map-pin blue-pin"   style="left:62%;top:35%;"></div>
+          <div class="map-pin active-pin" style="left:14%;top:60%;"></div>
+          <!-- Side panel -->
+          <div class="map-side-panel">
+            <div class="map-panel-title">Nearby Dealers (12)</div>
+            <div class="map-acct-card selected">
+              <div class="map-acct-name">COMFORT AIR LLC-44821</div>
+              <div class="map-acct-meta">Dallas, TX &nbsp;·&nbsp; 360 Finance</div>
+              <div class="map-acct-status">● Contractor Activated</div>
+            </div>
+            <div class="map-acct-card">
+              <div class="map-acct-name">SOUTHWEST HVAC SERVICES-31209</div>
+              <div class="map-acct-meta">Fort Worth, TX &nbsp;·&nbsp; 360 Finance</div>
+              <div class="map-acct-status">● Contractor Activated</div>
+            </div>
+            <div class="map-acct-card">
+              <div class="map-acct-name">LONE STAR COOLING LLC-52847</div>
+              <div class="map-acct-meta">Arlington, TX &nbsp;·&nbsp; Microf</div>
+              <div style="font-size:0.67rem;font-weight:700;color:#e08000;margin-top:3px;">● Account on Hold</div>
+            </div>
+            <div class="map-acct-card">
+              <div class="map-acct-name">PREMIER AIR INC-29103</div>
+              <div class="map-acct-meta">Plano, TX &nbsp;·&nbsp; OPTIMUS</div>
+              <div class="map-acct-status">● Contractor Activated</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── 8. Global Search ── -->
+    <section class="section" id="global-search">
+      <div class="section-label">Section 8</div>
+      <h2>Global Search</h2>
+      <p>Global Search lets you query <strong>all data objects at once</strong> — accounts, contacts, and SLP records — from a single search box within the main app. It's the fastest way to find something when you're not sure which type of record it is.</p>
+
+      <h3>How Global Search works</h3>
+      <ul style="margin:8px 0 14px 20px;color:var(--text2);">
+        <li>Type any name, email, dealer ID, or keyword into the Global Search box</li>
+        <li>Results are returned <strong>grouped by type</strong>: Accounts, Contacts, SLP Records</li>
+        <li>Each result shows the record type, name, and key identifiers at a glance</li>
+        <li>Click any result to navigate to its full detail view</li>
+      </ul>
+
+      <h3>When to use Global Search vs Account Search</h3>
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th>Use this</th>
+            <th>When you want to…</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Global Search</strong> (in-app)</td>
+            <td>Quickly find anything — you're not sure if it's an account or a contact, or you want to see SLP records by keyword</td>
+          </tr>
+          <tr>
+            <td><strong>Account Search</strong> (new tab)</td>
+            <td>Deep-dive into a specific account — view full SLP table, contacts, custom fields, and export to CSV</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout note">
+        <span class="callout-icon">ℹ️</span>
+        <div class="callout-body">
+          <strong>Keyboard shortcut</strong>
+          From most screens in the app, you can press <kbd style="background:#f0f0f5;border:1px solid #d1d5db;border-radius:4px;padding:1px 6px;font-size:0.8em;font-family:monospace;">⌘K</kbd> (Mac) or <kbd style="background:#f0f0f5;border:1px solid #d1d5db;border-radius:4px;padding:1px 6px;font-size:0.8em;font-family:monospace;">Ctrl+K</kbd> (Windows) to open Global Search instantly without going back to the Apps Grid.
+        </div>
+      </div>
+
+      <!-- Global Search mockup -->
+      <div class="mockup">
+        <div class="browser-chrome">
+          <div class="browser-dots">
+            <span class="dot-red"></span>
+            <span class="dot-yellow"></span>
+            <span class="dot-green"></span>
+          </div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/ — Global Search</div>
+        </div>
+        <div style="background:#fff;padding:24px 20px;">
+          <div style="max-width:480px;margin:0 auto;">
+            <div style="background:#f3f4f6;border:1.5px solid #0078d4;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+              <span style="color:#9ca3af;font-size:1rem;">🔍</span>
+              <span style="font-size:0.88rem;color:#1c1c1e;">ARS Dallas</span>
+              <span style="margin-left:auto;font-size:0.72rem;color:#aeaeb2;background:#e5e7eb;padding:1px 7px;border-radius:4px;font-family:monospace;">⌘K</span>
+            </div>
+
+            <div style="font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#636366;margin-bottom:6px;">Accounts</div>
+            <div class="mock-search-result" style="margin-bottom:6px;">
+              <div class="mock-result-avatar" style="background:#0078d4;border-radius:7px;width:32px;height:32px;font-size:.72rem;">CA</div>
+              <div class="mock-result-info">
+                <div class="mock-result-name">COMFORT AIR LLC-44821 DBA ARS of Dallas</div>
+                <div class="mock-result-meta">Dealer #44821 · Southwest · Contractor</div>
+              </div>
+              <span style="color:#aeaeb2;font-size:0.8rem;">›</span>
+            </div>
+
+            <div style="font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#636366;margin:12px 0 6px;">Contacts</div>
+            <div class="mock-search-result" style="margin-bottom:6px;">
+              <div class="mock-result-avatar" style="background:#059669;border-radius:50%;width:32px;height:32px;font-size:.72rem;">JM</div>
+              <div class="mock-result-info">
+                <div class="mock-result-name">Jennifer Martinez</div>
+                <div class="mock-result-meta">j.martinez@arsoftexas.com · Account #44821</div>
+              </div>
+              <span style="color:#aeaeb2;font-size:0.8rem;">›</span>
+            </div>
+
+            <div style="font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#636366;margin:12px 0 6px;">SLP Records</div>
+            <div class="mock-search-result">
+              <div class="mock-result-avatar" style="background:#7c3aed;border-radius:7px;width:32px;height:32px;font-size:.7rem;">SLP</div>
+              <div class="mock-result-info">
+                <div class="mock-result-name">COMFORT AIR LLC-44821 — 360 Finance</div>
+                <div class="mock-result-meta">Contractor Activated · TX-01612 · Dealer #44821</div>
+              </div>
+              <span style="color:#aeaeb2;font-size:0.8rem;">›</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Footer -->
+    <div style="padding:40px 0 20px;text-align:center;color:var(--text4);font-size:0.8rem;border-top:1px solid var(--border);margin-top:20px;">
+      AC Reporter User Guide &nbsp;·&nbsp; Microf &nbsp;·&nbsp; May 2026<br/>
+      <span style="font-size:0.72rem;">For IT support or access issues, contact your team administrator.</span>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// Highlight active TOC link based on scroll position
+(function() {
+  const tocLinks = document.querySelectorAll('.toc a');
+  const sections = document.querySelectorAll('.section[id]');
+
+  function onScroll() {
+    const scrollY = window.scrollY + 120;
+    let current = '';
+    sections.forEach(sec => {
+      if (sec.offsetTop <= scrollY) current = sec.id;
+    });
+    tocLinks.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+</body>
+</html>
