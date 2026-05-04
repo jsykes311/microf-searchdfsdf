@@ -818,14 +818,49 @@ code {
   .mock-acct-fields { grid-template-columns: 1fr 1fr; }
 }
 
+/* ── Download button ── */
+#download-btn {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 200;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  padding: 11px 22px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,120,212,0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+#download-btn:hover {
+  background: var(--blue-dark);
+  box-shadow: 0 6px 20px rgba(0,120,212,0.5);
+  transform: translateY(-1px);
+}
+
 /* ── Print ── */
 @media print {
-  .toc { display: none; }
-  .guide-wrap { max-width: 100%; padding: 0; }
-  .mockup { page-break-inside: avoid; }
-  .section { page-break-before: always; }
-  body { font-size: 13px; }
-  .hero { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  #download-btn { display: none !important; }
+  .toc { display: none !important; }
+  .guide-wrap { max-width: 100%; padding: 0; gap: 0; }
+  .guide-main { padding: 24px 40px 60px; }
+  body { background: #fff; font-size: 13px; }
+  .hero { background: #0078d4 !important; color: #fff; padding: 40px; }
+  .section { page-break-before: always; break-before: page; }
+  .section:first-child { page-break-before: avoid; break-before: avoid; }
+  .mockup { page-break-inside: avoid; break-inside: avoid; }
+  .steps li { page-break-inside: avoid; break-inside: avoid; }
+  .callout { page-break-inside: avoid; break-inside: avoid; }
+  h2, h3 { page-break-after: avoid; break-after: avoid; }
+  a { color: inherit; text-decoration: none; }
 }
 </style>
 </head>
@@ -1908,5 +1943,10 @@ code {
   onScroll();
 })();
 </script>
+
+<button id="download-btn" onclick="window.print()">
+  ⬇ Download PDF
+</button>
+
 </body>
 </html>
