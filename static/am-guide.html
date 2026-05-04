@@ -566,33 +566,33 @@ body {
 .mock-reports-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 20px 8px;
-  max-width: 620px;
+  gap: 24px 16px;
+  max-width: 700px;
 }
 .mock-report-tile {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   cursor: pointer;
 }
 .mock-report-tile-icon {
-  width: 72px;
-  height: 72px;
-  border-radius: 17px;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.08);
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.20), 0 0 0 0.5px rgba(0,0,0,0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 2.6rem;
 }
 .mock-report-tile-label {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 400;
   color: #3a3a3c;
   text-align: center;
   line-height: 1.3;
-  max-width: 72px;
+  max-width: 96px;
 }
 
 /* Report builder mockup */
@@ -812,7 +812,7 @@ code {
   .guide-wrap { flex-direction: column; padding: 0 16px; }
   .toc { position: relative; top: auto; width: 100%; min-width: unset; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
   .mock-apps-grid { grid-template-columns: repeat(3, 1fr); }
-  .mock-reports-grid { grid-template-columns: repeat(4, 1fr); }
+  .mock-reports-grid { grid-template-columns: repeat(3, 1fr); }
   .mock-builder-bg { flex-direction: column; }
   .mock-builder-left { width: 100%; }
   .mock-acct-fields { grid-template-columns: 1fr 1fr; }
@@ -1620,10 +1620,6 @@ code {
               <div class="mock-report-tile-label">Account Program Search</div>
             </div>
 
-            <div class="mock-report-tile">
-              <div class="mock-report-tile-icon" style="background:linear-gradient(145deg,#ff6b35,#c73e00);">⚠️</div>
-              <div class="mock-report-tile-label">Stale Untrained</div>
-            </div>
 
           </div>
         </div>
