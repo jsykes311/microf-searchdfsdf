@@ -1587,12 +1587,13 @@ code {
       </ul>
 
       <h3>Side Panel — Ranked by Last App Date</h3>
-      <p>The right panel lists nearby <strong>Microf-channel dealers</strong> sorted by their <strong>Last App Date</strong> — the most recently active dealers appear first. This ranking helps you instantly identify which dealers in an area are generating applications and which may need attention.</p>
+      <p>The right panel lists nearby <strong>Microf-channel dealers</strong> ranked by <strong>Last App Date</strong> using a 3-tier system. The dealer with the most recent application is ranked <strong>1st Choice</strong>, the second most recent is <strong>2nd Choice</strong>, and all others are <strong>3rd Choice</strong>. Within each tier, dealers are sorted by distance.</p>
       <ul style="margin:8px 0 14px 20px;color:var(--text2);">
-        <li><strong>Last App Date</strong> — the date a dealer last submitted a financing application through Microf</li>
-        <li>Dealers are ranked nearest-first when last app dates are equal or unavailable</li>
-        <li>Click any card in the list to highlight and center the corresponding pin on the map</li>
-        <li>Each card includes a direct link to open the full account in ActiveCampaign</li>
+        <li><span style="background:#dcfce7;color:#15803d;font-size:0.75rem;font-weight:700;padding:1px 6px;border-radius:4px;">1st Choice</span> — most recently active dealer in the area</li>
+        <li><span style="background:#dbeafe;color:#1d4ed8;font-size:0.75rem;font-weight:700;padding:1px 6px;border-radius:4px;">2nd Choice</span> — second most recently active dealer</li>
+        <li><span style="background:#fef9c3;color:#a16207;font-size:0.75rem;font-weight:700;padding:1px 6px;border-radius:4px;">3rd Choice</span> — all remaining dealers, sorted by distance</li>
+        <li>Dealers with no last app date on file are treated as 3rd Choice and sorted by distance</li>
+        <li>Click any card in the list to highlight and center its pin on the map</li>
       </ul>
 
       <div class="callout note">
@@ -1634,50 +1635,49 @@ code {
           <div class="map-pin active-pin" style="left:55%;top:50%;width:20px;height:20px;background:#107c10;box-shadow:0 0 0 5px rgba(16,124,16,0.18);"></div>
           <div class="map-pin blue-pin"   style="left:62%;top:35%;"></div>
           <div class="map-pin active-pin" style="left:14%;top:60%;"></div>
-          <!-- Side panel with last app date ranking -->
+          <!-- Side panel with tier badges -->
           <div class="map-side-panel">
-            <div class="map-panel-title">Nearby Microf Dealers (9) <span style="font-size:0.6rem;font-weight:400;color:#636366;">sorted by last app date</span></div>
+            <div class="map-panel-title">Nearest 10 contractors</div>
 
             <div class="map-acct-card selected">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div class="map-acct-name">COMFORT AIR LLC-44821</div>
-                <div style="font-size:0.6rem;background:#d1fae5;color:#065f46;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">Apr 28</div>
+                <span style="font-size:0.6rem;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">1st Choice</span>
               </div>
-              <div class="map-acct-meta">Dallas, TX &nbsp;·&nbsp; Microf</div>
+              <div class="map-acct-meta">Dallas, TX &nbsp;·&nbsp; 0.8 mi</div>
               <div class="map-acct-status">● Contractor Activated</div>
             </div>
 
             <div class="map-acct-card">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div class="map-acct-name">SOUTHWEST HVAC SERVICES-31209</div>
-                <div style="font-size:0.6rem;background:#d1fae5;color:#065f46;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">Apr 15</div>
+                <span style="font-size:0.6rem;background:#dbeafe;color:#1d4ed8;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">2nd Choice</span>
               </div>
-              <div class="map-acct-meta">Fort Worth, TX &nbsp;·&nbsp; Microf</div>
+              <div class="map-acct-meta">Fort Worth, TX &nbsp;·&nbsp; 3.2 mi</div>
               <div class="map-acct-status">● Contractor Activated</div>
             </div>
 
             <div class="map-acct-card">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div class="map-acct-name">LONE STAR COOLING LLC-52847</div>
-                <div style="font-size:0.6rem;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">Feb 03</div>
+                <span style="font-size:0.6rem;background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">3rd Choice</span>
               </div>
-              <div class="map-acct-meta">Arlington, TX &nbsp;·&nbsp; Microf</div>
+              <div class="map-acct-meta">Arlington, TX &nbsp;·&nbsp; 5.1 mi</div>
               <div class="map-acct-status">● Contractor Activated</div>
             </div>
 
             <div class="map-acct-card">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                 <div class="map-acct-name">PREMIER AIR INC-29103</div>
-                <div style="font-size:0.6rem;background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">Oct 2024</div>
+                <span style="font-size:0.6rem;background:#fef9c3;color:#a16207;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">3rd Choice</span>
               </div>
-              <div class="map-acct-meta">Plano, TX &nbsp;·&nbsp; Microf</div>
+              <div class="map-acct-meta">Plano, TX &nbsp;·&nbsp; 7.4 mi</div>
               <div class="map-acct-status">● Contractor Activated</div>
             </div>
           </div>
         </div>
       </div>
 
-      <p style="margin-top:12px;font-size:0.82rem;color:var(--text2);">The last app date badge uses a color scale: <strong style="color:#065f46;">green</strong> = recent (past 30 days), <strong style="color:#92400e;">amber</strong> = 30–90 days ago, <strong style="color:#991b1b;">red</strong> = over 90 days ago.</p>
 
     </section>
 
