@@ -846,6 +846,7 @@ code {
     <a href="#apps-grid">2. The Apps Grid</a>
     <a href="#global-search">3. Global Search</a>
     <a href="#account-view">4. Account View</a>
+    <a href="#account-view" style="padding-left:20px;font-size:0.78rem;color:var(--text3);">↳ Logging Notes &amp; Training</a>
     <a href="#prebuilt-reports">5. Pre-Built Reports</a>
     <a href="#report-builder">6. Report Builder</a>
     <a href="#dealer-locator">7. Dealer Locator</a>
@@ -1247,6 +1248,170 @@ code {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <h3>Logging Activity Notes</h3>
+      <p>The <strong>Activity Notes</strong> panel in the account sidebar lets you log any interaction with a dealer directly in ActiveCampaign — without leaving AC Reporter.</p>
+      <ol class="steps">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Open an account</strong>
+            <p>Use Global Search to find the account. The Activity Notes panel appears in the right sidebar of the account detail view.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Select the note type</strong>
+            <p>Choose from <em>Internal Note</em>, <em>Call</em>, <em>Email</em>, or <em>Text</em>.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Fill in the subject and body</strong>
+            <p>Add a short subject line and your note details. Notes are saved directly to the AC account record.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Click Submit</strong>
+            <p>The note saves immediately and appears in the notes list above the form.</p>
+          </div>
+        </li>
+      </ol>
+
+      <!-- Activity Notes mockup -->
+      <div class="mockup">
+        <div class="browser-chrome">
+          <div class="browser-dots"><span class="dot-red"></span><span class="dot-yellow"></span><span class="dot-green"></span></div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/ — Account Detail</div>
+        </div>
+        <div style="background:#f3f6fb;padding:16px;">
+          <div style="max-width:320px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+            <div style="padding:10px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:0.78rem;font-weight:700;color:#1c1c1e;">Activity Notes</span>
+            </div>
+            <!-- Existing notes -->
+            <div style="padding:10px 12px;border-bottom:1px solid #f3f4f6;max-height:110px;overflow:hidden;">
+              <div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;font-size:0.72rem;">
+                <div style="width:7px;height:7px;border-radius:50%;background:#9ca3af;flex-shrink:0;margin-top:4px;"></div>
+                <div style="flex:1;">
+                  <div style="color:#374151;line-height:1.5;"><strong>Call</strong> — Left voicemail re: summer promotion. Will follow up Friday.</div>
+                  <div style="font-size:0.63rem;color:#9ca3af;margin-top:2px;">Marcus Rivera · Apr 29, 2026</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;padding:5px 0;font-size:0.72rem;">
+                <div style="width:7px;height:7px;border-radius:50%;background:#9ca3af;flex-shrink:0;margin-top:4px;"></div>
+                <div style="flex:1;">
+                  <div style="color:#374151;line-height:1.5;"><strong>Internal Note</strong> — Confirmed dealer still active, new tech started last week.</div>
+                  <div style="font-size:0.63rem;color:#9ca3af;margin-top:2px;">Marcus Rivera · Apr 15, 2026</div>
+                </div>
+              </div>
+            </div>
+            <!-- New note form -->
+            <div style="padding:10px 12px;">
+              <select style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;margin-bottom:6px;">
+                <option>Call</option>
+              </select>
+              <input type="text" value="Follow-up — summer promo" readonly
+                style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid #0078d4;border-radius:4px;font-family:inherit;margin-bottom:6px;outline:none;box-shadow:0 0 0 2px rgba(0,120,212,.15);">
+              <textarea rows="2" readonly
+                style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;resize:none;margin-bottom:6px;color:#374151;">Spoke with owner — interested in the summer HVAC promo. Sending materials by email.</textarea>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <button style="padding:5px 14px;font-size:0.78rem;font-weight:600;background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;">Submit</button>
+                <span style="font-size:0.72rem;color:#6b7280;"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Logging Training Records</h3>
+      <p>The <strong>Training Records</strong> panel lets you log a training session for a dealer directly from the account view. Records are saved to ActiveCampaign and automatically appear in the Training Summary and Training Activity reports.</p>
+      <ol class="steps">
+        <li>
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Select the training type</strong>
+            <p>Choose <em>Webinar</em>, <em>Video Link</em>, or <em>In Person</em>.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Select the agenda</strong>
+            <p>Choose <em>Enrollment Training</em> (first-time) or <em>Refresh Training</em> (returning dealer).</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Select the trainer and date</strong>
+            <p>Pick who conducted the training. The date defaults to today — change it if logging a past session.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <strong>Add notes and click Submit</strong>
+            <p>Notes are optional. Click Submit to save the record — it will appear in the training list above and show up in reports immediately.</p>
+          </div>
+        </li>
+      </ol>
+
+      <!-- Training Records mockup -->
+      <div class="mockup">
+        <div class="browser-chrome">
+          <div class="browser-dots"><span class="dot-red"></span><span class="dot-yellow"></span><span class="dot-green"></span></div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/ — Account Detail</div>
+        </div>
+        <div style="background:#f3f6fb;padding:16px;">
+          <div style="max-width:320px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+            <div style="padding:10px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb;">
+              <span style="font-size:0.78rem;font-weight:700;color:#1c1c1e;">Training Records</span>
+            </div>
+            <!-- Existing training record -->
+            <div style="padding:10px 12px;border-bottom:1px solid #f3f4f6;">
+              <div style="font-size:0.72rem;display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-weight:600;color:#1c1c1e;">Enrollment Training</div>
+                  <div style="color:#636366;margin-top:2px;">Webinar &nbsp;·&nbsp; Barb Yeskey &nbsp;·&nbsp; Mar 12, 2026</div>
+                </div>
+                <span style="background:#dff6dd;color:#107c10;font-size:0.62rem;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-left:8px;">Completed</span>
+              </div>
+            </div>
+            <!-- New training form -->
+            <div style="padding:10px 12px;">
+              <select style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;margin-bottom:6px;">
+                <option>In Person</option>
+              </select>
+              <select style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid #0078d4;border-radius:4px;font-family:inherit;margin-bottom:6px;outline:none;box-shadow:0 0 0 2px rgba(0,120,212,.15);">
+                <option>Refresh Training</option>
+              </select>
+              <select style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;margin-bottom:6px;">
+                <option>Warren Neely</option>
+              </select>
+              <input type="date" value="2026-05-03" readonly
+                style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;margin-bottom:6px;">
+              <textarea rows="2" readonly
+                style="width:100%;padding:5px 8px;font-size:0.78rem;border:1px solid #d1d5db;border-radius:4px;font-family:inherit;resize:none;margin-bottom:6px;color:#9ca3af;">Training notes (optional)…</textarea>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <button style="padding:5px 14px;font-size:0.78rem;font-weight:600;background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <div class="callout-body">
+          <strong>Records show up in reports immediately</strong>
+          Notes appear in the Team Performance report and Training Records show up in Training Summary and Training Activity — no sync delay.
         </div>
       </div>
 
