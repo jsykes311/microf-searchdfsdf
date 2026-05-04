@@ -406,7 +406,7 @@
         cards.insertAdjacentHTML('beforeend', '<div class="section-heading">SLP Records</div>');
         slps.forEach(s => {
           const name = s.dealer_id ? `Dealer ID ${s.dealer_id}` : s.record_id;
-          const sub  = s.platform ? `Platform: ${s.platform}` : '';
+          const sub  = s.channel ? `Channel: ${s.channel}` : '';
           const url  = s.account_url || '#';   // always the account, not the SLP
           cards.insertAdjacentHTML('beforeend', card('📋', name, sub, 'slp', url));
         });
