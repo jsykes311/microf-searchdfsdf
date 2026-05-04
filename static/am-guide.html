@@ -831,7 +831,7 @@ code {
 <div class="hero">
   <div style="max-width:900px;margin:0 auto;">
     <span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;background:rgba(255,255,255,0.18);padding:3px 10px;border-radius:99px;display:inline-block;margin-bottom:14px;">Account Manager Guide</span>
-    <h1 style="font-size:2rem;font-weight:700;line-height:1.2;margin-bottom:10px;">AC Reporter — Moogle Search</h1>
+    <h1 style="font-size:2rem;font-weight:700;line-height:1.2;margin-bottom:10px;">AC Reporter — Account Manager Guide</h1>
     <p style="font-size:1rem;opacity:.88;max-width:560px;">Everything you need to find accounts, run reports, and explore dealer data in the Microf web app.</p>
     <p style="margin-top:16px;font-size:0.8rem;opacity:.65;">Last updated May 2026 &nbsp;·&nbsp; For questions, contact your team lead or IT support.</p>
   </div>
@@ -844,12 +844,11 @@ code {
     <div class="toc-title">On This Page</div>
     <a href="#logging-in">1. Logging In</a>
     <a href="#apps-grid">2. The Apps Grid</a>
-    <a href="#account-search">3. Account Search</a>
+    <a href="#global-search">3. Global Search</a>
     <a href="#account-view">4. Account View</a>
     <a href="#prebuilt-reports">5. Pre-Built Reports</a>
     <a href="#report-builder">6. Report Builder</a>
     <a href="#dealer-locator">7. Dealer Locator</a>
-    <a href="#global-search">8. Global Search</a>
   </aside>
 
   <!-- Main content -->
@@ -940,7 +939,7 @@ code {
         <span class="callout-icon">💡</span>
         <div class="callout-body">
           <strong>Tip — No sidebar needed</strong>
-          The Apps Grid is your home base. Some apps open within the main app; others (Account Search and Dealer Locator) open in a new tab so you can keep the grid open.
+          The Apps Grid is your home base. Some apps open within the main app; Dealer Locator opens in a new tab so you can keep the grid open.
         </div>
       </div>
 
@@ -965,13 +964,8 @@ code {
           </tr>
           <tr>
             <td><strong>🌐 Global Search</strong></td>
-            <td>Search across accounts, contacts, and SLP records simultaneously from a single search box.</td>
+            <td>Search across accounts, contacts, and SLP records simultaneously from a single search box. Find anything by name, dealer ID, email, oracle ID, or keyword.</td>
             <td>Same tab</td>
-          </tr>
-          <tr>
-            <td><strong>🔍 Account Search</strong></td>
-            <td>Full-featured account search (Moogle). Find accounts by name, dealer ID, or email. View SLP records and contacts. Export to CSV.</td>
-            <td>New tab (<code>/search</code>)</td>
           </tr>
           <tr>
             <td><strong>📍 Dealer Locator</strong></td>
@@ -1010,10 +1004,6 @@ code {
               <div class="mock-app-label">Global Search</div>
             </div>
             <div class="mock-app-card">
-              <div class="mock-app-icon" style="background:linear-gradient(135deg,#059669,#047857);">🔍</div>
-              <div class="mock-app-label">Account Search</div>
-            </div>
-            <div class="mock-app-card">
               <div class="mock-app-icon" style="background:linear-gradient(135deg,#ea580c,#c2410c);">📍</div>
               <div class="mock-app-label">Dealer Locator</div>
             </div>
@@ -1023,40 +1013,40 @@ code {
 
     </section>
 
-    <!-- ── 3. Account Search ── -->
-    <section class="section" id="account-search">
+    <!-- ── 3. Global Search ── -->
+    <section class="section" id="global-search">
       <div class="section-label">Section 3</div>
-      <h2>Account Search (Moogle)</h2>
-      <p>Clicking <strong>Account Search</strong> opens a full-featured search interface at <code>/search</code> in a new browser tab. This is the fastest way to look up a specific account, contact, or dealer record.</p>
+      <h2>Global Search</h2>
+      <p>Global Search lets you query <strong>all data objects at once</strong> — accounts, contacts, and SLP records — from a single search box. It's the fastest way to find anything when you're not sure exactly where to look.</p>
 
-      <h3>Searching for an Account</h3>
+      <h3>How to search</h3>
       <ol class="steps">
         <li>
           <div class="step-num">1</div>
           <div class="step-body">
-            <strong>Type your query in the search bar</strong>
-            <p>You can search by: account name (or partial name), dealer ID number, or contact email address. The search updates results as you type.</p>
+            <strong>Click Global Search from the Apps Grid</strong>
+            <p>The search box opens inline. You can search by account name (or partial name), dealer ID, contact email, oracle ID, channel name, or any keyword.</p>
           </div>
         </li>
         <li>
           <div class="step-num">2</div>
           <div class="step-body">
-            <strong>Review the results list</strong>
-            <p>Results are shown as cards grouped by type. Each card shows the account name, dealer ID, region, and status. Accounts matched via a contact's email will show a <span class="mock-result-badge badge-purple-sm">via contact</span> badge.</p>
+            <strong>Review grouped results</strong>
+            <p>Results are returned grouped by type — <strong>Accounts</strong>, <strong>Contacts</strong>, and <strong>SLP Records</strong>. Each card shows the name and key identifiers. Accounts matched via a contact's email show a <span class="mock-result-badge badge-purple-sm">via contact</span> badge.</p>
           </div>
         </li>
         <li>
           <div class="step-num">3</div>
           <div class="step-body">
-            <strong>Click a result to view its detail</strong>
-            <p>Clicking opens the Account View (see Section 4). A "View in ActiveCampaign" link lets you jump directly to the live AC record.</p>
+            <strong>Click a result</strong>
+            <p>Clicking navigates to the full account or contact detail in ActiveCampaign.</p>
           </div>
         </li>
         <li>
           <div class="step-num">4</div>
           <div class="step-body">
-            <strong>Export results as CSV</strong>
-            <p>Use the <strong>Export CSV</strong> button in the top-right to download the current results list as a spreadsheet for offline work.</p>
+            <strong>Export to CSV</strong>
+            <p>Use the <strong>Export CSV</strong> button to download the current results as a spreadsheet.</p>
           </div>
         </li>
       </ol>
@@ -1065,11 +1055,11 @@ code {
         <span class="callout-icon">💡</span>
         <div class="callout-body">
           <strong>Search tip — partial names work great</strong>
-          Searching "comfort air" will match "COMFORT AIR LLC-44821 DBA ARS of Dallas". You don't need the exact full name. For ARS accounts, try searching by the city name or dealer ID.
+          Searching "comfort air" will match "COMFORT AIR LLC-44821 DBA ARS of Dallas". For ARS accounts, try searching by city name or dealer ID.
         </div>
       </div>
 
-      <!-- Account Search mockup -->
+      <!-- Global Search mockup -->
       <div class="mockup">
         <div class="browser-chrome">
           <div class="browser-dots">
@@ -1077,51 +1067,57 @@ code {
             <span class="dot-yellow"></span>
             <span class="dot-green"></span>
           </div>
-          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/search</div>
+          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/ — Global Search</div>
         </div>
-        <div class="mock-search-bg">
-          <div class="mock-search-topbar">
-            <span class="logo-text">Moogle</span>
-            <div class="search-pill">
-              <span class="qi">🔍</span>
-              <span class="qs">COMFORT AIR</span>
+        <div style="background:#fff;padding:24px 20px;">
+          <div style="max-width:480px;margin:0 auto;">
+            <div style="background:#f3f4f6;border:1.5px solid #0078d4;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+              <span style="color:#9ca3af;font-size:1rem;">🔍</span>
+              <span style="font-size:0.88rem;color:#1c1c1e;">COMFORT AIR</span>
+              <span style="margin-left:auto;font-size:0.72rem;color:#aeaeb2;background:#e5e7eb;padding:1px 7px;border-radius:4px;font-family:monospace;">⌘K</span>
             </div>
-            <div style="margin-left:auto;display:flex;gap:8px;">
-              <div style="background:rgba(255,255,255,0.15);border-radius:5px;padding:4px 10px;font-size:0.73rem;color:#fff;cursor:pointer;">Export CSV</div>
-            </div>
-          </div>
-          <div class="mock-search-body">
-            <div class="mock-search-results-label">3 Accounts found</div>
 
-            <div class="mock-search-result">
-              <div class="mock-result-avatar" style="background:#0078d4;">CA</div>
+            <div style="font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#636366;margin-bottom:6px;">Accounts</div>
+            <div class="mock-search-result" style="margin-bottom:6px;">
+              <div class="mock-result-avatar" style="background:#0078d4;border-radius:7px;width:32px;height:32px;font-size:.72rem;">CA</div>
               <div class="mock-result-info">
                 <div class="mock-result-name">COMFORT AIR LLC-44821 DBA ARS of Dallas</div>
                 <div class="mock-result-meta">Dealer #44821 &nbsp;·&nbsp; Southwest &nbsp;·&nbsp; Contractor</div>
               </div>
-              <span class="mock-result-badge badge-green-sm">Active</span>
+              <span style="color:#aeaeb2;font-size:0.8rem;">↗</span>
             </div>
-
-            <div class="mock-search-result">
-              <div class="mock-result-avatar" style="background:#7c3aed;">CA</div>
+            <div class="mock-search-result" style="margin-bottom:6px;">
+              <div class="mock-result-avatar" style="background:#7c3aed;border-radius:7px;width:32px;height:32px;font-size:.72rem;">CA</div>
               <div class="mock-result-info">
                 <div class="mock-result-name">COMFORT AIR SOLUTIONS-38274 DBA ARS of Houston</div>
                 <div class="mock-result-meta">Dealer #38274 &nbsp;·&nbsp; Southeast &nbsp;·&nbsp; Contractor</div>
               </div>
-              <span class="mock-result-badge badge-green-sm">Active</span>
+              <span style="color:#aeaeb2;font-size:0.8rem;">↗</span>
             </div>
 
-            <div class="mock-search-result">
-              <div class="mock-result-avatar" style="background:#059669;">JM</div>
+            <div style="font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#636366;margin:12px 0 6px;">Contacts</div>
+            <div class="mock-search-result" style="margin-bottom:6px;">
+              <div class="mock-result-avatar" style="background:#059669;border-radius:50%;width:32px;height:32px;font-size:.72rem;">JM</div>
               <div class="mock-result-info">
-                <div class="mock-result-name">COMFORT AIR LLC-44821 DBA ARS of Dallas</div>
-                <div class="mock-result-meta">Matched via: j.miller@comfortair.com &nbsp;·&nbsp; Dealer #44821</div>
+                <div class="mock-result-name">Jennifer Martinez</div>
+                <div class="mock-result-meta">j.martinez@arsoftexas.com &nbsp;·&nbsp; <span class="mock-result-badge badge-purple-sm">via contact</span> Dealer #44821</div>
               </div>
-              <span class="mock-result-badge badge-purple-sm">via contact</span>
+              <span style="color:#aeaeb2;font-size:0.8rem;">↗</span>
             </div>
-          </div>
-          <div class="mock-export-bar">
-            <button class="mock-export-btn">⬇ Export CSV</button>
+
+            <div style="font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#636366;margin:12px 0 6px;">SLP Records</div>
+            <div class="mock-search-result">
+              <div class="mock-result-avatar" style="background:#7c3aed;border-radius:7px;width:32px;height:32px;font-size:.7rem;">SLP</div>
+              <div class="mock-result-info">
+                <div class="mock-result-name">COMFORT AIR LLC-44821 — 360 Finance</div>
+                <div class="mock-result-meta">Contractor Activated &nbsp;·&nbsp; TX-01612 &nbsp;·&nbsp; Dealer #44821</div>
+              </div>
+              <span style="color:#aeaeb2;font-size:0.8rem;">↗</span>
+            </div>
+
+            <div style="margin-top:14px;text-align:right;">
+              <button style="background:#059669;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:0.78rem;cursor:pointer;">⬇ Export CSV</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1132,7 +1128,7 @@ code {
     <section class="section" id="account-view">
       <div class="section-label">Section 4</div>
       <h2>Account View</h2>
-      <p>The Account View shows everything about a single account — its core fields, SLP (Strategic Lending Partner) program records, and associated contacts. You reach it by clicking any result in Account Search, or via the account lookup within the main app.</p>
+      <p>The Account View shows everything about a single account — its core fields, SLP (Strategic Lending Partner) program records, and associated contacts. You reach it by clicking any result in Global Search, or via the account lookup within the main app.</p>
 
       <h3>Core Account Information</h3>
       <p>At the top of the detail panel you'll see:</p>
@@ -1590,14 +1586,28 @@ code {
         <li><strong>Zoom and pan</strong> using standard map controls or your scroll wheel</li>
       </ul>
 
-      <h3>Side Panel</h3>
-      <p>The right panel lists nearby accounts as you move around the map. Click any card in the list to highlight and center the corresponding pin. The panel also shows a direct link to open the full account detail view.</p>
+      <h3>Side Panel — Ranked by Last App Date</h3>
+      <p>The right panel lists nearby <strong>Microf-channel dealers</strong> sorted by their <strong>Last App Date</strong> — the most recently active dealers appear first. This ranking helps you instantly identify which dealers in an area are generating applications and which may need attention.</p>
+      <ul style="margin:8px 0 14px 20px;color:var(--text2);">
+        <li><strong>Last App Date</strong> — the date a dealer last submitted a financing application through Microf</li>
+        <li>Dealers are ranked nearest-first when last app dates are equal or unavailable</li>
+        <li>Click any card in the list to highlight and center the corresponding pin on the map</li>
+        <li>Each card includes a direct link to open the full account in ActiveCampaign</li>
+      </ul>
+
+      <div class="callout note">
+        <span class="callout-icon">ℹ️</span>
+        <div class="callout-body">
+          <strong>Microf dealers only</strong>
+          The map and side panel show dealers with a Microf-channel SLP (including Microf Direct, Microf LTO, etc.) that are Contractor Activated. Non-Microf programs like OPTIMUS or 360 Finance are not shown here.
+        </div>
+      </div>
 
       <div class="callout tip">
         <span class="callout-icon">💡</span>
         <div class="callout-body">
           <strong>Territory planning use case</strong>
-          Zoom into a metro area and use the side panel to spot gaps — zip codes with no active dealers. This can help you identify expansion opportunities to discuss with your BDR team.
+          Zoom into a metro area — the side panel immediately shows you which dealers are actively using Microf (recent last app dates at the top) and which have gone quiet. Use this to prioritize re-engagement calls before heading into the field.
         </div>
       </div>
 
@@ -1624,130 +1634,54 @@ code {
           <div class="map-pin active-pin" style="left:55%;top:50%;width:20px;height:20px;background:#107c10;box-shadow:0 0 0 5px rgba(16,124,16,0.18);"></div>
           <div class="map-pin blue-pin"   style="left:62%;top:35%;"></div>
           <div class="map-pin active-pin" style="left:14%;top:60%;"></div>
-          <!-- Side panel -->
+          <!-- Side panel with last app date ranking -->
           <div class="map-side-panel">
-            <div class="map-panel-title">Nearby Dealers (12)</div>
+            <div class="map-panel-title">Nearby Microf Dealers (9) <span style="font-size:0.6rem;font-weight:400;color:#636366;">sorted by last app date</span></div>
+
             <div class="map-acct-card selected">
-              <div class="map-acct-name">COMFORT AIR LLC-44821</div>
-              <div class="map-acct-meta">Dallas, TX &nbsp;·&nbsp; 360 Finance</div>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div class="map-acct-name">COMFORT AIR LLC-44821</div>
+                <div style="font-size:0.6rem;background:#d1fae5;color:#065f46;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">Apr 28</div>
+              </div>
+              <div class="map-acct-meta">Dallas, TX &nbsp;·&nbsp; Microf</div>
               <div class="map-acct-status">● Contractor Activated</div>
             </div>
+
             <div class="map-acct-card">
-              <div class="map-acct-name">SOUTHWEST HVAC SERVICES-31209</div>
-              <div class="map-acct-meta">Fort Worth, TX &nbsp;·&nbsp; 360 Finance</div>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div class="map-acct-name">SOUTHWEST HVAC SERVICES-31209</div>
+                <div style="font-size:0.6rem;background:#d1fae5;color:#065f46;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">Apr 15</div>
+              </div>
+              <div class="map-acct-meta">Fort Worth, TX &nbsp;·&nbsp; Microf</div>
               <div class="map-acct-status">● Contractor Activated</div>
             </div>
+
             <div class="map-acct-card">
-              <div class="map-acct-name">LONE STAR COOLING LLC-52847</div>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div class="map-acct-name">LONE STAR COOLING LLC-52847</div>
+                <div style="font-size:0.6rem;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">Feb 03</div>
+              </div>
               <div class="map-acct-meta">Arlington, TX &nbsp;·&nbsp; Microf</div>
-              <div style="font-size:0.67rem;font-weight:700;color:#e08000;margin-top:3px;">● Account on Hold</div>
+              <div class="map-acct-status">● Contractor Activated</div>
             </div>
+
             <div class="map-acct-card">
-              <div class="map-acct-name">PREMIER AIR INC-29103</div>
-              <div class="map-acct-meta">Plano, TX &nbsp;·&nbsp; OPTIMUS</div>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div class="map-acct-name">PREMIER AIR INC-29103</div>
+                <div style="font-size:0.6rem;background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;margin-left:6px;">Oct 2024</div>
+              </div>
+              <div class="map-acct-meta">Plano, TX &nbsp;·&nbsp; Microf</div>
               <div class="map-acct-status">● Contractor Activated</div>
             </div>
           </div>
         </div>
       </div>
+
+      <p style="margin-top:12px;font-size:0.82rem;color:var(--text2);">The last app date badge uses a color scale: <strong style="color:#065f46;">green</strong> = recent (past 30 days), <strong style="color:#92400e;">amber</strong> = 30–90 days ago, <strong style="color:#991b1b;">red</strong> = over 90 days ago.</p>
 
     </section>
 
     <!-- ── 8. Global Search ── -->
-    <section class="section" id="global-search">
-      <div class="section-label">Section 8</div>
-      <h2>Global Search</h2>
-      <p>Global Search lets you query <strong>all data objects at once</strong> — accounts, contacts, and SLP records — from a single search box within the main app. It's the fastest way to find something when you're not sure which type of record it is.</p>
-
-      <h3>How Global Search works</h3>
-      <ul style="margin:8px 0 14px 20px;color:var(--text2);">
-        <li>Type any name, email, dealer ID, or keyword into the Global Search box</li>
-        <li>Results are returned <strong>grouped by type</strong>: Accounts, Contacts, SLP Records</li>
-        <li>Each result shows the record type, name, and key identifiers at a glance</li>
-        <li>Click any result to navigate to its full detail view</li>
-      </ul>
-
-      <h3>When to use Global Search vs Account Search</h3>
-      <table class="doc-table">
-        <thead>
-          <tr>
-            <th>Use this</th>
-            <th>When you want to…</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Global Search</strong> (in-app)</td>
-            <td>Quickly find anything — you're not sure if it's an account or a contact, or you want to see SLP records by keyword</td>
-          </tr>
-          <tr>
-            <td><strong>Account Search</strong> (new tab)</td>
-            <td>Deep-dive into a specific account — view full SLP table, contacts, custom fields, and export to CSV</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="callout note">
-        <span class="callout-icon">ℹ️</span>
-        <div class="callout-body">
-          <strong>Keyboard shortcut</strong>
-          From most screens in the app, you can press <kbd style="background:#f0f0f5;border:1px solid #d1d5db;border-radius:4px;padding:1px 6px;font-size:0.8em;font-family:monospace;">⌘K</kbd> (Mac) or <kbd style="background:#f0f0f5;border:1px solid #d1d5db;border-radius:4px;padding:1px 6px;font-size:0.8em;font-family:monospace;">Ctrl+K</kbd> (Windows) to open Global Search instantly without going back to the Apps Grid.
-        </div>
-      </div>
-
-      <!-- Global Search mockup -->
-      <div class="mockup">
-        <div class="browser-chrome">
-          <div class="browser-dots">
-            <span class="dot-red"></span>
-            <span class="dot-yellow"></span>
-            <span class="dot-green"></span>
-          </div>
-          <div class="browser-url"><span class="protocol">https://</span>microf-ac.onrender.com/ — Global Search</div>
-        </div>
-        <div style="background:#fff;padding:24px 20px;">
-          <div style="max-width:480px;margin:0 auto;">
-            <div style="background:#f3f4f6;border:1.5px solid #0078d4;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:18px;">
-              <span style="color:#9ca3af;font-size:1rem;">🔍</span>
-              <span style="font-size:0.88rem;color:#1c1c1e;">ARS Dallas</span>
-              <span style="margin-left:auto;font-size:0.72rem;color:#aeaeb2;background:#e5e7eb;padding:1px 7px;border-radius:4px;font-family:monospace;">⌘K</span>
-            </div>
-
-            <div style="font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#636366;margin-bottom:6px;">Accounts</div>
-            <div class="mock-search-result" style="margin-bottom:6px;">
-              <div class="mock-result-avatar" style="background:#0078d4;border-radius:7px;width:32px;height:32px;font-size:.72rem;">CA</div>
-              <div class="mock-result-info">
-                <div class="mock-result-name">COMFORT AIR LLC-44821 DBA ARS of Dallas</div>
-                <div class="mock-result-meta">Dealer #44821 · Southwest · Contractor</div>
-              </div>
-              <span style="color:#aeaeb2;font-size:0.8rem;">›</span>
-            </div>
-
-            <div style="font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#636366;margin:12px 0 6px;">Contacts</div>
-            <div class="mock-search-result" style="margin-bottom:6px;">
-              <div class="mock-result-avatar" style="background:#059669;border-radius:50%;width:32px;height:32px;font-size:.72rem;">JM</div>
-              <div class="mock-result-info">
-                <div class="mock-result-name">Jennifer Martinez</div>
-                <div class="mock-result-meta">j.martinez@arsoftexas.com · Account #44821</div>
-              </div>
-              <span style="color:#aeaeb2;font-size:0.8rem;">›</span>
-            </div>
-
-            <div style="font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#636366;margin:12px 0 6px;">SLP Records</div>
-            <div class="mock-search-result">
-              <div class="mock-result-avatar" style="background:#7c3aed;border-radius:7px;width:32px;height:32px;font-size:.7rem;">SLP</div>
-              <div class="mock-result-info">
-                <div class="mock-result-name">COMFORT AIR LLC-44821 — 360 Finance</div>
-                <div class="mock-result-meta">Contractor Activated · TX-01612 · Dealer #44821</div>
-              </div>
-              <span style="color:#aeaeb2;font-size:0.8rem;">›</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
     <!-- Footer -->
     <div style="padding:40px 0 20px;text-align:center;color:var(--text4);font-size:0.8rem;border-top:1px solid var(--border);margin-top:20px;">
       AC Reporter User Guide &nbsp;·&nbsp; Microf &nbsp;·&nbsp; May 2026<br/>
