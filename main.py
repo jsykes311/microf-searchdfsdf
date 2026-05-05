@@ -144,12 +144,13 @@ def _register_schedule(s: dict, persist: bool = True):
     hour   = int(s.get("hour", 9))
     minute = int(s.get("minute", 0))
 
+    tz = "America/New_York"
     if freq == "daily":
-        trigger = CronTrigger(hour=hour, minute=minute)
+        trigger = CronTrigger(hour=hour, minute=minute, timezone=tz)
     elif freq == "weekly":
-        trigger = CronTrigger(day_of_week=s.get("day_of_week", "mon"), hour=hour, minute=minute)
+        trigger = CronTrigger(day_of_week=s.get("day_of_week", "mon"), hour=hour, minute=minute, timezone=tz)
     else:  # monthly
-        trigger = CronTrigger(day=int(s.get("day_of_month", 1)), hour=hour, minute=minute)
+        trigger = CronTrigger(day=int(s.get("day_of_month", 1)), hour=hour, minute=minute, timezone=tz)
 
     report_type = s["report_type"]
     recipients  = s["recipients"]
