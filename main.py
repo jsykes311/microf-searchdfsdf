@@ -2093,12 +2093,11 @@ async def activations_report(
         if plat_norm in exclude_set or plat in exclude_set:
             continue
 
-        # Resolve acc_id early so we can fall back to account-level BDR
         rel    = r.get("relationships", {}).get("account", [])
         acc_id = str(rel[0]) if rel else None
 
         slp_bdr = str(fields.get("assigned-bdr", "")).strip()
-        eff_bdr = slp_bdr or _account_to_bdr.get(acc_id or "", "")
+        eff_bdr = slp_bdr
         if bdr and eff_bdr != bdr:
             continue
 
