@@ -3199,6 +3199,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Hide all group-gated cards first, then reveal only those matching the user's group
     document.querySelectorAll('.admin-card[class*="ac-group-"]').forEach(el => el.style.display = 'none');
     document.querySelectorAll(`.ac-group-${group}`).forEach(el => el.style.display = '');
+    // Sales admin also gets all account management cards
+    if (group === 'sales_admin') {
+      document.querySelectorAll('.ac-group-account_management').forEach(el => el.style.display = '');
+    }
 
     if (d.is_apps_user) {
       _isAppsUser = true;
