@@ -394,7 +394,7 @@ function renderTable(rows) {
       <td>${daysBadge(a.days_since_rpa, !!a.last_rpa_date)}</td>
       <td class="lc-date-cell">${lcCell}</td>
       <td class="lc-badge-cell">${lcBadge}</td>
-      <td class="lc-type-cell">${lcTypeCell}</td>
+      <td class="lc-type-cell" style="min-width:130px;white-space:nowrap;">${lcTypeCell}</td>
     </tr>`;
   }).join('');
 
@@ -564,7 +564,7 @@ async function loadLastContacted() {
       const typeCell  = row.querySelector('.lc-type-cell');
       if (dateCell)  dateCell.innerHTML  = lcDate ? esc(lcDate) : '<span class="days-na">—</span>';
       if (badgeCell) badgeCell.innerHTML = daysBadge(lcDays, !!lcDate);
-      if (typeCell)  typeCell.innerHTML  = lcType ? esc(lcType) : '<span class="days-na">—</span>';
+      if (typeCell) { typeCell.style.minWidth = '130px'; typeCell.style.whiteSpace = 'nowrap'; typeCell.innerHTML = lcType ? esc(lcType) : '<span class="days-na">—</span>'; }
     });
     // Update column headers
     const ths = document.querySelectorAll('table thead th');
