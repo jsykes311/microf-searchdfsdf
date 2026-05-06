@@ -669,7 +669,7 @@ async def _build_dealer_id_index() -> None:
         # last-app-date exists only on SLP, not on accounts. last-rpa-date (CF38)
         # is also supplemented here — SLP value wins if more recent.
         try:
-            slp_recs_for_dates = _slp_cache_records if _slp_cache_records else []
+            slp_recs_for_dates = _slp_cache_records if _slp_cache_records else await get_slp_cache()
 
             def _slp_fv(slp_rec, fid):
                 for _f in slp_rec.get("fields", []):
