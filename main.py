@@ -612,8 +612,6 @@ async def _build_dealer_id_index() -> None:
                     acct_to_website[aid]    = val
                 elif cf_id == ADDRESS_CF_ID:
                     acct_to_address[aid]    = val
-                elif cf_id == LAST_RPA_CF_ID:
-                    acct_to_last_rpa[aid]   = val[:10] if val else ""
                 elif cf_id == ACCT_TYPE_CF:
                     acct_to_type[aid]       = val
                 elif cf_id == REGION_CF_ID:
