@@ -87,7 +87,7 @@
   tr.row-none   td { background: #f8f8ff; }
   tr.row-none:hover td { background: #f0f0ff; }
 
-  .acct-name { font-weight: 600; color: #111827; }
+  .acct-name { font-weight: 600; color: #111827; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
   .acct-name a { color: #356ae6; text-decoration: none; }
   .acct-name a:hover { text-decoration: underline; }
 
@@ -394,7 +394,7 @@ function renderTable(rows) {
     const lcBadge    = _lcLoaded ? daysBadge(lcDays, !!lcDate) : '';
     const lcTypeCell = _lcLoaded ? (lcType ? esc(lcType) : '<span class="days-na">—</span>') : '';
     return `<tr class="${cls}" data-id="${a.id}">
-      <td class="acct-name"><a href="${acUrl}" target="_blank">${esc(a.name)}</a></td>
+      <td class="acct-name" title="${esc(a.name)}"><a href="${acUrl}" target="_blank">${esc(a.name)}</a></td>
       <td>${esc(a.owner_name || '—')}</td>
       <td class="tag-region">${esc(a.region || '—')}</td>
       <td class="tag-channel">${esc(a.channel || '—')}</td>
