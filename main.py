@@ -921,6 +921,7 @@ async def _refresh_lc_cache() -> None:
         except Exception:
             pass
 
+    # ── 1. Account Activity custom object ────────────────────────────────────
     try:
         activity_records = await ac_get_all(
             f"customObjects/records/{ACCT_ACTIVITY_SCHEMA_ID}", "records", {}
@@ -929,19 +930,71 @@ async def _refresh_lc_cache() -> None:
             fmap = {f["id"]: (f.get("value") or "") for f in r.get("fields", [])}
             aid  = next(iter(r.get("relationships", {}).get("account", [])), "")
             _update(aid, str(fmap.get("activity-date", ""))[:10])
+        print(f"[lc-cache] account activity: {len(activity_records)} records")
     except Exception as e:
         print(f"[lc-cache] activity fetch error: {e}")
 
+    # ── 2. Account Notes ──────────────────────────────────────────────────────
     try:
         all_notes = await ac_get_all("notes", "notes",
                                      {"reltype": "CustomerAccount", "limit": 100})
+        acct_note_n = 0
         for n in all_notes:
             if (n.get("reltype") or "").lower() != "customeraccount":
                 continue
             aid = str(n.get("rel_id") or n.get("relid") or "")
             _update(aid, n.get("cdate", ""))
+            acct_note_n += 1
+        print(f"[lc-cache] account notes: {acct_note_n} notes")
     except Exception as e:
         print(f"[lc-cache] notes fetch error: {e}")
+
+    # ── 3. Build contact → account map from accountContacts ──────────────────
+    contact_to_acct: dict = {}
+    try:
+        ac_contacts = await ac_get_all("accountContacts", "accountContacts", {"limit": 100})
+        for ac in ac_contacts:
+            cid = str(ac.get("contact") or "")
+            aid = str(ac.get("account") or "")
+            if cid and aid:
+                contact_to_acct[cid] = aid
+        print(f"[lc-cache] contact→account map: {len(contact_to_acct)} contacts")
+    except Exception as e:
+        print(f"[lc-cache] accountContacts fetch error: {e}")
+
+    # ── 4. Contact Notes ──────────────────────────────────────────────────────
+    if contact_to_acct:
+        try:
+            contact_notes = await ac_get_all("notes", "notes",
+                                             {"reltype": "Subscriber", "limit": 100})
+            contact_note_n = 0
+            for n in contact_notes:
+                if (n.get("reltype") or "").lower() != "subscriber":
+                    continue
+                cid = str(n.get("rel_id") or n.get("relid") or "")
+                aid = contact_to_acct.get(cid)
+                if aid:
+                    _update(aid, n.get("cdate", ""))
+                    contact_note_n += 1
+            print(f"[lc-cache] contact notes: {contact_note_n} notes mapped to accounts")
+        except Exception as e:
+            print(f"[lc-cache] contact notes fetch error: {e}")
+
+    # ── 5. Contact email activity (sent/opened) ───────────────────────────────
+    if contact_to_acct:
+        try:
+            email_activity = await ac_get_all("activities", "activities",
+                                              {"acttype": "send_email", "limit": 100})
+            email_n = 0
+            for act in email_activity:
+                cid = str(act.get("contact") or "")
+                aid = contact_to_acct.get(cid)
+                if aid:
+                    _update(aid, (act.get("tstamp") or act.get("cdate") or "")[:10])
+                    email_n += 1
+            print(f"[lc-cache] email activity: {email_n} events mapped to accounts")
+        except Exception as e:
+            print(f"[lc-cache] email activity fetch error (non-fatal): {e}")
 
     if latest:
         _lc_cache    = latest
