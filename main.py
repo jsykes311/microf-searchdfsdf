@@ -980,21 +980,9 @@ async def _refresh_lc_cache() -> None:
         except Exception as e:
             print(f"[lc-cache] contact notes fetch error: {e}")
 
-    # ── 5. Contact email activity (sent/opened) ───────────────────────────────
-    if contact_to_acct:
-        try:
-            email_activity = await ac_get_all("activities", "activities",
-                                              {"acttype": "send_email", "limit": 100})
-            email_n = 0
-            for act in email_activity:
-                cid = str(act.get("contact") or "")
-                aid = contact_to_acct.get(cid)
-                if aid:
-                    _update(aid, (act.get("tstamp") or act.get("cdate") or "")[:10], "Email")
-                    email_n += 1
-            print(f"[lc-cache] email activity: {email_n} events mapped to accounts")
-        except Exception as e:
-            print(f"[lc-cache] email activity fetch error (non-fatal): {e}")
+    # Source 5 (email activity) removed — the /activities endpoint without a
+    # contact filter pages through every AC event ever recorded and can take
+    # 10+ minutes.  Account Activity + Notes already cover AM-initiated contact.
 
     if latest:
         _lc_cache    = latest
