@@ -21,7 +21,7 @@
   }
   .apps-btn:hover { background: rgba(255,255,255,.22); color: #fff; }
 
-  .container { max-width: 1300px; margin: 24px auto; padding: 0 20px; }
+  .container { padding: 20px 24px; }
 
   /* ── Filters ── */
   .filters {
@@ -33,7 +33,7 @@
   .filter-group label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #6b7280; }
   select, input[type=text] {
     padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 6px;
-    font-size: .85rem; font-family: inherit; background: #fff; min-width: 180px;
+    font-size: .85rem; font-family: inherit; background: #fff; min-width: 160px;
     color: #111827;
   }
   select:focus, input[type=text]:focus { outline: none; border-color: #356ae6; }
@@ -65,7 +65,8 @@
   .results-title { font-size: .85rem; font-weight: 700; color: #374151; }
   .results-count { font-size: .8rem; color: #6b7280; }
 
-  table { width: 100%; min-width: 1100px; border-collapse: collapse; font-size: .82rem; }
+  #table-wrap { overflow-x: auto; border-radius: 0 0 10px 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; }
   th {
     background: #f8f9fb; text-align: left; padding: 9px 14px;
     font-size: .7rem; font-weight: 700; color: #6b7280; text-transform: uppercase;
@@ -75,7 +76,7 @@
   th:hover { background: #f0f2f8; color: #356ae6; }
   th.sorted-asc::after  { content: " ↑"; color: #356ae6; }
   th.sorted-desc::after { content: " ↓"; color: #356ae6; }
-  td { padding: 9px 14px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+  td { padding: 9px 14px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; white-space: nowrap; }
   tr:last-child td { border-bottom: none; }
   tr.row-red    td { background: #fff8f8; }
   tr.row-red:hover td { background: #fff0f0; }
@@ -101,6 +102,7 @@
   .days-na    { color: #9ca3af; font-size: .78rem; }
 
   .tag-region { font-size: .72rem; color: #6b7280; }
+  .tag-channel { font-size: .78rem; color: #374151; }
 
   /* ── Empty / loading ── */
   .empty-state, .loading-state {
@@ -131,8 +133,6 @@
     font-size: .72rem; color: #6b7280; padding: 6px 18px 8px;
     border-top: 1px solid #f3f4f6; display: flex; align-items: center; gap: 6px;
   }
-  .lc-type-cell { min-width: 130px; }
-  #table-wrap { overflow-x: auto; }
 </style>
 </head>
 <body>
@@ -164,6 +164,12 @@
       <label>Assigned BDR</label>
       <select id="f-bdr">
         <option value="">— All BDRs —</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Channel</label>
+      <select id="f-channel">
+        <option value="">— All Channels —</option>
       </select>
     </div>
     <div class="filter-group">
@@ -226,28 +232,30 @@
       <span class="results-count" id="result-count"></span>
     </div>
     <div id="table-wrap">
-      <div class="empty-state">Select an AM and click Load to view activity.</div>
+      <div class="empty-state">Select filters and click Load to view activity.</div>
     </div>
   </div>
 
 </div>
 
 <script>
-let _data = [];             // current filtered + sorted rows
-let _sortCol  = null;
-let _sortAsc  = true;
-let _lastContacted = {};     // account_id → "YYYY-MM-DD"
-let _lastContactedType = {}; // account_id → "Note"|"Email"|"Activity"
-let _lcLoaded = false;       // whether the async fetch has completed
+let _data = [];
+let _sortCol = null;
+let _sortAsc = true;
+let _lastContacted = {};
+let _lastContactedType = {};
+let _lcLoaded = false;
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function load() {
   const ownerEl   = document.getElementById('f-owner');
   const typeEl    = document.getElementById('f-type');
   const bdrEl     = document.getElementById('f-bdr');
+  const channelEl = document.getElementById('f-channel');
   const owner     = ownerEl.value;
   const acctType  = typeEl.value;
   const bdr       = bdrEl.value;
+  const channel   = channelEl.value;
 
   const wrap  = document.getElementById('table-wrap');
   const stats = document.getElementById('stats');
@@ -258,12 +266,12 @@ async function load() {
   if (owner)    params.set('owner', owner);
   if (acctType) params.set('acct_type', acctType);
   if (bdr)      params.set('bdr', bdr);
+  if (channel)  params.set('channel', channel);
 
   try {
     const res  = await fetch(`/api/reports/am-activity?${params}`);
     const data = await res.json();
 
-    // Populate AM dropdown from first load if empty
     if (ownerEl.options.length <= 1 && data.managers?.length) {
       data.managers.forEach(m => {
         const o = document.createElement('option');
@@ -271,12 +279,18 @@ async function load() {
         ownerEl.appendChild(o);
       });
     }
-    // Populate BDR dropdown from first load if empty
     if (bdrEl.options.length <= 1 && data.bdrs?.length) {
       data.bdrs.forEach(b => {
         const o = document.createElement('option');
         o.value = b; o.textContent = b;
         bdrEl.appendChild(o);
+      });
+    }
+    if (channelEl.options.length <= 1 && data.channels?.length) {
+      data.channels.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        channelEl.appendChild(o);
       });
     }
 
@@ -289,17 +303,15 @@ async function load() {
 
 // ── Filter + Render ───────────────────────────────────────────────────────────
 function applyFiltersAndRender() {
-  const regionFilter = document.getElementById('f-region').value.toLowerCase();
-  const sortKey      = document.getElementById('f-sort').value;
+  const regionFilter  = document.getElementById('f-region').value.toLowerCase();
+  const sortKey       = document.getElementById('f-sort').value;
 
   let rows = _data.filter(a => {
     if (regionFilter && (a.region || '').toLowerCase() !== regionFilter) return false;
     return true;
   });
 
-  // Sort
   rows = sortRows(rows, sortKey);
-
   renderStats(rows);
   renderTable(rows);
 }
@@ -311,7 +323,7 @@ function sortRows(rows, key) {
       case 'stale': {
         const da = a.days_since_app ?? BIG, db = b.days_since_app ?? BIG;
         const ra = a.days_since_rpa ?? BIG, rb = b.days_since_rpa ?? BIG;
-        return Math.max(db, rb) - Math.max(da, ra);  // higher days first
+        return Math.max(db, rb) - Math.max(da, ra);
       }
       case 'app_asc':  return (a.days_since_app ?? BIG)  - (b.days_since_app ?? BIG);
       case 'app_desc': return (b.days_since_app ?? -1)   - (a.days_since_app ?? -1);
@@ -324,15 +336,13 @@ function sortRows(rows, key) {
 }
 
 function renderStats(rows) {
-  const stats = document.getElementById('stats');
-  stats.style.display = 'flex';
-
-  const noApp      = rows.filter(r => !r.last_app_date).length;
-  const noRpa      = rows.filter(r => !r.last_rpa_date).length;
-  const staleApp   = rows.filter(r => r.days_since_app != null && r.days_since_app >= 90).length;
-  const staleRpa   = rows.filter(r => r.days_since_rpa != null && r.days_since_rpa >= 90).length;
-  const withApp    = rows.filter(r => r.days_since_app != null);
-  const avgApp     = withApp.length
+  document.getElementById('stats').style.display = 'flex';
+  const noApp    = rows.filter(r => !r.last_app_date).length;
+  const noRpa    = rows.filter(r => !r.last_rpa_date).length;
+  const staleApp = rows.filter(r => r.days_since_app != null && r.days_since_app >= 90).length;
+  const staleRpa = rows.filter(r => r.days_since_rpa != null && r.days_since_rpa >= 90).length;
+  const withApp  = rows.filter(r => r.days_since_app != null);
+  const avgApp   = withApp.length
     ? Math.round(withApp.reduce((s, r) => s + r.days_since_app, 0) / withApp.length) : null;
 
   document.getElementById('s-total').textContent    = rows.length;
@@ -346,7 +356,7 @@ function renderStats(rows) {
 
 function rowClass(a) {
   const maxDays = Math.max(a.days_since_app ?? -1, a.days_since_rpa ?? -1);
-  if (maxDays < 0)  return 'row-none';  // no dates at all
+  if (maxDays < 0)   return 'row-none';
   if (maxDays >= 90) return 'row-red';
   if (maxDays >= 30) return 'row-amber';
   return 'row-green';
@@ -361,7 +371,7 @@ function daysBadge(days, hasDate) {
 }
 
 function renderTable(rows) {
-  const wrap  = document.getElementById('table-wrap');
+  const wrap = document.getElementById('table-wrap');
   if (!rows.length) {
     wrap.innerHTML = `<div class="empty-state">No accounts match the current filters.</div>`;
     return;
@@ -373,20 +383,21 @@ function renderTable(rows) {
     : `<th>Last Contacted <span class="lc-spin"></span></th><th></th><th></th>`;
 
   const tbody = rows.map(a => {
-    const cls   = rowClass(a);
-    const acUrl = `https://microf.activehosted.com/app/accounts/${a.id}`;
-    const lcDate   = _lastContacted[a.id] || '';
-    const lcDays   = lcDate ? daysBetween(lcDate, today) : null;
-    const lcType   = _lastContactedType[a.id] || '';
-    const lcCell   = _lcLoaded
+    const cls    = rowClass(a);
+    const acUrl  = `https://microf.activehosted.com/app/accounts/${a.id}`;
+    const lcDate = _lastContacted[a.id] || '';
+    const lcDays = lcDate ? daysBetween(lcDate, today) : null;
+    const lcType = _lastContactedType[a.id] || '';
+    const lcCell  = _lcLoaded
       ? (lcDate ? esc(lcDate) : '<span class="days-na">—</span>')
       : `<span class="lc-loading"><span class="lc-spin"></span></span>`;
-    const lcBadge  = _lcLoaded ? daysBadge(lcDays, !!lcDate) : '';
+    const lcBadge    = _lcLoaded ? daysBadge(lcDays, !!lcDate) : '';
     const lcTypeCell = _lcLoaded ? (lcType ? esc(lcType) : '<span class="days-na">—</span>') : '';
     return `<tr class="${cls}" data-id="${a.id}">
       <td class="acct-name"><a href="${acUrl}" target="_blank">${esc(a.name)}</a></td>
       <td>${esc(a.owner_name || '—')}</td>
       <td class="tag-region">${esc(a.region || '—')}</td>
+      <td class="tag-channel">${esc(a.channel || '—')}</td>
       <td>${esc(a.dealer_id || '—')}</td>
       <td>${a.last_app_date ? esc(a.last_app_date) : '<span class="days-na">—</span>'}</td>
       <td>${daysBadge(a.days_since_app, !!a.last_app_date)}</td>
@@ -394,7 +405,7 @@ function renderTable(rows) {
       <td>${daysBadge(a.days_since_rpa, !!a.last_rpa_date)}</td>
       <td class="lc-date-cell">${lcCell}</td>
       <td class="lc-badge-cell">${lcBadge}</td>
-      <td class="lc-type-cell" style="min-width:130px;white-space:nowrap;">${lcTypeCell}</td>
+      <td class="lc-type-cell">${lcTypeCell}</td>
     </tr>`;
   }).join('');
 
@@ -403,13 +414,13 @@ function renderTable(rows) {
       <th onclick="colSort('name')">Account</th>
       <th onclick="colSort('owner')">AM</th>
       <th onclick="colSort('region')">Region</th>
+      <th onclick="colSort('channel')">Channel</th>
       <th onclick="colSort('dealer_id')">Dealer ID</th>
       <th onclick="colSort('last_app_date')">Last App Date</th>
       <th onclick="colSort('days_since_app')">Days Since App</th>
       <th onclick="colSort('last_rpa_date')">Last RPA Date</th>
       <th onclick="colSort('days_since_rpa')">Days Since RPA</th>
       ${lcHeader}
-
     </tr></thead>
     <tbody>${tbody}</tbody>
   </table>
@@ -417,25 +428,19 @@ function renderTable(rows) {
     ${_lcLoaded ? `✓ Last Contacted loaded from Account Activity + Notes` : `<span class="lc-spin"></span> Loading last contacted dates…`}
   </div>`;
 
-  // Re-apply sort indicator
   if (_sortCol) {
     const ths = wrap.querySelectorAll('th');
-    const colMap = ['name','owner','region','dealer_id','last_app_date','days_since_app','last_rpa_date','days_since_rpa'];
+    const colMap = ['name','owner','region','channel','dealer_id','last_app_date','days_since_app','last_rpa_date','days_since_rpa'];
     const idx = colMap.indexOf(_sortCol);
-    if (idx >= 0) {
-      ths[idx].classList.add(_sortAsc ? 'sorted-asc' : 'sorted-desc');
-    }
+    if (idx >= 0) ths[idx].classList.add(_sortAsc ? 'sorted-asc' : 'sorted-desc');
   }
 }
 
 // ── Column sort ───────────────────────────────────────────────────────────────
 function colSort(col) {
-  if (_sortCol === col) {
-    _sortAsc = !_sortAsc;
-  } else {
-    _sortCol = col;
-    _sortAsc = true;
-  }
+  _sortCol = col;
+  _sortAsc = (_sortCol === col) ? !_sortAsc : true;
+  _sortCol = col;
 
   const BIG = 99999;
   const sorted = [..._data].sort((a, b) => {
@@ -444,20 +449,20 @@ function colSort(col) {
       case 'name':           va = (a.name||'').toLowerCase();      vb = (b.name||'').toLowerCase();      break;
       case 'owner':          va = (a.owner_name||'').toLowerCase(); vb = (b.owner_name||'').toLowerCase(); break;
       case 'region':         va = (a.region||'').toLowerCase();    vb = (b.region||'').toLowerCase();    break;
+      case 'channel':        va = (a.channel||'').toLowerCase();   vb = (b.channel||'').toLowerCase();   break;
       case 'dealer_id':      va = (a.dealer_id||'');               vb = (b.dealer_id||'');               break;
       case 'last_app_date':  va = a.last_app_date||'0000-00-00';   vb = b.last_app_date||'0000-00-00';   break;
       case 'days_since_app': va = a.days_since_app ?? BIG;         vb = b.days_since_app ?? BIG;         break;
-      case 'last_rpa_date':    va = a.last_rpa_date||'0000-00-00';        vb = b.last_rpa_date||'0000-00-00';        break;
-      case 'days_since_rpa':   va = a.days_since_rpa ?? BIG;              vb = b.days_since_rpa ?? BIG;              break;
+      case 'last_rpa_date':  va = a.last_rpa_date||'0000-00-00';   vb = b.last_rpa_date||'0000-00-00';   break;
+      case 'days_since_rpa': va = a.days_since_rpa ?? BIG;         vb = b.days_since_rpa ?? BIG;         break;
       case 'last_contacted': {
-        const ta = _lastContacted[a.id]||'0000-00-00', tb = _lastContacted[b.id]||'0000-00-00';
-        va = ta; vb = tb; break;
+        va = _lastContacted[a.id]||'0000-00-00';
+        vb = _lastContacted[b.id]||'0000-00-00'; break;
       }
       case 'days_since_lc': {
         const today = new Date().toISOString().slice(0,10);
         va = _lastContacted[a.id] ? daysBetween(_lastContacted[a.id], today) ?? BIG : BIG;
-        vb = _lastContacted[b.id] ? daysBetween(_lastContacted[b.id], today) ?? BIG : BIG;
-        break;
+        vb = _lastContacted[b.id] ? daysBetween(_lastContacted[b.id], today) ?? BIG : BIG; break;
       }
       default: return 0;
     }
@@ -466,12 +471,8 @@ function colSort(col) {
     return 0;
   });
 
-  // Re-apply region filter
   const regionFilter = document.getElementById('f-region').value.toLowerCase();
-  const filtered = regionFilter
-    ? sorted.filter(a => (a.region||'').toLowerCase() === regionFilter)
-    : sorted;
-
+  const filtered = regionFilter ? sorted.filter(a => (a.region||'').toLowerCase() === regionFilter) : sorted;
   renderTable(filtered);
   renderStats(filtered);
 }
@@ -480,12 +481,10 @@ function colSort(col) {
 function exportCsv() {
   if (!_data.length) { alert('Load data first.'); return; }
   const regionFilter = document.getElementById('f-region').value.toLowerCase();
-  const rows = regionFilter
-    ? _data.filter(a => (a.region||'').toLowerCase() === regionFilter)
-    : _data;
+  const rows = regionFilter ? _data.filter(a => (a.region||'').toLowerCase() === regionFilter) : _data;
 
   const today   = new Date().toISOString().slice(0,10);
-  const headers = ['Account','Account ID','AM','Region','Dealer ID','Last App Date','Days Since App','Last RPA Date','Days Since RPA','Last Contacted','Days Since Contacted','Contact Type'];
+  const headers = ['Account','Account ID','AM','Region','Channel','Dealer ID','Last App Date','Days Since App','Last RPA Date','Days Since RPA','Last Contacted','Days Since Contacted','Contact Type'];
   const lines   = [headers.join(',')];
   rows.forEach(a => {
     const lcDate = _lastContacted[a.id] || '';
@@ -496,6 +495,7 @@ function exportCsv() {
       a.id,
       `"${(a.owner_name||'').replace(/"/g,'""')}"`,
       `"${(a.region||'').replace(/"/g,'""')}"`,
+      `"${(a.channel||'').replace(/"/g,'""')}"`,
       a.dealer_id||'',
       a.last_app_date||'',
       a.days_since_app ?? '',
@@ -535,12 +535,19 @@ function exportCsv() {
         bdrSel.appendChild(o);
       });
     }
+    const chSel = document.getElementById('f-channel');
+    if (data.channels?.length && chSel.options.length <= 1) {
+      data.channels.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        chSel.appendChild(o);
+      });
+    }
     _data = data.accounts || [];
     applyFiltersAndRender();
   } catch(e) {
     console.warn('AM Activity init failed:', e);
   }
-  // Load last-contacted in background — table already visible, cells update in place
   loadLastContacted();
 })();
 
@@ -552,7 +559,6 @@ async function loadLastContacted() {
     _lastContacted     = data.last_contacted || {};
     _lastContactedType = data.last_contacted_type || {};
     _lcLoaded = true;
-    // Patch existing table cells without full re-render
     const today = new Date().toISOString().slice(0,10);
     document.querySelectorAll('tr[data-id]').forEach(row => {
       const aid    = row.dataset.id;
@@ -564,19 +570,16 @@ async function loadLastContacted() {
       const typeCell  = row.querySelector('.lc-type-cell');
       if (dateCell)  dateCell.innerHTML  = lcDate ? esc(lcDate) : '<span class="days-na">—</span>';
       if (badgeCell) badgeCell.innerHTML = daysBadge(lcDays, !!lcDate);
-      if (typeCell) { typeCell.style.minWidth = '130px'; typeCell.style.whiteSpace = 'nowrap'; typeCell.innerHTML = lcType ? esc(lcType) : '<span class="days-na">—</span>'; }
+      if (typeCell)  typeCell.innerHTML  = lcType ? esc(lcType) : '<span class="days-na">—</span>';
     });
-    // Update column headers
     const ths = document.querySelectorAll('table thead th');
-    if (ths.length >= 9) {
-      ths[8].innerHTML = 'Last Contacted';
-      ths[8].onclick   = () => colSort('last_contacted');
-      if (ths[9]) { ths[9].innerHTML = 'Days Since'; ths[9].onclick = () => colSort('days_since_lc'); }
-      if (ths[10]) { ths[10].innerHTML = 'Contact Type'; ths[10].onclick = () => colSort('contact_type'); }
+    if (ths.length >= 10) {
+      ths[9].innerHTML  = 'Last Contacted'; ths[9].onclick  = () => colSort('last_contacted');
+      ths[10].innerHTML = 'Days Since';     ths[10].onclick = () => colSort('days_since_lc');
+      ths[11].innerHTML = 'Contact Type';   ths[11].onclick = () => colSort('contact_type');
     }
-    // Update status bar
     const ns = document.getElementById('notes-status');
-    if (ns) ns.innerHTML = '✓ Last Contacted loaded from Account Activity, Notes &amp; Email';
+    if (ns) ns.innerHTML = '✓ Last Contacted loaded from Account Activity &amp; Notes';
   } catch(e) {
     const ns = document.getElementById('notes-status');
     if (ns) ns.innerHTML = `⚠ Could not load last contacted: ${esc(e.message)}`;
@@ -585,16 +588,13 @@ async function loadLastContacted() {
 
 // ── Util ──────────────────────────────────────────────────────────────────────
 function daysBetween(a, b) {
-  try {
-    return Math.round((new Date(b) - new Date(a)) / 86400000);
-  } catch { return null; }
+  try { return Math.round((new Date(b) - new Date(a)) / 86400000); }
+  catch { return null; }
 }
-
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// Re-render on filter change (region + sort are client-side)
 document.getElementById('f-region').addEventListener('change', applyFiltersAndRender);
 document.getElementById('f-sort').addEventListener('change', applyFiltersAndRender);
 </script>

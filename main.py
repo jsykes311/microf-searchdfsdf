@@ -7471,6 +7471,7 @@ async def am_activity_report(
     owner: Optional[str] = Query(None, description="Filter by AC owner user ID"),
     acct_type: Optional[str] = Query("Contractor", description="Filter by Account Type; empty = all"),
     bdr: Optional[str] = Query(None, description="Filter by Assigned BDR name"),
+    channel: Optional[str] = Query(None, description="Filter by channel/platform"),
     user=Depends(require_auth),
 ):
     """
@@ -7526,6 +7527,10 @@ async def am_activity_report(
         if bdr and assigned_bdr.lower() != bdr.lower():
             continue
 
+        acct_channel = _account_to_platform.get(aid, "")
+        if channel and acct_channel.lower() != channel.lower():
+            continue
+
         last_app   = clean_date(_account_to_last_app.get(aid, ""))
         last_rpa   = clean_date(_account_to_last_rpa.get(aid, ""))
         dealer_id  = _account_to_dealer.get(aid, "")
@@ -7543,6 +7548,7 @@ async def am_activity_report(
             "bdr":           assigned_bdr,
             "dealer_id":     dealer_id,
             "region":        region,
+            "channel":       acct_channel,
             "last_app_date": last_app,
             "days_since_app": days_app,
             "last_rpa_date": last_rpa,
@@ -7573,11 +7579,14 @@ async def am_activity_report(
         key=lambda x: x["name"]
     )
 
+    channels = sorted({a["channel"] for a in accounts if a["channel"]})
+
     return {
         "accounts":  accounts,
         "total":     len(accounts),
         "managers":  managers,
         "bdrs":      sorted(bdrs),
+        "channels":  channels,
     }
 
 
