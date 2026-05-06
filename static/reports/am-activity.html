@@ -234,8 +234,9 @@
 let _data = [];             // current filtered + sorted rows
 let _sortCol  = null;
 let _sortAsc  = true;
-let _lastContacted = {};   // account_id → "YYYY-MM-DD"
-let _lcLoaded = false;     // whether the async fetch has completed
+let _lastContacted = {};     // account_id → "YYYY-MM-DD"
+let _lastContactedType = {}; // account_id → "Note"|"Email"|"Activity"
+let _lcLoaded = false;       // whether the async fetch has completed
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function load() {
@@ -366,18 +367,20 @@ function renderTable(rows) {
 
   const today    = new Date().toISOString().slice(0,10);
   const lcHeader = _lcLoaded
-    ? `<th onclick="colSort('last_contacted')">Last Contacted</th><th onclick="colSort('days_since_lc')">Days Since</th>`
-    : `<th>Last Contacted <span class="lc-spin"></span></th><th></th>`;
+    ? `<th onclick="colSort('last_contacted')">Last Contacted</th><th onclick="colSort('days_since_lc')">Days Since</th><th onclick="colSort('contact_type')">Contact Type</th>`
+    : `<th>Last Contacted <span class="lc-spin"></span></th><th></th><th></th>`;
 
   const tbody = rows.map(a => {
     const cls   = rowClass(a);
     const acUrl = `https://microf.activehosted.com/app/accounts/${a.id}`;
     const lcDate   = _lastContacted[a.id] || '';
     const lcDays   = lcDate ? daysBetween(lcDate, today) : null;
+    const lcType   = _lastContactedType[a.id] || '';
     const lcCell   = _lcLoaded
       ? (lcDate ? esc(lcDate) : '<span class="days-na">—</span>')
       : `<span class="lc-loading"><span class="lc-spin"></span></span>`;
     const lcBadge  = _lcLoaded ? daysBadge(lcDays, !!lcDate) : '';
+    const lcTypeCell = _lcLoaded ? (lcType ? esc(lcType) : '<span class="days-na">—</span>') : '';
     return `<tr class="${cls}" data-id="${a.id}">
       <td class="acct-name"><a href="${acUrl}" target="_blank">${esc(a.name)}</a></td>
       <td>${esc(a.owner_name || '—')}</td>
@@ -389,6 +392,7 @@ function renderTable(rows) {
       <td>${daysBadge(a.days_since_rpa, !!a.last_rpa_date)}</td>
       <td class="lc-date-cell">${lcCell}</td>
       <td class="lc-badge-cell">${lcBadge}</td>
+      <td class="lc-type-cell">${lcTypeCell}</td>
     </tr>`;
   }).join('');
 
@@ -403,6 +407,7 @@ function renderTable(rows) {
       <th onclick="colSort('last_rpa_date')">Last RPA Date</th>
       <th onclick="colSort('days_since_rpa')">Days Since RPA</th>
       ${lcHeader}
+
     </tr></thead>
     <tbody>${tbody}</tbody>
   </table>
@@ -478,10 +483,11 @@ function exportCsv() {
     : _data;
 
   const today   = new Date().toISOString().slice(0,10);
-  const headers = ['Account','Account ID','AM','Region','Dealer ID','Last App Date','Days Since App','Last RPA Date','Days Since RPA','Last Contacted','Days Since Contacted'];
+  const headers = ['Account','Account ID','AM','Region','Dealer ID','Last App Date','Days Since App','Last RPA Date','Days Since RPA','Last Contacted','Days Since Contacted','Contact Type'];
   const lines   = [headers.join(',')];
   rows.forEach(a => {
     const lcDate = _lastContacted[a.id] || '';
+    const lcType = _lastContactedType[a.id] || '';
     const lcDays = lcDate ? daysBetween(lcDate, today) : '';
     lines.push([
       `"${(a.name||'').replace(/"/g,'""')}"`,
@@ -495,6 +501,7 @@ function exportCsv() {
       a.days_since_rpa ?? '',
       lcDate,
       lcDays ?? '',
+      lcType,
     ].join(','));
   });
 
@@ -540,29 +547,34 @@ async function loadLastContacted() {
   try {
     const res  = await fetch('/api/reports/am-activity/last-contacted');
     const data = await res.json();
-    _lastContacted = data.last_contacted || {};
+    _lastContacted     = data.last_contacted || {};
+    _lastContactedType = data.last_contacted_type || {};
     _lcLoaded = true;
     // Patch existing table cells without full re-render
     const today = new Date().toISOString().slice(0,10);
     document.querySelectorAll('tr[data-id]').forEach(row => {
       const aid    = row.dataset.id;
       const lcDate = _lastContacted[aid] || '';
+      const lcType = _lastContactedType[aid] || '';
       const lcDays = lcDate ? daysBetween(lcDate, today) : null;
       const dateCell  = row.querySelector('.lc-date-cell');
       const badgeCell = row.querySelector('.lc-badge-cell');
+      const typeCell  = row.querySelector('.lc-type-cell');
       if (dateCell)  dateCell.innerHTML  = lcDate ? esc(lcDate) : '<span class="days-na">—</span>';
       if (badgeCell) badgeCell.innerHTML = daysBadge(lcDays, !!lcDate);
+      if (typeCell)  typeCell.innerHTML  = lcType ? esc(lcType) : '<span class="days-na">—</span>';
     });
-    // Update column header
+    // Update column headers
     const ths = document.querySelectorAll('table thead th');
     if (ths.length >= 9) {
       ths[8].innerHTML = 'Last Contacted';
       ths[8].onclick   = () => colSort('last_contacted');
       if (ths[9]) { ths[9].innerHTML = 'Days Since'; ths[9].onclick = () => colSort('days_since_lc'); }
+      if (ths[10]) { ths[10].innerHTML = 'Contact Type'; ths[10].onclick = () => colSort('contact_type'); }
     }
     // Update status bar
     const ns = document.getElementById('notes-status');
-    if (ns) ns.innerHTML = '✓ Last Contacted loaded from Account Activity + Notes';
+    if (ns) ns.innerHTML = '✓ Last Contacted loaded from Account Activity, Notes &amp; Email';
   } catch(e) {
     const ns = document.getElementById('notes-status');
     if (ns) ns.innerHTML = `⚠ Could not load last contacted: ${esc(e.message)}`;

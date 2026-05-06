@@ -906,9 +906,9 @@ _LC_CACHE_TTL = 1800     # 30 minutes
 async def _refresh_lc_cache() -> None:
     global _lc_cache, _lc_cache_ts
     today = date.today()
-    latest: dict = {}
+    latest: dict = {}   # aid → {"date": "YYYY-MM-DD", "type": str}
 
-    def _update(aid: str, raw_date: str) -> None:
+    def _update(aid: str, raw_date: str, contact_type: str) -> None:
         if not aid or not raw_date:
             return
         try:
@@ -916,8 +916,8 @@ async def _refresh_lc_cache() -> None:
             if d.year < 2000 or d > today:
                 return
             ds = d.isoformat()
-            if aid not in latest or ds > latest[aid]:
-                latest[aid] = ds
+            if aid not in latest or ds > latest[aid]["date"]:
+                latest[aid] = {"date": ds, "type": contact_type}
         except Exception:
             pass
 
@@ -929,7 +929,7 @@ async def _refresh_lc_cache() -> None:
         for r in activity_records:
             fmap = {f["id"]: (f.get("value") or "") for f in r.get("fields", [])}
             aid  = next(iter(r.get("relationships", {}).get("account", [])), "")
-            _update(aid, str(fmap.get("activity-date", ""))[:10])
+            _update(aid, str(fmap.get("activity-date", ""))[:10], "Activity")
         print(f"[lc-cache] account activity: {len(activity_records)} records")
     except Exception as e:
         print(f"[lc-cache] activity fetch error: {e}")
@@ -943,7 +943,7 @@ async def _refresh_lc_cache() -> None:
             if (n.get("reltype") or "").lower() != "customeraccount":
                 continue
             aid = str(n.get("rel_id") or n.get("relid") or "")
-            _update(aid, n.get("cdate", ""))
+            _update(aid, n.get("cdate", ""), "Note")
             acct_note_n += 1
         print(f"[lc-cache] account notes: {acct_note_n} notes")
     except Exception as e:
@@ -974,7 +974,7 @@ async def _refresh_lc_cache() -> None:
                 cid = str(n.get("rel_id") or n.get("relid") or "")
                 aid = contact_to_acct.get(cid)
                 if aid:
-                    _update(aid, n.get("cdate", ""))
+                    _update(aid, n.get("cdate", ""), "Note")
                     contact_note_n += 1
             print(f"[lc-cache] contact notes: {contact_note_n} notes mapped to accounts")
         except Exception as e:
@@ -990,7 +990,7 @@ async def _refresh_lc_cache() -> None:
                 cid = str(act.get("contact") or "")
                 aid = contact_to_acct.get(cid)
                 if aid:
-                    _update(aid, (act.get("tstamp") or act.get("cdate") or "")[:10])
+                    _update(aid, (act.get("tstamp") or act.get("cdate") or "")[:10], "Email")
                     email_n += 1
             print(f"[lc-cache] email activity: {email_n} events mapped to accounts")
         except Exception as e:
@@ -7601,10 +7601,12 @@ async def am_last_contacted(user=Depends(require_auth)):
     (e.g. first minute after deploy) triggers a background build and returns empty.
     """
     if not _lc_cache:
-        # Kick off a background build if not already running
         asyncio.create_task(_refresh_lc_cache())
     age = int(_time.time() - _lc_cache_ts) if _lc_cache_ts else None
-    return {"last_contacted": _lc_cache, "cache_age_seconds": age}
+    # Flatten to {aid: date} and {aid: type} for frontend
+    dates = {aid: v["date"] for aid, v in _lc_cache.items()}
+    types = {aid: v["type"] for aid, v in _lc_cache.items()}
+    return {"last_contacted": dates, "last_contacted_type": types, "cache_age_seconds": age}
 
 
 # ── Verdata Active Report ─────────────────────────────────────────────────────
