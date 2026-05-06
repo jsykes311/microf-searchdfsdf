@@ -88,11 +88,12 @@ _RECIPIENTS = [r.strip() for r in os.getenv("REPORT_RECIPIENTS", "").split(",") 
 
 # ── Admin / Scheduler ─────────────────────────────────────────────────────
 _ADMIN_EMAILS       = {e.strip().lower() for e in os.getenv("ADMIN_EMAIL",       "jsykes@microf.com,bsanders@microf.com").split(",") if e.strip()}
+_SALES_ADMIN_EMAILS = {e.strip().lower() for e in os.getenv("SALES_ADMIN_EMAIL", "parnold@microf.com").split(",") if e.strip()}
 _CONTRACTOR_SUPPORT_EMAILS = {e.strip().lower() for e in os.getenv("CONTRACTOR_SUPPORT_EMAIL", "elove@microf.com,cristian.perez@microf.com,rlugo@microf.com").split(",") if e.strip()}
 _ONBOARDING_EMAILS  = {e.strip().lower() for e in os.getenv("ONBOARDING_EMAIL",  "tbillings@microf.com,cristian.perez@microf.com,elove@microf.com").split(",") if e.strip()}
 _ACCT_MGMT_EMAILS   = {e.strip().lower() for e in os.getenv("ACCT_MGMT_EMAIL",   "jtiplady@microf.com,ajones@microf.com,lfutrell@microf.com,abergen@microf.com,wneely@microf.com,charden@microf.com,zolbrys@microf.com,rolbrys@microf.com,ctwiggs@microf.com").split(",") if e.strip()}
 # All groups that can access the Apps tab
-_APPS_EMAILS        = _ADMIN_EMAILS | _CONTRACTOR_SUPPORT_EMAILS | _ONBOARDING_EMAILS | _ACCT_MGMT_EMAILS | {e.strip().lower() for e in os.getenv("APPS_EMAIL", "").split(",") if e.strip()}
+_APPS_EMAILS        = _ADMIN_EMAILS | _CONTRACTOR_SUPPORT_EMAILS | _ONBOARDING_EMAILS | _ACCT_MGMT_EMAILS | _SALES_ADMIN_EMAILS | {e.strip().lower() for e in os.getenv("APPS_EMAIL", "").split(",") if e.strip()}
 _SCHEDULES_FILE = os.getenv("SCHEDULES_FILE", os.path.join(os.path.dirname(__file__), "schedules.json"))
 _scheduler      = AsyncIOScheduler()
 _schedules: dict = {}   # job_id → schedule dict
@@ -3973,6 +3974,8 @@ async def get_me(request: _Request):
         group = "contractor_support"
     elif em in _ONBOARDING_EMAILS:
         group = "onboarding"
+    elif em in _SALES_ADMIN_EMAILS:
+        group = "sales_admin"
     elif em in _ACCT_MGMT_EMAILS:
         group = "account_management"
     else:
