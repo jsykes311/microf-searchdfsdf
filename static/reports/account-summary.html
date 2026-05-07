@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account Summary — Microf Reports</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f3f4f6; color: #111827; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+  /* ── Top bar ── */
+  .topbar { background: #1e3a5f; color: #fff; padding: 0 20px; height: 48px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+  .topbar h1 { font-size: 1rem; font-weight: 600; letter-spacing: .02em; }
+  .topbar .count { font-size: .82rem; color: #93c5fd; margin-left: 4px; }
+  .topbar .spacer { flex: 1; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 6px; font-size: .82rem; font-weight: 500; cursor: pointer; border: none; transition: background .15s; }
+  .btn-outline { background: transparent; border: 1px solid rgba(255,255,255,.4); color: #fff; }
+  .btn-outline:hover { background: rgba(255,255,255,.1); }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+
+  /* ── Filter bar ── */
+  .filters { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex-shrink: 0; }
+  .filters select, .filters input { padding: 5px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: .82rem; color: #374151; background: #fff; height: 32px; }
+  .filters select:focus, .filters input:focus { outline: none; border-color: #2563eb; }
+  .filter-label { font-size: .75rem; color: #6b7280; font-weight: 500; }
+  .clear-btn { font-size: .78rem; color: #6b7280; cursor: pointer; padding: 4px 8px; border-radius: 4px; border: none; background: none; }
+  .clear-btn:hover { color: #111; background: #f3f4f6; }
+
+  /* ── Table wrapper ── */
+  .table-wrap { flex: 1; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  thead { position: sticky; top: 0; z-index: 10; background: #1e3a5f; color: #fff; }
+  thead th { padding: 9px 10px; text-align: left; white-space: nowrap; font-weight: 500; cursor: pointer; user-select: none; font-size: .78rem; letter-spacing: .02em; }
+  thead th:hover { background: #1d4472; }
+  thead th .sort-icon { opacity: .4; margin-left: 3px; font-size: .7rem; }
+  thead th.sorted-asc .sort-icon::after  { content: '▲'; opacity: 1; }
+  thead th.sorted-desc .sort-icon::after { content: '▼'; opacity: 1; }
+  thead th:not(.sorted-asc):not(.sorted-desc) .sort-icon::after { content: '⇅'; }
+
+  tbody tr { border-bottom: 1px solid #e5e7eb; }
+  tbody tr:hover { background: #eff6ff; }
+  tbody td { padding: 7px 10px; white-space: nowrap; color: #374151; vertical-align: middle; }
+  tbody td.acct-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  tbody td.acct-name a { color: #1d4ed8; text-decoration: none; font-weight: 500; }
+  tbody td.acct-name a:hover { text-decoration: underline; }
+
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: .72rem; font-weight: 500; }
+  .badge-active   { background: #d1fae5; color: #065f46; }
+  .badge-inactive { background: #fee2e2; color: #991b1b; }
+  .badge-yes      { background: #dbeafe; color: #1e40af; }
+  .badge-channel  { background: #f3f4f6; color: #374151; font-size: .72rem; }
+
+  .empty { text-align: center; padding: 60px 20px; color: #9ca3af; font-size: .9rem; }
+  .loading { text-align: center; padding: 60px 20px; color: #6b7280; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Status bar ── */
+  .statusbar { background: #fff; border-top: 1px solid #e5e7eb; padding: 6px 16px; font-size: .78rem; color: #6b7280; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Account Summary</h1>
+  <span class="count" id="row-count"></span>
+  <div class="spacer"></div>
+  <button class="btn btn-outline" onclick="downloadCSV()">⬇ Export CSV</button>
+</div>
+
+<div class="filters">
+  <span class="filter-label">Filter:</span>
+  <select id="f-type" onchange="load()">
+    <option value="">All Types</option>
+    <option value="Contractor" selected>Contractor</option>
+    <option value="Distributor">Distributor</option>
+    <option value="Strategic Partner">Strategic Partner</option>
+    <option value="Other">Other</option>
+  </select>
+  <select id="f-status" onchange="load()"><option value="">All Statuses</option></select>
+  <select id="f-owner"  onchange="load()"><option value="">All Owners</option></select>
+  <select id="f-region" onchange="load()"><option value="">All Regions</option></select>
+  <select id="f-bdr"    onchange="load()"><option value="">All BDRs</option></select>
+  <select id="f-channel" onchange="load()"><option value="">All Channels</option></select>
+  <input  id="f-search" type="search" placeholder="Search name…" oninput="filterLocal()" style="width:180px">
+  <button class="clear-btn" onclick="clearFilters()">✕ Clear</button>
+</div>
+
+<div class="table-wrap">
+  <table id="main-table">
+    <thead>
+      <tr>
+        <th onclick="colSort('name')">Account Name <span class="sort-icon"></span></th>
+        <th onclick="colSort('owner_name')">Account Owner <span class="sort-icon"></span></th>
+        <th onclick="colSort('status')">Account Status <span class="sort-icon"></span></th>
+        <th onclick="colSort('bdr')">Assigned BDR <span class="sort-icon"></span></th>
+        <th onclick="colSort('dba_name')">DBA Name <span class="sort-icon"></span></th>
+        <th onclick="colSort('doing_business_states')">Doing Business In <span class="sort-icon"></span></th>
+        <th onclick="colSort('dealer_id')">Parent Dealer ID <span class="sort-icon"></span></th>
+        <th onclick="colSort('activation_date')">Partner Activation Date <span class="sort-icon"></span></th>
+        <th onclick="colSort('contractor_reactivation')">Contractor Reactivation <span class="sort-icon"></span></th>
+        <th onclick="colSort('region')">Sales Region <span class="sort-icon"></span></th>
+        <th onclick="colSort('reactivation_date')">Reactivation Date <span class="sort-icon"></span></th>
+        <th onclick="colSort('legal_name')">Account Name (Legal Business Name) <span class="sort-icon"></span></th>
+        <th onclick="colSort('revenue')">Annual Revenue <span class="sort-icon"></span></th>
+        <th onclick="colSort('strategic_partners')">Strategic Partners <span class="sort-icon"></span></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div class="statusbar" id="statusbar">Loading…</div>
+
+<script>
+const AC_BASE = 'https://microf.activehosted.com/app/accounts/';
+let allRows = [], sortCol = 'name', sortDir = 1;
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function params() {
+  const p = new URLSearchParams();
+  const t = document.getElementById('f-type').value;
+  const s = document.getElementById('f-status').value;
+  const o = document.getElementById('f-owner').value;
+  const r = document.getElementById('f-region').value;
+  const b = document.getElementById('f-bdr').value;
+  const c = document.getElementById('f-channel').value;
+  if (t) p.set('acct_type', t);
+  if (s) p.set('status', s);
+  if (o) p.set('owner', o);
+  if (r) p.set('region', r);
+  if (b) p.set('bdr', b);
+  if (c) p.set('channel', c);
+  return p;
+}
+
+async function load() {
+  document.getElementById('tbody').innerHTML = '<tr><td colspan="14" class="loading"><span class="spinner"></span>Loading…</td></tr>';
+  document.getElementById('statusbar').textContent = 'Loading…';
+  try {
+    const res = await fetch('/api/reports/account-summary?' + params());
+    const data = await res.json();
+    allRows = data.rows || [];
+
+    // Populate dropdowns (first load)
+    const populate = (id, items, labelField) => {
+      const sel = document.getElementById(id);
+      if (sel.options.length <= 1 && items?.length) {
+        items.forEach(v => {
+          const o = document.createElement('option');
+          o.value = o.textContent = v;
+          sel.appendChild(o);
+        });
+      }
+    };
+    populate('f-status',  data.statuses);
+    populate('f-region',  data.regions);
+    populate('f-bdr',     data.bdrs);
+    populate('f-channel', data.channels);
+    populate('f-owner',   data.owners);
+
+    sortDir = 1; sortCol = 'name';
+    renderTable(allRows);
+    document.getElementById('statusbar').textContent =
+      `${allRows.length.toLocaleString()} accounts`;
+  } catch(e) {
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="14" class="empty">Error loading data: ${e.message}</td></tr>`;
+  }
+}
+
+function filterLocal() {
+  const q = document.getElementById('f-search').value.toLowerCase();
+  const filtered = q ? allRows.filter(r => r.name.toLowerCase().includes(q) ||
+    (r.dealer_id||'').includes(q) || (r.dba_name||'').toLowerCase().includes(q)) : allRows;
+  renderTable(filtered);
+}
+
+const REVENUE_ORDER = ['Less than 100K','100K - 500K','501K - 1M','1M - 5M','6M - 10M','More than 10M'];
+
+function colSort(col) {
+  if (sortCol === col) sortDir = -sortDir;
+  else { sortCol = col; sortDir = 1; }
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.remove('sorted-asc','sorted-desc');
+  });
+  const colMap = ['name','owner_name','status','bdr','dba_name','doing_business_states',
+                  'dealer_id','activation_date','contractor_reactivation','region',
+                  'reactivation_date','legal_name','revenue','strategic_partners'];
+  const idx = colMap.indexOf(col);
+  if (idx >= 0) {
+    const th = document.querySelectorAll('thead th')[idx];
+    th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+  }
+  const q = document.getElementById('f-search').value.toLowerCase();
+  const rows = q ? allRows.filter(r => r.name.toLowerCase().includes(q)) : [...allRows];
+  rows.sort((a, b) => {
+    let va = a[col] || '', vb = b[col] || '';
+    if (col === 'dealer_id') { va = parseInt(va)||0; vb = parseInt(vb)||0; return sortDir*(va-vb); }
+    if (col === 'revenue') {
+      va = REVENUE_ORDER.indexOf(va); vb = REVENUE_ORDER.indexOf(vb);
+      if (va < 0) va = -1; if (vb < 0) vb = -1;
+      return sortDir*(va-vb);
+    }
+    return sortDir * va.toString().toLowerCase().localeCompare(vb.toString().toLowerCase());
+  });
+  renderTable(rows);
+}
+
+function renderTable(rows) {
+  const tbody = document.getElementById('tbody');
+  document.getElementById('row-count').textContent = `(${rows.length.toLocaleString()})`;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="14" class="empty">No accounts match the current filters.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const statusBadge = r.status
+      ? `<span class="badge ${r.status.toLowerCase().includes('active') && !r.status.toLowerCase().includes('not') ? 'badge-active' : 'badge-inactive'}">${esc(r.status)}</span>`
+      : '';
+    const reactBadge = r.contractor_reactivation === 'Yes'
+      ? `<span class="badge badge-yes">Yes</span>` : '';
+    const actDate = r.activation_date ? r.activation_date.substring(0,10) : '';
+    return `<tr>
+      <td class="acct-name" title="${esc(r.name)}">
+        <a href="${AC_BASE}${esc(r.id)}" target="_blank">${esc(r.name)}</a>
+      </td>
+      <td>${esc(r.owner_name)}</td>
+      <td>${statusBadge}</td>
+      <td>${esc(r.bdr)}</td>
+      <td>${esc(r.dba_name)}</td>
+      <td>${esc(r.doing_business_states)}</td>
+      <td>${esc(r.dealer_id)}</td>
+      <td>${esc(actDate)}</td>
+      <td>${reactBadge}</td>
+      <td>${esc(r.region)}</td>
+      <td>${esc(r.reactivation_date)}</td>
+      <td>${esc(r.legal_name)}</td>
+      <td>${esc(r.revenue)}</td>
+      <td>${esc(r.strategic_partners)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function clearFilters() {
+  ['f-type','f-status','f-owner','f-region','f-bdr','f-channel'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-search').value = '';
+  load();
+}
+
+function downloadCSV() {
+  window.location = '/api/reports/account-summary/csv?' + params();
+}
+
+load();
+</script>
+</body>
+</html>

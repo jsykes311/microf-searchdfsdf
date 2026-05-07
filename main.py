@@ -452,6 +452,13 @@ _account_to_dba: dict = {}      # account_id (str) → DBA Name (customfield 15)
 _account_to_status: dict = {}   # account_id (str) → Account Status (customfield 19)
 _account_to_tax_id: dict = {}   # account_id (str) → Vendor Tax-ID (customfield 40)
 _account_to_group: dict = {}    # account_id (str) → Group Name (CF146)
+_account_to_legal_name: dict = {}       # account_id (str) → Account Name (Legal Business Name) CF36
+_account_to_revenue: dict = {}          # account_id (str) → Annual Revenue dropdown value CF9
+_account_to_strategic_partners: dict = {} # account_id (str) → Strategic Partners multiselect CF132
+_account_to_contractor_reactivation: dict = {} # account_id (str) → "Yes" or "" CF32
+_account_to_reactivation_date: dict = {}       # account_id (str) → Reactivation Date CF28
+_account_to_activation_date: dict = {}         # account_id (str) → contractor-activated-date from SLP
+_account_to_slp_states: dict = {}              # account_id (str) → doing-business-in-states from SLP
 _user_id_to_name: dict = {}     # AC user_id (str) → "First Last"
 _program_to_accounts: dict = {} # lowercase(dealer_program) → set of account_ids
 _dealer_index_ts:  float = 0.0
@@ -555,6 +562,11 @@ async def _build_dealer_id_index() -> None:
     ACCT_STATUS_CF = 19    # customFieldId for "Account Status"
     VENDOR_TAX_CF  = 40    # customFieldId for "Vendor Tax-ID"
     GROUP_NAME_CF  = 146   # customFieldId for "Group Name"
+    LEGAL_NAME_CF  = 36    # customFieldId for "Account Name (Legal Business Name)"
+    REVENUE_CF     = 9     # customFieldId for "Annual Revenue" (dropdown)
+    STRAT_PART_CF  = 132   # customFieldId for "Strategic Partners" (multiselect)
+    CONTRACTOR_REACT_CF = 32  # customFieldId for "Contractor Reactivation" (checkbox)
+    REACT_DATE_CF  = 28    # customFieldId for "Reactivation Date"
     CF_PAGE        = 1000  # 1000 records/page → ~190 pages instead of ~1900
     CONCURRENCY    = 8     # 8 concurrent requests → index builds in ~10s instead of ~5min
 
@@ -584,6 +596,11 @@ async def _build_dealer_id_index() -> None:
         acct_to_status:     dict = {}
         acct_to_tax_id:     dict = {}
         acct_to_group:      dict = {}
+        acct_to_legal_name: dict = {}
+        acct_to_revenue:    dict = {}
+        acct_to_strat_part: dict = {}
+        acct_to_react:      dict = {}
+        acct_to_react_date: dict = {}
 
         def _ingest(items: list) -> None:
             for item in items:
@@ -625,6 +642,16 @@ async def _build_dealer_id_index() -> None:
                     acct_to_tax_id[aid]     = val
                 elif cf_id == GROUP_NAME_CF:
                     acct_to_group[aid]      = val
+                elif cf_id == LEGAL_NAME_CF:
+                    acct_to_legal_name[aid] = val
+                elif cf_id == REVENUE_CF:
+                    acct_to_revenue[aid]    = val
+                elif cf_id == STRAT_PART_CF:
+                    acct_to_strat_part[aid] = val
+                elif cf_id == CONTRACTOR_REACT_CF:
+                    acct_to_react[aid]      = val   # "Yes" if checked
+                elif cf_id == REACT_DATE_CF:
+                    acct_to_react_date[aid] = val
 
         _ingest(first_page.get("accountCustomFieldData", []))
 
@@ -737,6 +764,11 @@ async def _build_dealer_id_index() -> None:
         _account_to_status.clear();      _account_to_status.update(acct_to_status)
         _account_to_tax_id.clear();      _account_to_tax_id.update(acct_to_tax_id)
         _account_to_group.clear();       _account_to_group.update(acct_to_group)
+        _account_to_legal_name.clear();       _account_to_legal_name.update(acct_to_legal_name)
+        _account_to_revenue.clear();          _account_to_revenue.update(acct_to_revenue)
+        _account_to_strategic_partners.clear(); _account_to_strategic_partners.update(acct_to_strat_part)
+        _account_to_contractor_reactivation.clear(); _account_to_contractor_reactivation.update(acct_to_react)
+        _account_to_reactivation_date.clear();       _account_to_reactivation_date.update(acct_to_react_date)
 
         # Reverse index: lowercase dealer program → set of account IDs
         new_prog: dict = {}
@@ -1040,6 +1072,14 @@ def _update_app_rpa_from_slp_cache() -> None:
                     if val:
                         _account_to_slp_dealer[aid] = val  # SLP dealer-id (authoritative)
                         did_n += 1
+                    continue
+                if fid == "contractor-activated-date":
+                    if val:
+                        _account_to_activation_date[aid] = val[:10]
+                    continue
+                if fid == "doing-business-in-states":
+                    if val:
+                        _account_to_slp_states[aid] = val
                     continue
                 v10 = val[:10] if len(val) >= 10 else ""
                 if not v10:
@@ -7471,6 +7511,122 @@ async def webhook_deal_created(request: _Request, background_tasks: BackgroundTa
 @app.get("/reports/slp-health")
 async def slp_health_page(user=Depends(require_auth)):
     return FileResponse("static/reports/slp-health.html")
+
+
+# ── Account Summary Report ────────────────────────────────────────────────────
+
+@app.get("/reports/account-summary")
+async def account_summary_page(user=Depends(require_auth)):
+    return FileResponse("static/reports/account-summary.html")
+
+@app.get("/api/reports/account-summary")
+async def account_summary_report(
+    owner:      Optional[str] = Query(None),
+    acct_type:  Optional[str] = Query(None),
+    status:     Optional[str] = Query(None),
+    region:     Optional[str] = Query(None),
+    bdr:        Optional[str] = Query(None),
+    channel:    Optional[str] = Query(None),
+    user=Depends(require_auth),
+):
+    """SLP-based account summary report."""
+    rows = []
+    for aid, name in _account_to_name.items():
+        typ = _account_to_type.get(aid, "")
+        if acct_type and typ.lower() != acct_type.lower():
+            continue
+        acct_status = _account_to_status.get(aid, "")
+        if status and acct_status.lower() != status.lower():
+            continue
+        owner_id = _account_to_owner.get(aid, "")
+        if owner and owner_id != owner:
+            continue
+        assigned_bdr = _account_to_bdr.get(aid, "")
+        if bdr and assigned_bdr.lower() != bdr.lower():
+            continue
+        acct_channel = _account_to_platform.get(aid, "")
+        if channel and acct_channel.lower() != channel.lower():
+            continue
+
+        dealer_id       = _account_to_slp_dealer.get(aid, "") or _account_to_dealer.get(aid, "")
+        activation_date = _account_to_activation_date.get(aid, "")
+        slp_states      = _account_to_slp_states.get(aid, "")
+        react           = _account_to_contractor_reactivation.get(aid, "")
+        react_date      = _account_to_reactivation_date.get(aid, "")
+        dba             = _account_to_dba.get(aid, "")
+        legal_name      = _account_to_legal_name.get(aid, "")
+        revenue         = _account_to_revenue.get(aid, "")
+        strat_partners  = _account_to_strategic_partners.get(aid, "")
+        region_val      = _account_to_region.get(aid, "")
+        if region and region_val.lower() != region.lower():
+            continue
+
+        rows.append({
+            "id":                   aid,
+            "name":                 name,
+            "owner_name":           _user_id_to_name.get(owner_id, owner_id or ""),
+            "status":               acct_status,
+            "bdr":                  assigned_bdr,
+            "dba_name":             dba,
+            "doing_business_states":slp_states,
+            "dealer_id":            dealer_id,
+            "activation_date":      activation_date,
+            "contractor_reactivation": "Yes" if react else "",
+            "reactivation_date":    react_date[:10] if react_date else "",
+            "region":               region_val,
+            "legal_name":           legal_name,
+            "revenue":              revenue,
+            "strategic_partners":   strat_partners,
+            "channel":              acct_channel,
+        })
+
+    rows.sort(key=lambda r: r["name"].lower())
+
+    # Build filter option lists
+    owners   = sorted({r["owner_name"] for r in rows if r["owner_name"]})
+    statuses = sorted({r["status"]     for r in rows if r["status"]})
+    regions  = sorted({r["region"]     for r in rows if r["region"]})
+    bdrs     = sorted({r["bdr"]        for r in rows if r["bdr"]})
+    channels = sorted({r["channel"]    for r in rows if r["channel"]})
+
+    return {"rows": rows, "owners": owners, "statuses": statuses,
+            "regions": regions, "bdrs": bdrs, "channels": channels,
+            "total": len(rows)}
+
+
+@app.get("/api/reports/account-summary/csv")
+async def account_summary_csv(
+    owner:      Optional[str] = Query(None),
+    acct_type:  Optional[str] = Query(None),
+    status:     Optional[str] = Query(None),
+    region:     Optional[str] = Query(None),
+    bdr:        Optional[str] = Query(None),
+    channel:    Optional[str] = Query(None),
+    user=Depends(require_auth),
+):
+    data = await account_summary_report(owner=owner, acct_type=acct_type,
+                                        status=status, region=region,
+                                        bdr=bdr, channel=channel, user=user)
+    import io, csv as _csv
+    buf = io.StringIO()
+    w = _csv.writer(buf)
+    w.writerow(["Account Name","Account Owner","Account Status","Assigned BDR",
+                "DBA Name","Doing Business In States","Parent Dealer ID",
+                "Partner Activation Date","Contractor Reactivation","Sales Region",
+                "Reactivation Date","Account Name (Legal Business Name)",
+                "Annual Revenue","Strategic Partners","Channel"])
+    for r in data["rows"]:
+        w.writerow([r["name"], r["owner_name"], r["status"], r["bdr"],
+                    r["dba_name"], r["doing_business_states"], r["dealer_id"],
+                    r["activation_date"], r["contractor_reactivation"], r["region"],
+                    r["reactivation_date"], r["legal_name"], r["revenue"],
+                    r["strategic_partners"], r["channel"]])
+    from fastapi.responses import StreamingResponse
+    buf.seek(0)
+    fn = f"account_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(iter([buf.getvalue()]),
+                             media_type="text/csv",
+                             headers={"Content-Disposition": f"attachment; filename={fn}"})
 
 
 # ── AM Activity Dashboard ─────────────────────────────────────────────────────
