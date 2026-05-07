@@ -1017,16 +1017,24 @@ async def _slp_cache_loop() -> None:
             await asyncio.sleep(30)
 
 def _update_app_rpa_from_slp_cache() -> None:
-    """Update _account_to_last_app and _account_to_last_rpa from the current SLP cache.
-    Called after every SLP cache refresh so the indexes stay current without
-    waiting for the 24h dealer index rebuild."""
-    app_n = rpa_n = 0
+    """Update _account_to_last_app, _account_to_last_rpa, and _account_to_platform
+    from the current SLP cache.  Called after every SLP cache refresh so the indexes
+    stay current without waiting for the 24h dealer index rebuild.
+
+    NOTE: channel is updated here (not just in _build_dealer_id_index) so that
+    it survives cases where Phase-4 of the dealer index fails silently at startup."""
+    app_n = rpa_n = ch_n = 0
     for slp_rec in _slp_cache_records:
         for acct_id in slp_rec.get("relationships", {}).get("account", []):
             aid = str(acct_id)
             for _f in slp_rec.get("fields", []):
                 fid = _f.get("id", "")
                 val = (_f.get("value") or "").strip()
+                if fid == "channel":
+                    if val:
+                        _account_to_platform[aid] = val   # always overwrite — latest SLP wins
+                        ch_n += 1
+                    continue
                 v10 = val[:10] if len(val) >= 10 else ""
                 if not v10:
                     continue
@@ -1038,7 +1046,7 @@ def _update_app_rpa_from_slp_cache() -> None:
                     if not _account_to_last_rpa.get(aid) or v10 > _account_to_last_rpa[aid]:
                         _account_to_last_rpa[aid] = v10
                         rpa_n += 1
-    print(f"[slp-cache] app/rpa index updated — {app_n} app dates, {rpa_n} rpa dates")
+    print(f"[slp-cache] index updated — {app_n} app dates, {rpa_n} rpa dates, {ch_n} channels")
 
 def get_cached(cache_type: str, key: str):
     if key in CACHE[cache_type]:
