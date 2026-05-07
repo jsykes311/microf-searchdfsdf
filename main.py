@@ -431,7 +431,8 @@ _cf_meta_ts: float   = 0.0
 
 # ── Dealer ID ↔ Account index (built at startup, refreshed hourly) ───────────
 _dealer_id_index:  dict  = {}   # dealer_id (str) → {"id": account_id, "name": account_name}
-_account_to_dealer: dict = {}   # account_id (str) → dealer_id (str)
+_account_to_dealer: dict = {}   # account_id (str) → dealer_id (str) from account CF18
+_account_to_slp_dealer: dict = {} # account_id (str) → dealer_id (str) from SLP record (authoritative for SLP reports)
 _account_to_platform: dict = {} # account_id (str) → platform/Dealer Program (customfield 29)
 _account_to_bdr: dict = {}      # account_id (str) → Assigned BDR (customfield 119)
 _account_to_name: dict = {}     # account_id (str) → account name
@@ -1023,7 +1024,7 @@ def _update_app_rpa_from_slp_cache() -> None:
 
     NOTE: channel is updated here (not just in _build_dealer_id_index) so that
     it survives cases where Phase-4 of the dealer index fails silently at startup."""
-    app_n = rpa_n = ch_n = 0
+    app_n = rpa_n = ch_n = did_n = 0
     for slp_rec in _slp_cache_records:
         for acct_id in slp_rec.get("relationships", {}).get("account", []):
             aid = str(acct_id)
@@ -1034,6 +1035,11 @@ def _update_app_rpa_from_slp_cache() -> None:
                     if val:
                         _account_to_platform[aid] = val   # always overwrite — latest SLP wins
                         ch_n += 1
+                    continue
+                if fid == "dealer-id":
+                    if val:
+                        _account_to_slp_dealer[aid] = val  # SLP dealer-id (authoritative)
+                        did_n += 1
                     continue
                 v10 = val[:10] if len(val) >= 10 else ""
                 if not v10:
@@ -1046,7 +1052,7 @@ def _update_app_rpa_from_slp_cache() -> None:
                     if not _account_to_last_rpa.get(aid) or v10 > _account_to_last_rpa[aid]:
                         _account_to_last_rpa[aid] = v10
                         rpa_n += 1
-    print(f"[slp-cache] index updated — {app_n} app dates, {rpa_n} rpa dates, {ch_n} channels")
+    print(f"[slp-cache] index updated — {app_n} app dates, {rpa_n} rpa dates, {ch_n} channels, {did_n} dealer IDs")
 
 def get_cached(cache_type: str, key: str):
     if key in CACHE[cache_type]:
@@ -7541,7 +7547,8 @@ async def am_activity_report(
 
         last_app   = clean_date(_account_to_last_app.get(aid, ""))
         last_rpa   = clean_date(_account_to_last_rpa.get(aid, ""))
-        dealer_id  = _account_to_dealer.get(aid, "")
+        # Use SLP dealer-id (authoritative) — falls back to account CF18 if SLP has none
+        dealer_id  = _account_to_slp_dealer.get(aid, "") or _account_to_dealer.get(aid, "")
         region     = _account_to_region.get(aid, "")
         owner_name = _user_id_to_name.get(owner_id, owner_id or "—")
 
